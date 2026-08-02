@@ -1,0 +1,61 @@
+# Agent Constitution — <Project Name>
+
+<One paragraph: what this system is, who uses it, the one or two domain
+constraints that shape everything (compliance regime, multi-tenancy, …).>
+
+## Working Principles
+
+1. **Think before coding.** State assumptions; surface ambiguity before implementing.
+2. **Simplicity first.** Minimum code that solves the problem; no speculative abstractions.
+3. **Surgical changes.** Touch only what the task requires; match existing style.
+4. **Goal-driven execution.** Every task becomes a verifiable goal; write the test first.
+5. **Plan-first for non-trivial work.** Questions → Research → Structure → Plan → Implement; only blocking questions pause the work.
+
+Full text + litmus tests: [`.claude/rules/working-principles.md`](.claude/rules/working-principles.md)
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | <language, framework, versions> |
+| Frontend | <framework, versions> |
+| Database | <engine, migration tool> |
+| Infrastructure | <IaC, containers/orchestration, CI/CD> |
+| Auth | <identity provider, AuthN/AuthZ model> |
+| Messaging / Integration | <message bus, event streams, external APIs> |
+| Testing | <frameworks per layer> |
+
+## Commands
+
+```bash
+make dev          # start local stack
+make test         # full test suite
+make lint         # lint + enforcement checks (must pass before any PR)
+```
+
+## Non-Negotiable Rules
+
+| Rule | Detail |
+|---|---|
+| **Git** | Never commit to main. Branch prefixes: feat/, fix/, chore/, docs/ |
+| **TDD** | Failing test first. Bug fixes need a regression test before the fix. |
+| **Security** | <e.g. every endpoint authenticated by default; secrets only via env/secret manager> — see rule file |
+| **Documentation** | Docs are part of the change — updated in the same PR — see [`documentation.md`](.claude/rules/documentation.md) |
+| **Versioning** | SemVer 2.0.0; new functionality = MINOR, never PATCH; changelog bullet in the same PR — see [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) |
+| **<Domain rule 1>** | <one-line imperative> — see [`.claude/rules/<domain>.md`](.claude/rules/<domain>.md) |
+| **<Domain rule 2>** | <one-line imperative> — see rule file |
+
+## Detailed Rules
+
+- [`working-principles.md`](.claude/rules/working-principles.md) — process directives
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR-lite format, comment hygiene
+- [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
+- [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
+- [`security.md`](.claude/rules/security.md) — AuthN/AuthZ defaults, secret handling, data classification
+- <add one line per rule file as they accumulate — infrastructure, messaging/integration, and other cross-cutting concerns earn one early>
+
+## Debugging
+
+Before investigating any bug, search `docs/DEBUGGING-KNOWLEDGE-BASE.md` (ISSUE-001+).
+After resolving a non-obvious bug (>30 min), add a new ISSUE-NNN entry:
+Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug Shortcut.

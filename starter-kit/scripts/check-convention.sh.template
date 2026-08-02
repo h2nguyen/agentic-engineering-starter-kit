@@ -1,0 +1,24 @@
+#!/bin/bash
+# Enforces: <rule name> — see .claude/rules/<domain>.md § <section>
+# Escape: commit-message marker [<marker>] anywhere on the branch.
+#
+# Design rules (guide § 3.8):
+#   - Fail with a file:line trail AND a pointer to the rule being enforced.
+#   - Wire into the umbrella lint target that CI runs on every PR.
+#   - Escape hatches are greppable commit-message markers, never silent.
+set -euo pipefail
+
+violations=$(grep -rn "<forbidden-pattern>" <path-scope> || true)
+
+if [ -n "$violations" ]; then
+  # honor the sanctioned-exception marker if this repo defines one
+  if git log origin/main..HEAD --format=%B 2>/dev/null | grep -q "\[<marker>\]"; then
+    echo "WARN: <rule> violated but [<marker>] present — allowing."
+    exit 0
+  fi
+  echo "FAIL: <rule name> violated:"
+  echo "$violations"
+  echo "Fix per .claude/rules/<domain>.md § <section>, or add [<marker>] to a commit message if sanctioned."
+  exit 1
+fi
+echo "OK: <rule name>"
