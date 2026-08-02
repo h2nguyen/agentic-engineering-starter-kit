@@ -1,0 +1,31 @@
+#!/bin/bash
+# SessionStart hook — make sure every agent session has a working toolchain.
+#
+# Why this exists: agent harnesses spawn NON-INTERACTIVE shells that skip
+# /etc/profile and ~/.bashrc, so PATH/toolchain setup from login shells is
+# absent. This hook runs once per session and persists env vars via
+# $CLAUDE_ENV_FILE so every subsequent tool call sees them.
+#
+# Design rules:
+#   - Idempotent: each step no-ops when already satisfied.
+#   - Degrading: a blocked download warns and continues; the session still
+#     starts (docs/config work doesn't need the full toolchain).
+set -uo pipefail
+
+# 1. Verify/install the pinned toolchain versions your build needs
+#    e.g. probe for the JDK/Node/Python version your build files pin,
+#    install to a canonical path only if absent.
+
+# 2. Install dependencies if the lockfile changed (no-op otherwise)
+#    e.g. npm ci / pip install -r requirements.txt
+
+# 3. Start local daemons your tests need (database, docker, ...)
+#    e.g. if ! docker info >/dev/null 2>&1; then <start docker>; fi
+
+# 4. Persist env vars for subsequent tool calls
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  echo "export PATH=$PATH" >> "$CLAUDE_ENV_FILE"
+  # echo "export JAVA_HOME=..." >> "$CLAUDE_ENV_FILE"
+fi
+
+echo "session-start: toolchain ready"

@@ -1,0 +1,32 @@
+# AI Workspace Changelog
+
+Audit history for this repo's AI/agent configuration (constitution, rules,
+skills, agents, commands, hooks, settings). Maintained by the
+`ai-engineering-workspace-audit` skill — one entry per run, newest first.
+This file is the record that stops future audits from re-litigating settled
+decisions: the "deliberately NOT changed" list is as load-bearing as the
+changes themselves.
+
+Entry format — copy per run:
+
+## <YYYY-MM-DD> — <quick|full> audit
+
+**Mode:** <quick|full>. **Baseline:** `<branch@short-sha>`. **Branch:** `<working branch>`.
+
+### Headline result
+
+<One or two sentences: the most important outcome, with numbers where possible
+(e.g. always-loaded lines before → after).>
+
+### Changes applied
+
+| # | Commit | Change | Ladder rung | Ledger items |
+|---|---|---|---|---|
+
+### Deliberately NOT changed (with reasons)
+
+- <artifact / finding> — <why it was left alone>
+
+### Follow-ups
+
+- <anything outside audit scope that needs a ticket or a later run>
