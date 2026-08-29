@@ -127,6 +127,7 @@ Autonomy is bounded by review gates that keep humans in control of anything hard
 | **Enforcement script** | A CI-wired check that mechanically enforces a convention | Every PR | `scripts/check-*.sh` + lint target |
 | **Knowledge base** | Append-only log of diagnosed bugs in a fixed format | Searched on demand | `docs/…/DEBUGGING-KNOWLEDGE-BASE.*` |
 | **Workspace changelog** | Audit history of the AI configuration itself | On demand | `.claude/WORKSPACE_CHANGELOG.md` |
+| **Registry fragment** | One entry of a shared append-only registry, as its own file — the authored source a generator assembles (§3.11) | Authored per entry | `changelog.d/`, `<artifact>.d/` |
 
 Locations are shown in Claude Code's conventions; §3.10 maps each artifact to other agentic tools, and every artifact's *content* is tool-neutral.
 
@@ -222,9 +223,16 @@ your-repo/
 │   ├── hooks/
 │   │   └── session-start.sh         # optional environment bootstrap
 │   └── WORKSPACE_CHANGELOG.md       # audit history of this configuration
+├── registries.json                  # declares the shared append-only registries (§3.11)
+├── .gitattributes                   # merge behaviour for those registries (§3.11)
+├── CHANGELOG.md                     # generated from changelog.d/
+├── changelog.d/                     # one file per changelog bullet
+│   └── <category>/<date>-<slug>.md  #   added / changed / … / security
 ├── docs/
-│   └── DEBUGGING-KNOWLEDGE-BASE.md  # ISSUE-NNN entries
+│   ├── DEBUGGING-KNOWLEDGE-BASE.md  # generated from the fragment directory
+│   └── DEBUGGING-KNOWLEDGE-BASE.d/  # one file per entry — the authored source
 └── scripts/
+    ├── registry_tool.py             # fragment generator + identifier gate
     └── check-<convention>.sh        # CI-wired enforcement checks
 ```
 
@@ -549,26 +557,15 @@ echo "OK: <rule name>"
 
 ### 3.9 Debugging knowledge base
 
-One append-only file, fixed entry format, numbered IDs. The format matters more than the storage medium (Markdown, AsciiDoc, wiki — anything greppable). Two design rules upgrade it from a log into a **substrate**:
+A fixed entry format with stable identifiers, read as one file and *written* as one file per entry (§3.11 — one shared file that every branch appends to conflicts on every concurrent pair, and hands two branches the same number without either noticing). The format matters more than the storage medium (Markdown, AsciiDoc, wiki — anything greppable). Two design rules upgrade it from a log into a **substrate**:
 
 - **Stable IDs + typed links.** Entry IDs are never reused, and entries cross-reference other artifacts with typed tokens (`ISSUE-NNN`, `ADR-NNN`, `RULE:<slug>`, `SKILL:<slug>`, `SCRIPT:<slug>`, `DOC:<slug>`) on an optional `Related:` line. This is what makes the KB graph-ready (§5.6) at near-zero extra writing cost.
-- **Shape is enforced.** The starter kit ships `scripts/check-kb-shape.sh` — runnable as-is, no adaptation — validating heading shape, ID uniqueness, the six required fields, and link syntax. Wire it into the lint target; it doubles as the project's first working enforcement check on day one.
+- **Shape is enforced.** The starter kit ships `scripts/check-kb-shape.sh` — runnable as-is, no adaptation — validating heading shape, identifier uniqueness, the six required fields, and link syntax. It is already chained into the installed lint target, and doubles as the project's first working enforcement check on day one. Note what it asserts *first*: that identifiers match an exact shape. `ISSUE-7`, `ISSUE-07` and `ISSUE-007` are one identifier to a reader and three to a check that only compares numbers, so a width variant walks straight past a uniqueness test — the shape assertion has to precede the uniqueness assertion or the uniqueness assertion buys nothing.
 
-**Template** (starter kit: `docs/DEBUGGING-KNOWLEDGE-BASE.md`)
+**Template** — one fragment per entry (starter kit: `docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md`). The filename carries the identifier and nothing else does, so two branches cannot claim the same one; `make registry-generate` assembles the fragments into the readable file, and `registry_tool.py new` creates them so the name always matches the grammar the check enforces.
 
 ```markdown
-# Debugging Knowledge Base
-
-Search here BEFORE investigating any bug. Add an entry AFTER resolving any
-non-obvious bug (>30 min to diagnose). Entries are append-only.
-
-Graph-ready conventions: entry IDs are stable and never reused; cross-reference
-other artifacts with typed links on the optional `**Related:**` line —
-`ISSUE-NNN`, `ADR-NNN`, `RULE:<slug>`, `SKILL:<slug>`, `SCRIPT:<slug>`,
-`DOC:<slug>`, comma-separated. `scripts/check-kb-shape.sh` validates shape and
-link syntax.
-
-## ISSUE-001: <Short symptom-style title>
+# <Short symptom-style title>
 
 **Symptom:** What the developer/agent observes.
 
@@ -614,6 +611,60 @@ The starter kit's **`bootstrap.sh`** encodes this mapping: it detects which tool
 
 Two layers are 100 % portable regardless of tool — the enforcement scripts and the knowledge base. Build those first if you're unsure which agent tooling you'll standardize on; they also pay off for the humans on the team.
 
+### 3.11 Shared append-only registries
+
+The knowledge base (§3.9), the changelog, and the decision-record index are three instances of one shape, and it is the shape that breaks first under agentic engineering. A file belongs to it when all three hold:
+
+1. many pull requests **append** to it,
+2. at a **fixed anchor** — the end of the file, or a heading that is always there, and
+3. under an **allocated identifier** — the next free number.
+
+Translation bundles, message-code catalogues and entity registries qualify too. Design for the class rather than for the files you can name today.
+
+**Why it belongs in a guide about agents rather than in a git tutorial.** Contention scales with parallelism, not with repository size. One person opening one pull request a week meets this once a month and calls it an annoyance. Five agents opening five pull requests in an afternoon meet it constantly, and it becomes the dominant source of merge friction — the characteristic failure mode of this way of working, arriving exactly when the workflow starts paying off.
+
+**The constraint that ranks every option:**
+
+> A merge conflict costs thirty seconds. **A duplicate identifier is permanent, because the identifier is a citation target.**
+
+Rank proposals against that sentence, not against how irritating the conflict is. Two failure modes live here and only one of them is loud. A conflict announces itself and someone fixes it. A duplicate identifier — two branches both taking the next free number — merges **cleanly**, fails no test, and is discovered months later when both are already cited from rule files, decision records, source comments and test names. So is a silently dropped bullet: nobody notices a number that was never there.
+
+**Three tiers, in the order you should reach for them:**
+
+| Tier | Mechanism | Property | Verdict |
+|---|---|---|---|
+| **Eliminate** | one file per entry + a generator; identifiers derived from the filename | the conflict and the collision **cannot occur** | the real fix |
+| **Automate** | `merge=union` + a gate that can still see the damage | the conflict resolves unattended; corruption is caught downstream | correct stopgap |
+| **Delegate** | an agent resolves conflicts mid-merge | non-deterministic, unauditable, fires at the worst moment | escalation only |
+
+The third tier deserves its demotion for a specific reason. An agent resolving two colliding entries **cannot safely renumber either of them**: the citations that would break live in files the conflict resolution never opens, and nothing checks that a cited identifier still resolves. Deterministic allocation beats intelligent repair — which is the general lesson, not a claim about any particular agent's competence. Anything that must come out the same way every time belongs in a tool.
+
+**What the starter kit ships**, working on a fresh clone with no `git config` in it:
+
+| Component | What it does |
+|---|---|
+| `.gitattributes` | `merge=union` on the generated artifacts, with both hazards documented inline |
+| fragment directories | `<artifact>.d/` and `changelog.d/<category>/` — one file per entry, named so two branches cannot collide |
+| `registry_tool.py` | creates fragments, assembles them deterministically, promotes a release, gates identifiers |
+| drift check | regenerate, diff against the committed artifact, fail on difference |
+| identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
+| `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
+| coverage check | proves every check in that target actually runs in CI |
+| two skills | authoring the entry; triaging a conflict — deliberately separate |
+
+**Identifier schemes.** Both ship; the choice is declared in `registries.json`. `slug` (`ISSUE-2026-08-29-cache-warms-before-config`) is the default: the date and slug come from the author, so no allocator exists and no collision is possible. `numeric` (`ISSUE-042`) keeps short identifiers at the cost of an allocator that can only see the local checkout — parallel branches *will* be handed the same number, so there the gate is not a safety net but the mechanism itself. A short commit SHA is the third obvious candidate and the worst of the three: it solves collisions and destroys readability, which matters in a file whose whole purpose is to be searched by a human under time pressure.
+
+**Three traps worth designing out on day one.**
+
+*A Makefile target is not a CI step.* A check chained into `make lint` but not into a workflow step does not run. Where CI enumerates sub-targets one at a time, the two lists drift apart one pull request at a time and nothing reports it — the checks still pass locally, the rule files still describe the conventions as enforced, and the gate that quietly stopped running is discovered only by the bug it should have caught. **A rules file claiming mechanical enforcement is only as true as the workflow step behind it.** Have CI invoke the aggregate target; that makes coverage total by construction. Keep the coverage check for the day per-path job gating forces enumeration.
+
+*Union merge without a downstream gate is a downgrade on doing nothing.* It removes the loud failure and leaves the quiet one. Ship it only where something can still see the damage — here the drift check, which notices any artifact that stopped matching its fragments. Remove that check and the union entries have to go with it.
+
+*Custom merge drivers do not travel with the repository.* `merge=union` is built into git. A **custom** driver named in `.gitattributes` needs `git config merge.<name>.driver` in every clone, and when it is missing git falls back **silently** — the repository looks configured and is not. Committed hooks have the same shape of problem until `core.hooksPath` points at them. Anything needing per-clone setup ships with its bootstrap *and* a check that the setup took effect.
+
+**The acceptance test to write first.** Two branches each add a registry entry; both merge with zero conflicts and zero duplicate identifiers. Write it before the mechanism and watch it fail — and keep a control case in it that reproduces the defect on the shape you are replacing, because a test that cannot fail proves nothing. The kit ships this as `scripts/tests/test-parallel-merge.sh`.
+
+
 ---
 
 ## 4. Adoption playbook
@@ -634,7 +685,7 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 
 **Day 1 — Level 1 (≈ 1–2 hours):**
 
-1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, versioning & changelog), the knowledge-base skeleton, and the ready-to-run KB-shape check to that tool's expected locations. Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
+1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
 2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling).
 3. Enable the common generic skills worth having from day one — `starter-kit/skills/common-catalog.md` lists them with adoption notes; the prompt-enhancer and semver skills already ship in the kit, and architecture review / architecture docs are one copy away.
 4. Commit. The setup is live: every agent session now starts from the contract.
@@ -642,8 +693,8 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 **Week 1 — Level 2:**
 
 5. Each time you correct the agent twice about the same thing → add the rule (constitution table row if short; new rule file if it needs examples).
-6. Wire an umbrella `make lint` target into CI — the kit's `check-kb-shape.sh` is a working first entry; add your first mined `check-*.sh` when a documented rule gets violated anyway.
-7. First >30-min bug → ISSUE-001 in the KB. Enforce the discipline from the start; the KB's value is compounding.
+6. Wire an umbrella `make lint` target into CI — the kit installs one, already chained to the knowledge-base shape check, the registry drift and identifier gates, and the coverage check that proves all of them actually run in CI. Add your first mined `check-*.sh` when a documented rule gets violated anyway.
+7. First >30-min bug → the first knowledge-base entry (`registry_tool.py new --registry debugging-kb`). Enforce the discipline from the start; the KB's value is compounding.
 
 **Month 1 — Level 3:**
 
@@ -700,6 +751,7 @@ The single habit that separates a living setup from a decorative one — run the
 | Same review comment on a second PR | Rule + agent violations-list entry |
 | Documented rule violated anyway | Enforcement script wired into lint |
 | Rule file contradicted by current code reality | Fix the rule file — a stale rule is worse than no rule |
+| Two pull requests conflicted in the same shared file, or two branches claimed one identifier | Move that file to the fragment layout (§3.11) — the second occurrence is the signal, and the cost of moving rises with every entry already cited |
 | Agents mis-retrieve from a grown KB/rules corpus, or an impact-analysis need appears | The knowledge-graph layer over the workspace (§5.6) — the conventions already make every artifact a well-formed node |
 
 The "same PR" clause matters: the author of the fix is the only one who knows what to write, and the knowledge decays within days.
@@ -740,6 +792,8 @@ Guardrails: propose-never-silently-change, and prefer sharpening an existing age
 | **Silent knowledge deletion** | "Cleanup" that loses learned gotchas re-pays for old bugs | Knowledge ledger + lossless-first + written justification (§5.2) |
 | **Copying another project's domain rules as universal** | Their constraints are not your constraints | Copy *structures* (this guide); write your own *content* |
 | **Speculative artifacts** | Guessed skills/agents nobody triggers = maintenance load | Everything traces to a recurred signal (§4.5) |
+| **Shared append-only registries** | Every concurrent pull request conflicts, and two branches taking "the next free number" collide *cleanly* — permanently, because the identifier is cited elsewhere | One file per entry + generator + drift check (§3.11) |
+| **Gates that live only in a Makefile** | A check CI never invokes stops running silently, while the rule file still calls it enforced | CI invokes the aggregate target; a coverage check proves it (§3.11) |
 
 ### 5.5 Health checklist
 
@@ -751,6 +805,8 @@ Run quarterly (or as the quick-audit report):
 - [ ] KB entry count growing (bugs are being converted, not just fixed)?
 - [ ] No rule file contradicts current code reality (spot-check the three oldest)?
 - [ ] No command duplicates a skill's body?
+- [ ] Every gate in the lint target actually runs in CI (not just present in the Makefile)?
+- [ ] No shared file that many PRs append to has escaped the fragment layout?
 - [ ] Agents' violation lists match the current rule files they enforce?
 - [ ] `WORKSPACE_CHANGELOG.md` has an entry newer than the last milestone?
 

@@ -39,12 +39,12 @@ for every artifact type, the adoption playbook, and the maintenance flywheel.
 | [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The full guide: § 1 concepts → § 2 reference anatomy → § 3 blueprint → § 4 adoption → § 5 maintenance (+ § 5.6 agentic-graph-engineering outlook) |
 | [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md) | Self-contained prompt that makes an agent drive the whole setup — with fallback specs, so it works even without the rest of this kit |
 | [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop |
-| [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, versioning & changelog — plus a rule-file template |
-| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests), the common-skills catalog, the workspace-audit skill (Level 4), and a skill template |
+| [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, versioning & changelog, shared registries — plus a rule-file template |
+| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage), the common-skills catalog, the workspace-audit skill (Level 4), and a skill template |
 | [`starter-kit/agents/`](starter-kit/agents/) | Agent template + the agent-coach meta-agent (Level 4, propose-never-silently-change) |
 | [`starter-kit/commands/`](starter-kit/commands/) | Slash-command template + the audit command entry point |
-| [`starter-kit/scripts/`](starter-kit/scripts/) | `check-kb-shape.sh` (runnable knowledge-base lint) + enforcement-script template |
-| [`starter-kit/docs/`](starter-kit/docs/) | Graph-ready debugging-knowledge-base skeleton |
+| [`starter-kit/scripts/`](starter-kit/scripts/) | `registry_tool.py` (fragment generator + identifier gate), `check-kb-shape.sh`, the registry drift/identifier gates, the CI-coverage gate, tests + the parallel-merge acceptance test, and an enforcement-script template |
+| [`starter-kit/docs/`](starter-kit/docs/), `changelog.d/`, `registries.json.template`, `gitattributes.template`, `Makefile.template`, `ci/` | The shared-append-only-registry layer: fragment directories, declaration, merge behaviour, lint target and CI workflow (guide § 3.11) |
 | [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, `WORKSPACE_CHANGELOG.md.template` | Session-bootstrap hook skeleton, tool settings, audit-history skeleton |
 | [`docs/adr/`](docs/adr/) | Decision records for this project — starting with why the repo is canonical and a plugin is a future distribution channel |
 
@@ -57,6 +57,15 @@ and review comments recur (Level 3); the self-improvement loop — workspace
 audits + agent coach — once the workspace has real mass (Level 4,
 `--with-meta`); knowledge-graph tooling only when a consumer exists (§ 5.6).
 Every artifact ships de-branded and directly usable.
+
+One thing is a day-1 default rather than a grown-by-signal artifact, and
+deliberately so: files that many pull requests append to — changelogs,
+knowledge bases, decision records — conflict on every concurrent pair and hand
+two branches the same identifier without either noticing. The conflict is
+loud and cheap; the duplicate identifier is silent and permanent, because
+other files cite it. Retrofitting the fix costs nothing while those files are
+empty and a great deal once their identifiers are in use, so the kit installs
+it at commit one (guide § 3.11).
 
 ## Related
 

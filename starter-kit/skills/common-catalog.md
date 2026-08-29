@@ -8,9 +8,8 @@ generates its first signal.
 ## How to adopt
 
 - **Claude Code** — copy the skill directory into `.claude/skills/<name>/`.
-  The **prompt-enhancer and semver skills ship in this kit**
-  (`skills/prompt-enhancer/`, `skills/semver/`) and are installed automatically
-  by `bootstrap.sh`.
+  The **prompt-enhancer, semver, registry-entry and registry-conflict-triage
+  skills ship in this kit** and are installed automatically by `bootstrap.sh`.
 - **Other tools** — convert the skill's SKILL.md into a playbook doc linked from
   your constitution (guide § 3.10); the phase structure carries over unchanged.
 
@@ -26,6 +25,8 @@ skills worth building or porting first.
 |---|---|---|
 | **prompt-enhancer** *(ships in this kit)* | Rewrites rough user prompts into precise, context-rich ones — role framing, injected session context, output format, success criteria — before they hit an agent. Improves every other interaction. | Level 1 — installed by bootstrap on day one |
 | **semver** *(ships in this kit)* | Rigorous Semantic Versioning 2.0.0 decisions: bump levels, the 0.y.z stance, pre-release identifiers, version validation, recovery from misversioned releases. Ships the full spec + decision-guide references, a validator script, and its own test suite. The kit's `rules/versioning-and-changelog.md` default carries the core rule; this skill adds the full decision depth. Canonical upstream: <https://github.com/h2nguyen/semver-skill> — check there for updates. | Level 1 — installed by bootstrap on day one |
+| **registry-entry** *(ships in this kit)* | Writes a changelog bullet, knowledge-base entry or decision record as a fragment file in the right shape, category and filename — the authoring half of the shared-registry pattern (guide § 3.11). Installed by bootstrap. | Level 1 — installed by bootstrap on day one |
+| **registry-conflict-triage** *(ships in this kit)* | Escalation path for a registry merge conflict or a duplicate-identifier failure: classify, regenerate rather than hand-resolve, and never renumber an identifier that has already landed. Installed by bootstrap. | Level 1 — rarely triggered, but the moment it is needed is the wrong moment to improvise |
 | **architecture-docs (arc42)** | Structured architecture documentation over the 12 arc42 sections plus ADRs, optionally backed by an MCP server so the agent can update sections as callable tools. | Level 1–2 — as soon as design decisions are worth recording durably |
 | **architecture-review (clean architecture)** | Layer-dependency, SOLID, and module-boundary checking as a repeatable review workflow, optionally backed by an analyzer MCP server. | Level 2–3 — once the codebase has layers worth guarding |
 | **plan-first ticket execution (QRSPI)** | Questions → Research → Design → Structure → Plan → Implement phases for medium, large, or ambiguous tickets: blocking-vs-parked question triage, evidence-grounded research, design alternatives, plans published on the ticket. Working principle 5 is its distillation; the full skill automates it end-to-end. | Level 3 — when ticket-driven agent execution becomes routine |

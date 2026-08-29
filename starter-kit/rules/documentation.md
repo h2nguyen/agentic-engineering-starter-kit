@@ -11,7 +11,7 @@ as the project grows.
 |---|---|
 | New feature | Feature doc (or README section) + CHANGELOG `[Unreleased]` bullet |
 | Behaviour or API change | The affected doc + CHANGELOG bullet |
-| Bug fix that took >30 min to diagnose | Debugging-KB entry (ISSUE-NNN) + CHANGELOG `Fixed` bullet |
+| Bug fix that took >30 min to diagnose | Debugging-KB entry + CHANGELOG `Fixed` bullet — both as fragment files |
 | Architectural decision (affects multiple files or future choices) | New ADR |
 | New convention agents must follow | Rule file + constitution index line |
 
@@ -42,7 +42,18 @@ description; leave at most a one-line pointer.
 
 ## ADR-lite format
 
-One file per decision, `docs/adr/NNN-<slug>.md`, four sections:
+One file per decision under `docs/adr/`, four sections. Create it with
+`registry_tool.py new --registry adr --title "..."` so the filename matches the
+project's identifier scheme — under the default that is
+`docs/adr/<date>-<slug>.md`, publishing as `ADR-<date>-<slug>`.
+
+A numbered filename (`NNN-<slug>.md`) is also supported and is the reason the
+identifier gate exists: the *file* never conflicts, because two decisions are
+two paths, but two branches both taking the next free number produce a
+duplicate that merges cleanly and is caught by nothing until something cites
+it. See the shared-registries rule.
+
+The four sections:
 
 1. **Context** — why a decision was needed
 2. **Decision** — what was chosen
@@ -50,7 +61,10 @@ One file per decision, `docs/adr/NNN-<slug>.md`, four sections:
 4. **Consequences** — what becomes easier, what becomes harder
 
 Accepted ADRs are immutable; changing course means a new ADR that supersedes
-the old one by number.
+the old one by identifier. **Never renumber an ADR that is already on the
+default branch** — its identifier is cited from rule files, other ADRs, code
+comments and knowledge-base entries, and nothing checks that a citation still
+resolves.
 
 ## PR checklist
 

@@ -39,13 +39,29 @@ feat: add /api/export endpoint        → v1.5.0
   then one section per released version.
 - **Every PR with a user-observable change adds an `[Unreleased]` bullet in the
   same PR.** The author of the change is the only one who knows what to write.
+- **The bullet is a file, not a line.** Add it under `changelog.d/<category>/`
+  and run `make registry-generate`; the `[Unreleased]` section is assembled
+  from those files and must not be hand-edited. A conventional changelog
+  re-emits all six category headings on every release, so two PRs adding an
+  `### Added` bullet insert at the same line and always conflict — see the
+  shared-registries rule for why this is a file-shape problem rather than a
+  git-skill problem.
+
+  ```bash
+  python3 scripts/registry_tool.py new --registry changelog --category added \
+    --title "Export endpoint for the account ledger (#1234)"
+  ```
 - Each bullet sits under exactly one of the six categories: **Added / Changed /
-  Deprecated / Removed / Fixed / Security**.
+  Deprecated / Removed / Fixed / Security** — which is the directory it lives in.
 - One bullet per logical change (not per commit), ticket linked, written for
   the operator who reads it after a deploy — never pasted commit messages.
-- Releasing = promoting `[Unreleased]` → `[X.Y.Z] — <date>` and re-emptying
-  `[Unreleased]`. Released sections are immutable; errata go under a new
-  `[Unreleased]` `Fixed` bullet.
+- Releasing = `registry_tool.py release --registry changelog --version X.Y.Z`,
+  which renders the current fragments as a dated section and deletes the ones
+  it consumed. Released sections are immutable; errata go under a new
+  `[Unreleased]` `Fixed` bullet. Consuming the *files* is what makes a release
+  safe to run while other branches are open: a branch that added a bullet in
+  parallel still holds its own file, so its bullet reappears under
+  `[Unreleased]` instead of merging into a section that has moved.
 - Internal refactors, test-only changes, and formatting sweeps need no bullet —
   when in doubt, add one anyway; an extra `Changed` line is cheaper than an
   unrecorded behaviour shift.
@@ -53,7 +69,7 @@ feat: add /api/export endpoint        → v1.5.0
 ## Release checklist (generic shape — adapt to your pipeline)
 
 1. Decide the bump level from the `[Unreleased]` content + declared commit intents.
-2. Promote `[Unreleased]` → the new version section.
+2. Promote: `registry_tool.py release --registry changelog --version X.Y.Z`.
 3. Bump the version literal(s) in one commit; tag on merge.
 4. Build/publish from the tag.
 5. Verify the deployed version reports the new number.
