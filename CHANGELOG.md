@@ -5,19 +5,40 @@ All notable changes to this project are documented here, following
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — the same
 conventions this kit ships as a default rule.
 
+The `[Unreleased]` section is generated from `changelog.d/`. Add a bullet by
+creating a file there rather than editing this file:
+
+```bash
+python3 starter-kit/scripts/registry_tool.py new --registry changelog \
+  --category added --title "What an operator will observe"
+make registry-generate
+```
+
+Released sections are immutable — errata go under a new `[Unreleased]` bullet.
+
 ## [Unreleased]
+
+<!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 ### Added
 
+- ADR-002 recording why the registry layer is a day-1 default rather than a grown-by-signal artifact
+- `.gitattributes` template with `merge=union` on generated artifacts, both of its silent hazards documented inline, and a warning that custom merge drivers need per-clone configuration and fail silently without it
+- Enforcement gates chained into a shipped `make lint` target and a CI workflow that invokes it: registry drift, identifier shape and uniqueness, and a coverage check proving every gate in the lint target actually runs in CI
+- Two skills: `registry-entry` for authoring an entry, and `registry-conflict-triage` for the residue — the second prohibits renaming any identifier already on the default branch
+- Test suites for the registry layer: unit tests for the generator and gates, plus a parallel-merge acceptance test that keeps control cases reproducing the defect on the shape being replaced
+- `starter-kit/scripts/registry_tool.py`: creates fragments, assembles them into a marked region of the readable artifact, promotes a release, and gates identifier shape and uniqueness. Identifier schemes are configurable — `slug` (collision-free by construction) is the default, `numeric` is supported with the gate as its backstop
+- Shared append-only registry pattern: fragment directories, a deterministic generator, and gates for changelogs, knowledge bases and decision records — so files many pull requests append to no longer conflict on every concurrent pair (guide § 3.11)
+
 ### Changed
 
-### Deprecated
-
-### Removed
+- The debugging knowledge base and the changelog now ship in the fragment layout: entries and bullets are authored as files, and the readable artifact is generated. The rule files, constitution template, setup prompt and bootstrap installer were updated to match
 
 ### Fixed
 
-### Security
+- `check-kb-shape.sh` asserted identifier uniqueness against the pattern `ISSUE-[0-9]+`, which treats `ISSUE-7` and `ISSUE-007` as distinct — so a digit-width variant passed the uniqueness check. Shape is now asserted first, at an exact width, and mixing identifier schemes in one file is rejected
+
+<!-- END GENERATED: changelog -->
 
 ## [0.1.0] — 2026-08-02
 

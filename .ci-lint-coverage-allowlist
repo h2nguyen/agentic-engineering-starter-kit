@@ -1,0 +1,12 @@
+# Sub-targets of the umbrella lint target that deliberately do NOT run in CI.
+#
+# One bare target name per line; everything after '#' is a comment. Every entry
+# needs a reason, because an entry is a gate that has stopped running.
+#
+# This list is SHRINK-ONLY. check-ci-lint-coverage.sh compares it against the
+# merge base and fails when it grows: exemptions are debt being paid down, never
+# debt being taken on. If a check genuinely cannot run in CI, that is usually a
+# sign it belongs in a different job, not that it belongs here.
+#
+# Empty by default — the shipped workflow invokes `make lint` directly, so
+# coverage is total by construction and nothing needs exempting.
