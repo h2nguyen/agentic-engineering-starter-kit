@@ -1,0 +1,60 @@
+{
+  "_readme": [
+    "Declares this repository's shared append-only registries — the files many",
+    "pull requests append to at a fixed anchor under an allocated identifier.",
+    "Each one is authored as fragments (one file per entry) and assembled by",
+    "scripts/registry_tool.py. Copy to the repository root as registries.json,",
+    "then delete the registries you do not have and add the ones you do.",
+    "",
+    "id_scheme  'slug'    ISSUE-2026-08-29-cache-warms-before-config  (default)",
+    "                     Collision-free by construction: the date and slug come",
+    "                     from the author, never from an allocator, so two",
+    "                     branches cannot claim the same identifier.",
+    "           'numeric' ISSUE-042",
+    "                     Keeps short identifiers, at the cost of allocation:",
+    "                     `new` reads only the local checkout, so parallel",
+    "                     branches CAN claim the same number and the check gate",
+    "                     is what stops it reaching a citation. Set id_width to",
+    "                     the exact digit count you use; a variant width is",
+    "                     rejected before uniqueness is ever tested.",
+    "",
+    "Set the scheme once at the top level, or override it per registry."
+  ],
+
+  "id_scheme": "slug",
+  "id_width": 3,
+  "regen_command": "make registry-generate",
+  "rule_pointer": ".claude/rules/shared-registries.md",
+
+  "registries": [
+    {
+      "name": "debugging-kb",
+      "kind": "entries",
+      "id_prefix": "ISSUE",
+      "fragments": "docs/DEBUGGING-KNOWLEDGE-BASE.d",
+      "output": "docs/DEBUGGING-KNOWLEDGE-BASE.md",
+      "required_fields": [
+        "Symptom",
+        "Investigation Trail",
+        "Root Cause",
+        "Fix",
+        "Prevention",
+        "Debug Shortcut"
+      ]
+    },
+    {
+      "name": "changelog",
+      "kind": "changelog",
+      "fragments": "changelog.d",
+      "output": "CHANGELOG.md",
+      "categories": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
+    },
+    {
+      "name": "adr",
+      "kind": "documents",
+      "id_prefix": "ADR",
+      "fragments": "docs/adr",
+      "required_headings": ["Context", "Decision", "Alternatives", "Consequences"]
+    }
+  ]
+}
