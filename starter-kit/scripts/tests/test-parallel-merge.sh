@@ -178,10 +178,7 @@ scaffold_fragment_repo() { # $1 = repo dir, $2 = id_scheme
   local repo="$1" scheme="$2"
   git_init "$repo"
   mkdir -p "$repo/scripts" "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" "$repo/docs/adr"
-  for c in added changed deprecated removed fixed security; do
-    mkdir -p "$repo/changelog.d/$c"
-    touch "$repo/changelog.d/$c/.gitkeep"
-  done
+  mkdir -p "$repo/changelog.d"
   cp "$TOOL" "$repo/scripts/registry_tool.py"
 
   cat > "$repo/registries.json" <<EOF
@@ -255,9 +252,11 @@ add_on_branch() { # $1 = repo, $2 = branch, $3... = registry_tool args
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b "$branch"
   ( cd "$repo" && python3 scripts/registry_tool.py "$@" >/dev/null 2>&1 )
-  # Fill the template placeholders so the shape gate passes on real content.
+  # Fill the template placeholders so the shape gate sees real content.
   find "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" -name '*.md' ! -name '_*' \
     -exec sed -i 's/<fill in>/Recorded by the acceptance test./g' {} + 2>/dev/null || true
+  find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*' \
+    -exec sed -i 's/^- <what an operator.*/- Recorded by the acceptance test./' {} + 2>/dev/null || true
   ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "registry: entry from $branch"
 }
@@ -327,6 +326,9 @@ contract_changelog() {
   local repo="$WORK/fragment-changelog"
   scaffold_fragment_repo "$repo" slug
 
+  # Each branch writes ONE fragment covering its whole change, and both put a
+  # bullet under the same category. The paths are still disjoint, so the same
+  # category is no longer a shared anchor the way a heading in one file was.
   add_on_branch "$repo" branch-a new --registry changelog --category added \
       --title "Export endpoint for the account ledger" --date 2026-08-29
   add_on_branch "$repo" branch-b new --registry changelog --category added \
@@ -350,6 +352,41 @@ contract_changelog() {
   fi
 }
 
+contract_one_fragment_many_categories() {
+  # The reason this layout replaced one-file-per-bullet: a change that touches
+  # several categories is ONE unit of work, and reads as one file rather than
+  # three near-empty ones.
+  local repo="$WORK/fragment-multi"
+  scaffold_fragment_repo "$repo" slug
+
+  git -C "$repo" checkout -q -b branch-multi
+  ( cd "$repo" && python3 scripts/registry_tool.py new --registry changelog \
+      --category added --title "Ledger export" --date 2026-08-29 >/dev/null 2>&1 )
+  cat > "$repo/changelog.d/2026-08-29-ledger-export.md" <<'EOF'
+# Ledger export
+
+## Added
+
+- Export endpoint for the account ledger.
+
+## Fixed
+
+- Retry loop no longer swallows the timeout error.
+EOF
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  commit_all "$repo" "changelog: one fragment, two categories"
+
+  local added fixed files
+  added="$(grep -c 'Export endpoint' "$repo/CHANGELOG.md" || true)"
+  fixed="$(grep -c 'swallows the timeout' "$repo/CHANGELOG.md" || true)"
+  files="$(find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*' | wc -l)"
+  if [ "$added" -eq 1 ] && [ "$fixed" -eq 1 ] && [ "$files" -eq 1 ]; then
+    ok "[changelog] one fragment feeds two categories (1 file, not 2)"
+  else
+    bad "[changelog] multi-category fragment wrong (added=$added fixed=$fixed files=$files)"
+  fi
+}
+
 contract_append_vs_release() {
   # The hazard union merge cannot handle: one branch releases (promoting the
   # whole Unreleased block into a version section) while another appends to it.
@@ -362,7 +399,9 @@ contract_append_vs_release() {
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b branch-release
   ( cd "$repo" && python3 scripts/registry_tool.py new --registry changelog \
-      --category added --title "Initial public interface" --date 2026-08-20 >/dev/null
+      --category added --title "Initial public interface" --date 2026-08-20 >/dev/null 2>&1
+    sed -i 's/^- <what an operator.*/- Initial public interface./' \
+      changelog.d/2026-08-20-initial-public-interface.md
     python3 scripts/registry_tool.py release --registry changelog \
       --version 1.0.0 --date 2026-08-28 >/dev/null )
   commit_all "$repo" "release: 1.0.0"
@@ -469,6 +508,7 @@ else
   contract_kb slug
   contract_kb numeric
   contract_changelog
+  contract_one_fragment_many_categories
   contract_append_vs_release
   contract_adr_numbers slug
   contract_adr_numbers numeric

@@ -57,7 +57,7 @@ confirm the gates pass, enable further common skills from
 | `registries.json.template` | `registries.json` | Delete the registries you don't have; pick the identifier scheme |
 | `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config` |
 | `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — add the generated-region markers to it instead |
-| `changelog.d/` | `changelog.d/` | One directory per Keep-a-Changelog category; bullets are files |
+| `changelog.d/` | `changelog.d/` | One fragment per change; categories are `## ` headings inside it |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | One file per entry — the authored source of the KB |
 | `Makefile.template` | `Makefile` | Merge the targets into your existing one if you have it |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |

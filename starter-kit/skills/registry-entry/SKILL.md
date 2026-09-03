@@ -40,12 +40,15 @@ than an unrecorded behaviour shift.
 ## Phase 2 — Create the fragment with the tool
 
 ```bash
-python3 scripts/registry_tool.py new --registry changelog --category added \
-  --title "Export endpoint for the account ledger (#1234)"
+python3 scripts/registry_tool.py new --registry changelog --title "Ledger export"
 
 python3 scripts/registry_tool.py new --registry debugging-kb \
   --title "Cache warms before the config is loaded"
 ```
+
+A changelog fragment covers the **whole change**, not one bullet. If the change
+touches several categories, add a `## <category>` heading for each inside the
+same file rather than creating another file.
 
 Use the tool rather than writing the file by hand. It derives the slug, applies
 the project's identifier scheme, refuses a name that is already taken, and
@@ -54,10 +57,11 @@ ends up outside the grammar the check enforces.
 
 Then fill it in:
 
-- **Changelog bullet** — the level-1 heading *is* the bullet. Write it for the
-  operator reading it after a deploy: what changed, what they will observe,
-  the ticket reference. Never a pasted commit message. One bullet per logical
-  change, not per commit.
+- **Changelog fragment** — the level-1 heading names the change and is never
+  rendered; the bullets under each `## <category>` heading are what ship. Write
+  them for the operator reading them after a deploy: what changed, what they
+  will observe, the ticket reference. Never a pasted commit message. One bullet
+  per logical change, not per commit.
 - **Knowledge-base entry** — fill every field the template carries. `Symptom`
   is what someone will search for, so phrase it as the observation, not the
   diagnosis. `Prevention` names the rule or check that now encodes the lesson;
@@ -90,9 +94,12 @@ without its fragment fails it the other way.
 - **Choosing the identifier by hand under the numeric scheme.** The allocator
   sees only the local checkout, which is already a weak guarantee; overriding
   it makes a collision likely rather than possible.
-- **Writing several entries into one fragment.** One entry per file is what
-  makes concurrent authorship safe; a fragment holding three entries conflicts
-  exactly like the shared file it replaced.
+- **Splitting one change across several changelog fragments.** A change is one
+  file, however many categories it touches. Several files for one PR is the
+  granularity this layout deliberately moved away from — each file ends up
+  holding a line and no unit of meaning. (Knowledge-base entries are the
+  opposite: one entry per file, always, because each is a document and its
+  identifier is a citation target.)
 - **A registry entry as the whole pull request.** The entry belongs in the same
   pull request as the change it describes — the author is the only person who
   knows what to write, and the knowledge decays within days.

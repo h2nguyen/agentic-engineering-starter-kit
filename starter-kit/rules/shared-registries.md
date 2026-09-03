@@ -88,9 +88,26 @@ docs/DEBUGGING-KNOWLEDGE-BASE.md
 // CORRECT — one file per entry; the path carries the identifier.
 // Two branches add two different paths, which git merges without being asked,
 // and neither branch had to ask what the next free number was.
-changelog.d/added/2026-08-29-export-endpoint.md
+changelog.d/2026-08-29-ledger-export.md
 docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-cache-warms-before-config.md
 ```
+
+## Choosing the granularity
+
+The layout says *files, not line ranges*. It does not say how much goes in a
+file, and that is a separate decision worth making deliberately.
+
+**Pick the smallest unit that is still a unit of meaning.** For a changelog
+that is one file per **change**, with a `## <category>` heading for each
+category it touches — not one file per bullet. A file holding a single line
+carries no meaning on its own, multiplies for no benefit, and turns one change
+that spans three categories into three near-empty files. For a debugging
+knowledge base the unit is the **entry**, because each entry is already a
+document and its identifier is cited from elsewhere.
+
+The guarantee is unaffected either way: what makes concurrent authorship safe
+is that two branches write two different **paths**, and that holds whether a
+file carries one bullet or six.
 
 ## Identifier schemes
 

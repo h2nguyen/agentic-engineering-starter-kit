@@ -370,9 +370,13 @@ never there.
 
 **Minimum implementation, when the kit is not present:**
 
-- **Fragment directory** beside each artifact — `changelog.d/<category>/` and
-  `<artifact>.d/`. One file per entry. The filename carries the identifier and
-  nothing else does, so two branches cannot claim the same one.
+- **Fragment directory** beside each artifact — `changelog.d/` and
+  `<artifact>.d/`. The filename carries the identifier and nothing else does,
+  so two branches cannot claim the same one. Pick the smallest unit that is
+  still a unit of meaning: for a changelog that is one file per *change*, with
+  the categories as `## ` headings inside it, not one file per bullet — a file
+  holding a single line carries no meaning and multiplies for no benefit. For a
+  knowledge base it is one file per entry, since each is already a document.
 - **Identifier scheme.** Default to `<date>-<slug>` (`2026-08-29-cache-warms`),
   which is collision-free by construction because no allocator exists. A
   numeric scheme is fine if the team prefers short identifiers, but then the

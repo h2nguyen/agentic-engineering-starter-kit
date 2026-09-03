@@ -39,20 +39,33 @@ feat: add /api/export endpoint        → v1.5.0
   then one section per released version.
 - **Every PR with a user-observable change adds an `[Unreleased]` bullet in the
   same PR.** The author of the change is the only one who knows what to write.
-- **The bullet is a file, not a line.** Add it under `changelog.d/<category>/`
-  and run `make registry-generate`; the `[Unreleased]` section is assembled
-  from those files and must not be hand-edited. A conventional changelog
-  re-emits all six category headings on every release, so two PRs adding an
-  `### Added` bullet insert at the same line and always conflict — see the
-  shared-registries rule for why this is a file-shape problem rather than a
-  git-skill problem.
+- **One fragment file per change, in `changelog.d/`.** A PR adds a single file
+  describing everything it changed, then runs `make registry-generate`; the
+  `[Unreleased]` section is assembled from those files and must not be
+  hand-edited. A conventional changelog re-emits all six category headings on
+  every release, so two PRs adding an `### Added` bullet insert at the same
+  line and always conflict — see the shared-registries rule for why this is a
+  file-shape problem rather than a git-skill problem.
 
   ```bash
-  python3 scripts/registry_tool.py new --registry changelog --category added \
-    --title "Export endpoint for the account ledger (#1234)"
+  python3 scripts/registry_tool.py new --registry changelog \
+    --title "Ledger export"
+  ```
+
+  ```markdown
+  # Ledger export
+
+  ## Added
+
+  - `/api/export` endpoint for CSV extraction of the account ledger (#1234).
+
+  ## Fixed
+
+  - Retry loop no longer swallows the timeout error (#1235).
   ```
 - Each bullet sits under exactly one of the six categories: **Added / Changed /
-  Deprecated / Removed / Fixed / Security** — which is the directory it lives in.
+  Deprecated / Removed / Fixed / Security** — a `## ` heading inside the
+  fragment. One change may touch several; that is one file, not several.
 - One bullet per logical change (not per commit), ticket linked, written for
   the operator who reads it after a deploy — never pasted commit messages.
 - Releasing = `registry_tool.py release --registry changelog --version X.Y.Z`,

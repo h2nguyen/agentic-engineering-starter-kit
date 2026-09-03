@@ -4,12 +4,12 @@ All notable changes to this project are documented here, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**The `[Unreleased]` section is generated.** Add a bullet by creating a file
-under `changelog.d/<category>/`, then run `make registry-generate`:
+**The `[Unreleased]` section is generated.** Record a change by creating one
+file in `changelog.d/` — with a `## <category>` section for each category the
+change touches — then run `make registry-generate`:
 
 ```bash
-python3 scripts/registry_tool.py new --registry changelog --category added \
-  --title "Export endpoint for the account ledger (#1234)"
+python3 scripts/registry_tool.py new --registry changelog --title "Ledger export"
 ```
 
 Released sections below are written once by `registry_tool.py release` and are

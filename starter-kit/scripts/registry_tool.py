@@ -219,42 +219,89 @@ def fragment_paths(reg: Registry) -> list[str]:
     if not os.path.isdir(base):
         return []
     found = []
-    if reg.kind == "changelog":
-        for category in reg.categories:
-            sub = os.path.join(base, category.lower())
-            if not os.path.isdir(sub):
-                continue
-            for name in os.listdir(sub):
-                if _is_fragment(name):
-                    found.append(os.path.join(sub, name))
-    else:
-        for name in os.listdir(base):
-            if _is_fragment(name):
-                found.append(os.path.join(base, name))
+    for name in os.listdir(base):
+        if _is_fragment(name):
+            found.append(os.path.join(base, name))
     return sorted(found)
 
 
 def stray_changelog_paths(reg: Registry) -> list[str]:
-    """Fragments under the changelog tree that no category directory owns.
+    """Fragments nested in a subdirectory, where the generator will not see them.
 
-    `fragment_paths` deliberately looks only where the generator looks. This
-    looks everywhere else, because a file the generator cannot see is exactly
-    the failure that leaves no trace.
+    `fragment_paths` reads the top level only. A file one directory deeper is
+    never assembled and never reported — the bullet simply never appears, with
+    no conflict and no error. That silent loss is worth a gate, and it is the
+    likely shape of a mistake for anyone who remembers the old category-per-
+    directory layout.
     """
     base = reg.fragments_dir
     if not os.path.isdir(base):
         return []
-    known = {c.lower() for c in reg.categories}
     stray = []
-    for current, directories, files in os.walk(base):
-        relative = os.path.relpath(current, base)
-        top = relative.split(os.sep)[0] if relative != "." else "."
-        if top != "." and top.lower() in known:
+    for current, _directories, files in os.walk(base):
+        if os.path.abspath(current) == os.path.abspath(base):
             continue
         for name in files:
             if _is_fragment(name):
                 stray.append(os.path.join(current, name))
     return sorted(stray)
+
+
+def parse_changelog_fragment(reg: Registry, path: str) -> dict[str, list[str]]:
+    """Read one per-change fragment into {category: [bullet, ...]}.
+
+    The file is a small readable document rather than a single line: a title
+    naming the change, then one section per Keep a Changelog category it
+    touches. That granularity is the point — a fragment is a unit of meaning
+    ("what this change did"), not a line that happens to own an inode.
+    """
+    known = {c.lower(): c for c in reg.categories}
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().splitlines()
+
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    bullets: list[str] = []
+
+    def flush():
+        if current and bullets:
+            sections.setdefault(current, []).extend(bullets)
+
+    for index, raw in enumerate(lines, start=1):
+        if raw.startswith("# "):
+            continue  # the title; readability only, never rendered
+        if raw.startswith("## "):
+            flush()
+            bullets = []
+            heading = raw[3:].strip()
+            if heading.lower() not in known:
+                raise RegistryError(
+                    f"{reg.rel(path)}:{index} — unknown category "
+                    f"'{heading}'.\n"
+                    f"  Expected one of: {', '.join(reg.categories)}.\n"
+                    f"  See {reg.rule_pointer}."
+                )
+            current = known[heading.lower()]
+            continue
+        if raw.lstrip().startswith("<!--"):
+            continue  # authoring guidance in the template; never rendered
+        if raw.startswith("- "):
+            if current is None:
+                raise RegistryError(
+                    f"{reg.rel(path)}:{index} — bullet before any category "
+                    f"heading; it would never reach the changelog.\n"
+                    f"  Add a '## <category>' heading above it "
+                    f"({', '.join(reg.categories)}).\n"
+                    f"  See {reg.rule_pointer}."
+                )
+            bullets.append(raw[2:].rstrip())
+        elif bullets and raw[:1].isspace() and raw.strip():
+            # Only an INDENTED line continues the bullet above it. Anything
+            # else — prose, a stray comment — is not swept into the changelog,
+            # which is how the template's own guidance used to leak into it.
+            bullets[-1] += "\n" + raw.rstrip()
+    flush()
+    return sections
 
 
 def read_fragment(reg: Registry, path: str) -> tuple[str, str]:
@@ -320,17 +367,14 @@ def render(reg: Registry) -> str:
 def _render_changelog(reg: Registry, paths: list[str]) -> str:
     by_category: dict[str, list[str]] = {}
     for path in paths:
-        category = os.path.basename(os.path.dirname(path))
-        title, body = read_fragment(reg, path)
-        bullet = title if not body else f"{title}\n" + "\n".join(
-            f"  {line}" if line.strip() else "" for line in body.splitlines()
-        )
-        by_category.setdefault(category.lower(), []).append(f"- {bullet}")
+        for category, bullets in parse_changelog_fragment(reg, path).items():
+            by_category.setdefault(category, []).extend(bullets)
     sections = []
     for category in reg.categories:
-        bullets = by_category.get(category.lower())
+        bullets = by_category.get(category)
         if bullets:
-            sections.append(f"### {category}\n\n" + "\n".join(bullets))
+            body = "\n".join(f"- {b}" for b in bullets)
+            sections.append(f"### {category}\n\n{body}")
     return "\n\n".join(sections)
 
 
@@ -384,9 +428,17 @@ def next_number(reg: Registry) -> str:
     return str(highest + 1).zfill(reg.id_width)
 
 
-def fragment_template(reg: Registry, title: str) -> str:
+def fragment_template(reg: Registry, title: str, category: str | None = None) -> str:
     if reg.kind == "changelog":
-        return f"# {title}\n"
+        first = category or reg.categories[0]
+        others = ", ".join(c for c in reg.categories if c != first)
+        return (
+            f"# {title}\n\n"
+            f"## {first}\n\n"
+            f"- <what an operator will observe after the deploy>\n\n"
+            f"<!-- One section per category this change touches. Others "
+            f"available: {others}. Delete this comment. -->\n"
+        )
     lines = [f"# {title}", ""]
     for field in reg.required_fields:
         lines.append(f"**{field}:** <fill in>")
@@ -420,20 +472,21 @@ def cmd_new(args) -> int:
         stem = f"{next_number(reg)}-{slug}"
 
     directory = reg.fragments_dir
+    category = None
     if reg.kind == "changelog":
-        if not args.category:
-            raise RegistryError(
-                "--category is required for a changelog entry "
-                f"(one of: {', '.join(reg.categories)})"
-            )
-        match = [c for c in reg.categories if c.lower() == args.category.lower()]
-        if not match:
-            raise RegistryError(
-                f"unknown category {args.category!r} "
-                f"(expected one of: {', '.join(reg.categories)})"
-            )
-        directory = os.path.join(directory, match[0].lower())
-        # Changelog bullets are never cited by identifier, so they always use a
+        # One fragment per change, holding every category that change touches.
+        # --category only seeds the first section; the rest are added by hand,
+        # because a change that spans categories is one unit of work and reads
+        # better as one file than as three.
+        if args.category:
+            match = [c for c in reg.categories if c.lower() == args.category.lower()]
+            if not match:
+                raise RegistryError(
+                    f"unknown category {args.category!r} "
+                    f"(expected one of: {', '.join(reg.categories)})"
+                )
+            category = match[0]
+        # Changelog entries are never cited by identifier, so they always use a
         # date-slug name regardless of the project's identifier scheme.
         date = args.date or _dt.date.today().isoformat()
         stem = f"{date}-{slug}"
@@ -443,7 +496,7 @@ def cmd_new(args) -> int:
     if os.path.exists(path):
         raise RegistryError(f"{reg.rel(path)} already exists — pick a different --slug")
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(fragment_template(reg, args.title))
+        fh.write(fragment_template(reg, args.title, category))
 
     print(reg.rel(path))
     if reg.kind != "changelog" and reg.id_prefix:
@@ -545,18 +598,28 @@ def cmd_check(args) -> int:
             for path in paths:
                 try:
                     read_fragment(reg, path)
+                    sections = parse_changelog_fragment(reg, path)
                 except RegistryError as exc:
                     failures += 1
                     print(f"FAIL: {exc}", file=sys.stderr)
+                    continue
+                if not sections:
+                    failures += 1
+                    print(
+                        f"FAIL: {reg.rel(path)}:1 — no bullets under any "
+                        f"category, so this fragment contributes nothing.\n"
+                        f"  Add '## <category>' with at least one '- ' bullet, "
+                        f"or delete the file. See {reg.rule_pointer}.",
+                        file=sys.stderr,
+                    )
             for path in stray_changelog_paths(reg):
                 failures += 1
                 print(
-                    f"FAIL: {reg.rel(path)}:1 — this fragment is in no known "
-                    f"category directory, so it would never reach the "
-                    f"changelog.\n"
-                    f"  Move it under {reg.fragments}/<category>/, where "
-                    f"<category> is one of: "
-                    f"{', '.join(c.lower() for c in reg.categories)}.\n"
+                    f"FAIL: {reg.rel(path)}:1 — this fragment is nested in a "
+                    f"subdirectory, where the generator never looks, so its "
+                    f"bullets would silently never reach the changelog.\n"
+                    f"  Move it directly into {reg.fragments}/ and put the "
+                    f"category as a '## ' heading inside the file.\n"
                     f"  See {reg.rule_pointer}.",
                     file=sys.stderr,
                 )

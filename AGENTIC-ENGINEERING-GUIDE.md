@@ -226,8 +226,8 @@ your-repo/
 ├── registries.json                  # declares the shared append-only registries (§3.11)
 ├── .gitattributes                   # merge behaviour for those registries (§3.11)
 ├── CHANGELOG.md                     # generated from changelog.d/
-├── changelog.d/                     # one file per changelog bullet
-│   └── <category>/<date>-<slug>.md  #   added / changed / … / security
+├── changelog.d/                     # one file per change
+│   └── <date>-<slug>.md             #   categories are `## ` headings inside
 ├── docs/
 │   ├── DEBUGGING-KNOWLEDGE-BASE.md  # generated from the fragment directory
 │   └── DEBUGGING-KNOWLEDGE-BASE.d/  # one file per entry — the authored source
@@ -644,13 +644,25 @@ The third tier deserves its demotion for a specific reason. An agent resolving t
 | Component | What it does |
 |---|---|
 | `.gitattributes` | `merge=union` on the generated artifacts, with both hazards documented inline |
-| fragment directories | `<artifact>.d/` and `changelog.d/<category>/` — one file per entry, named so two branches cannot collide |
+| fragment directories | `<artifact>.d/` and `changelog.d/` — one file per entry (per *change*, for changelogs), named so two branches cannot collide |
 | `registry_tool.py` | creates fragments, assembles them deterministically, promotes a release, gates identifiers |
 | drift check | regenerate, diff against the committed artifact, fail on difference |
 | identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
 | `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
 | coverage check | proves every check in that target actually runs in CI |
 | two skills | authoring the entry; triaging a conflict — deliberately separate |
+
+**Granularity is a separate decision from layout, and it is easy to get wrong.**
+The first version of this pattern used one file per changelog *bullet*, under a
+directory per category. It satisfied every guarantee above and was still the
+wrong shape: a file held one line and no coherent unit of meaning, a change
+touching three categories became three near-empty files, and 2.5 KB of content
+occupied 56 KB once filesystem blocks were counted. One file per *change* —
+with the categories as headings inside it — keeps the disjoint paths that make
+merging safe while making each file something you can read. Pick the smallest
+unit that is still a unit of meaning: for a changelog that is a change, not a
+bullet; for a knowledge base it is the entry, because each entry is already a
+document and its identifier is cited elsewhere.
 
 **Identifier schemes.** Both ship; the choice is declared in `registries.json`. `slug` (`ISSUE-2026-08-29-cache-warms-before-config`) is the default: the date and slug come from the author, so no allocator exists and no collision is possible. `numeric` (`ISSUE-042`) keeps short identifiers at the cost of an allocator that can only see the local checkout — parallel branches *will* be handed the same number, so there the gate is not a safety net but the mechanism itself. A short commit SHA is the third obvious candidate and the worst of the three: it solves collisions and destroys readability, which matters in a file whose whole purpose is to be searched by a human under time pressure.
 

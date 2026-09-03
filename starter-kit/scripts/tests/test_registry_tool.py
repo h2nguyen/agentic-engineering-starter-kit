@@ -63,7 +63,7 @@ class RegistryTestCase(unittest.TestCase):
         config["id_scheme"] = self.scheme
         self.write("registries.json", json.dumps(config))
 
-        for path in ("kb.d", "adr", "changelog.d/added", "changelog.d/fixed"):
+        for path in ("kb.d", "adr", "changelog.d"):
             os.makedirs(os.path.join(self.root, path), exist_ok=True)
 
         self.write(
@@ -225,31 +225,94 @@ class TestGeneration(RegistryTestCase):
 
 
 class TestChangelog(RegistryTestCase):
-    def bullet(self, category, name, text="A bullet"):
-        return self.write(f"changelog.d/{category}/{name}", f"# {text}\n")
+    """One fragment per change, with the categories it touches inside it."""
+
+    def fragment(self, name, sections):
+        lines = ["# A change", ""]
+        for category, bullets in sections:
+            lines.append(f"## {category}")
+            lines.append("")
+            lines.extend(f"- {b}" for b in bullets)
+            lines.append("")
+        return self.write(f"changelog.d/{name}", "\n".join(lines))
 
     def test_only_categories_with_entries_are_emitted(self):
-        self.bullet("added", "2026-08-29-one.md", "Adds a thing")
+        self.fragment("2026-08-29-one.md", [("Added", ["Adds a thing"])])
         self.run_tool("generate", "--registry", "changelog")
         body = self.read("CHANGELOG.md")
         self.assertIn("### Added", body)
         self.assertNotIn("### Fixed", body)
 
     def test_categories_keep_their_declared_order(self):
-        self.bullet("fixed", "2026-08-29-f.md", "Fixes a thing")
-        self.bullet("added", "2026-08-29-a.md", "Adds a thing")
+        self.fragment(
+            "2026-08-29-one.md",
+            [("Fixed", ["Fixes a thing"]), ("Added", ["Adds a thing"])],
+        )
         self.run_tool("generate", "--registry", "changelog")
         body = self.read("CHANGELOG.md")
         self.assertLess(body.index("### Added"), body.index("### Fixed"))
 
-    def test_a_fragment_in_an_unknown_category_is_rejected(self):
-        self.write("changelog.d/invented/2026-08-29-x.md", "# Nope\n")
-        # An unknown directory is not scanned by the generator, so the gate is
-        # what notices the bullet would silently never appear.
+    def test_one_fragment_can_span_several_categories(self):
+        self.fragment(
+            "2026-08-29-one.md",
+            [("Added", ["Adds a thing"]), ("Fixed", ["Fixes a thing"])],
+        )
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        self.assertIn("Adds a thing", body)
+        self.assertIn("Fixes a thing", body)
+
+    def test_bullets_from_several_fragments_merge_under_one_category(self):
+        self.fragment("2026-08-29-a.md", [("Added", ["From A"])])
+        self.fragment("2026-08-30-b.md", [("Added", ["From B"])])
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        self.assertEqual(body.count("### Added"), 1)
+        self.assertLess(body.index("From A"), body.index("From B"))
+
+    def test_unknown_category_heading_is_rejected(self):
+        self.fragment("2026-08-29-one.md", [("Invented", ["Nope"])])
         self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
 
+    def test_bullet_before_any_heading_is_rejected(self):
+        self.write("changelog.d/2026-08-29-one.md", "# A change\n\n- orphan bullet\n")
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
+
+    def test_fragment_with_no_bullets_is_rejected(self):
+        self.write("changelog.d/2026-08-29-empty.md", "# A change\n\n## Added\n")
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
+
+    def test_a_fragment_nested_in_a_subdirectory_is_rejected(self):
+        # The likely mistake for anyone who remembers the category-directory
+        # layout. The generator never looks there, so the bullet would vanish
+        # with no conflict and no error.
+        self.write("changelog.d/added/2026-08-29-x.md", "# A change\n\n## Added\n\n- Nope\n")
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
+
+    def test_template_guidance_never_reaches_the_changelog(self):
+        # The template carries an HTML comment telling the author which other
+        # categories exist. It leaked into the rendered changelog as a bullet
+        # continuation before the parser required continuations to be indented.
+        self.write(
+            "changelog.d/2026-08-29-one.md",
+            "# A change\n\n## Added\n\n- A real bullet.\n"
+            "<!-- One section per category this change touches. -->\n",
+        )
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        self.assertIn("A real bullet.", body)
+        self.assertNotIn("<!-- One section", body)
+
+    def test_indented_lines_still_continue_a_bullet(self):
+        self.write(
+            "changelog.d/2026-08-29-two.md",
+            "# A change\n\n## Added\n\n- First line\n  continued here.\n",
+        )
+        self.run_tool("generate", "--registry", "changelog")
+        self.assertIn("continued here.", self.read("CHANGELOG.md"))
+
     def test_release_promotes_and_consumes_the_fragments(self):
-        self.bullet("added", "2026-08-20-one.md", "Adds a thing")
+        self.fragment("2026-08-20-one.md", [("Added", ["Adds a thing"])])
         self.run_tool("generate", "--registry", "changelog")
         self.assertEqual(
             self.run_tool(
@@ -261,7 +324,11 @@ class TestChangelog(RegistryTestCase):
         body = self.read("CHANGELOG.md")
         self.assertIn("## [1.0.0] — 2026-08-28", body)
         self.assertIn("Adds a thing", body)
-        self.assertEqual(os.listdir(os.path.join(self.root, "changelog.d/added")), [])
+        self.assertEqual(
+            [f for f in os.listdir(os.path.join(self.root, "changelog.d"))
+             if f.endswith(".md")],
+            [],
+        )
 
     def test_a_bullet_added_after_a_release_lands_in_unreleased(self):
         # The append-versus-promote hazard: a release moves the anchor a
@@ -269,13 +336,13 @@ class TestChangelog(RegistryTestCase):
         # fragment files, the concurrent branch still holds its own file and
         # its bullet reappears under [Unreleased] instead of being absorbed
         # into the section that moved.
-        self.bullet("added", "2026-08-20-released.md", "Shipped in 1.0.0")
+        self.fragment("2026-08-20-released.md", [("Added", ["Shipped in 1.0.0"])])
         self.run_tool("generate", "--registry", "changelog")
         self.run_tool(
             "release", "--registry", "changelog",
             "--version", "1.0.0", "--date", "2026-08-28",
         )
-        self.bullet("fixed", "2026-08-29-later.md", "Landed after the release")
+        self.fragment("2026-08-29-later.md", [("Fixed", ["Landed after the release"])])
         self.run_tool("generate", "--registry", "changelog")
 
         body = self.read("CHANGELOG.md")
@@ -401,9 +468,23 @@ class TestNewCommand(RegistryTestCase):
         with self.assertRaises(rt.RegistryError):
             self.run_raw(*args)
 
-    def test_changelog_entry_requires_a_category(self):
-        with self.assertRaises(rt.RegistryError):
-            self.run_raw("new", "--registry", "changelog", "--title", "A bullet")
+    def test_changelog_entry_does_not_require_a_category(self):
+        # A change spans whatever categories it spans; the fragment seeds the
+        # first one and the author adds the rest as headings.
+        self.assertEqual(
+            self.run_tool("new", "--registry", "changelog",
+                          "--title", "A change", "--date", "2026-08-29"),
+            0,
+        )
+        body = self.read("changelog.d/2026-08-29-a-change.md")
+        self.assertIn("## Added", body)
+
+    def test_changelog_fragment_is_flat_not_nested(self):
+        self.run_tool("new", "--registry", "changelog", "--category", "fixed",
+                      "--title", "A change", "--date", "2026-08-29")
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.root, "changelog.d/2026-08-29-a-change.md")))
+        self.assertIn("## Fixed", self.read("changelog.d/2026-08-29-a-change.md"))
 
     def test_changelog_entry_rejects_an_unknown_category(self):
         with self.assertRaises(rt.RegistryError) as caught:

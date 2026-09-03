@@ -182,12 +182,10 @@ if [ "$TOOL" = "claude" ]; then
   install_file skills/registry-conflict-triage/SKILL.md .claude/skills/registry-conflict-triage/SKILL.md || true
 fi
 
-# Fragment directories must survive a clone even while empty, and .gitkeep is
-# not copied by install_tree because it is not a regular kit file everywhere.
-for _d in added changed deprecated removed fixed security; do
-  [ -d "$TARGET/changelog.d/$_d" ] || mkdir -p "$TARGET/changelog.d/$_d"
-  [ -e "$TARGET/changelog.d/$_d/.gitkeep" ] || touch "$TARGET/changelog.d/$_d/.gitkeep"
-done
+# One fragment per change lives directly in changelog.d/, so there are no
+# category directories to pre-create — the categories are headings inside each
+# file, and the tool creates the directory itself on first use.
+[ -d "$TARGET/changelog.d" ] || mkdir -p "$TARGET/changelog.d"
 
 if [ "$WITH_META" -eq 1 ]; then
   case "$TOOL" in
