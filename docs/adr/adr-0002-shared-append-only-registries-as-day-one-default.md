@@ -1,4 +1,4 @@
-# ADR-002: Shared append-only registries ship as a day-1 default, not a grown-by-signal artifact
+# ADR-0002: Shared append-only registries ship as a day-1 default, not a grown-by-signal artifact
 
 ## Status
 

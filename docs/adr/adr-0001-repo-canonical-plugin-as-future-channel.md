@@ -1,4 +1,4 @@
-# ADR-001: The repository is canonical; an agent plugin is a future distribution channel
+# ADR-0001: The repository is canonical; an agent plugin is a future distribution channel
 
 ## Status
 

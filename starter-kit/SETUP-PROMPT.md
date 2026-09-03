@@ -377,6 +377,10 @@ never there.
   the categories as `## ` headings inside it, not one file per bullet — a file
   holding a single line carries no meaning and multiplies for no benefit. For a
   knowledge base it is one file per entry, since each is already a document.
+- **Filenames.** Whatever convention the project uses, derive names with the
+  tool rather than by hand. For decision records the MADR convention is
+  `adr-NNNN-short-title.md`; the number lives in the filename and the
+  identifier (`ADR-0001`) is derived from it, never stored twice.
 - **Identifier scheme.** Default to `<date>-<slug>` (`2026-08-29-cache-warms`),
   which is collision-free by construction because no allocator exists. A
   numeric scheme is fine if the team prefers short identifiers, but then the

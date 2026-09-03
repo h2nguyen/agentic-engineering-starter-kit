@@ -110,6 +110,11 @@ class Registry:
                 f"(expected \"slug\" or \"numeric\")"
             )
         self.id_width = int(raw.get("id_width", cfg.get("id_width", 3)))
+        # Literal text every fragment filename starts with, before the number
+        # or date — e.g. "adr-" for the MADR convention adr-NNNN-short-title.md.
+        # It is part of the filename only; it never appears in the identifier,
+        # which already carries id_prefix.
+        self.filename_prefix = raw.get("filename_prefix", "")
         self.fragments = raw.get("fragments")
         if not self.fragments:
             raise RegistryError(f"{self.name}: \"fragments\" directory is required")
@@ -153,9 +158,14 @@ class Registry:
         return f"{self.id_prefix}-" + "N" * self.id_width
 
     def stem_regex(self) -> re.Pattern:
+        head = re.escape(self.filename_prefix)
         if self.id_scheme == "slug":
-            return re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$")
-        return re.compile(r"^(\d{%d})-([a-z0-9]+(?:-[a-z0-9]+)*)$" % self.id_width)
+            return re.compile(
+                r"^%s(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$" % head
+            )
+        return re.compile(
+            r"^%s(\d{%d})-([a-z0-9]+(?:-[a-z0-9]+)*)$" % (head, self.id_width)
+        )
 
     def id_for(self, path: str) -> str:
         """Derive the identifier from the fragment filename.
@@ -175,17 +185,23 @@ class Registry:
                 f"{self.id_pattern}.\n"
                 f"  See {self.rule_pointer}."
             )
-        # Under the slug scheme the whole stem is the identifier (date AND
-        # slug); under the numeric scheme only the number is, and the trailing
-        # slug is a human-readable filename affordance that never appears in a
-        # citation.
-        core = stem if self.id_scheme == "slug" else match.group(1)
+        # Under the slug scheme the identifier is the date AND slug; under the
+        # numeric scheme only the number is, and the trailing slug is a
+        # human-readable filename affordance that never appears in a citation.
+        # Either way it comes from the captured groups, so a filename_prefix
+        # stays out of the identifier.
+        core = (
+            f"{match.group(1)}-{match.group(2)}"
+            if self.id_scheme == "slug"
+            else match.group(1)
+        )
         return f"{self.id_prefix}-{core}" if self.id_prefix else core
 
     def _stem_hint(self) -> str:
+        head = self.filename_prefix
         if self.id_scheme == "slug":
-            return "YYYY-MM-DD-<lowercase-slug>.md"
-        return f"<{self.id_width}-digit number>-<lowercase-slug>.md"
+            return f"{head}YYYY-MM-DD-<lowercase-slug>.md"
+        return f"{head}<{self.id_width}-digit number>-<lowercase-slug>.md"
 
 
 def load_registries(args) -> tuple[list[Registry], str, dict]:
@@ -421,8 +437,9 @@ def next_number(reg: Registry) -> str:
     it is why the `check` gate exists, and why the slug scheme is the default.
     """
     highest = 0
+    head = re.escape(reg.filename_prefix)
     for path in fragment_paths(reg):
-        match = re.match(r"^(\d+)-", os.path.splitext(os.path.basename(path))[0])
+        match = re.match(head + r"(\d+)-", os.path.splitext(os.path.basename(path))[0])
         if match:
             highest = max(highest, int(match.group(1)))
     return str(highest + 1).zfill(reg.id_width)
@@ -467,9 +484,9 @@ def cmd_new(args) -> int:
         date = args.date or _dt.date.today().isoformat()
         if not DATE_RE.match(date):
             raise RegistryError(f"--date must be YYYY-MM-DD, got {date!r}")
-        stem = f"{date}-{slug}"
+        stem = f"{reg.filename_prefix}{date}-{slug}"
     else:
-        stem = f"{next_number(reg)}-{slug}"
+        stem = f"{reg.filename_prefix}{next_number(reg)}-{slug}"
 
     directory = reg.fragments_dir
     category = None

@@ -53,6 +53,8 @@
       "name": "adr",
       "kind": "documents",
       "id_prefix": "ADR",
+      "id_width": 4,
+      "filename_prefix": "adr-",
       "fragments": "docs/adr",
       "required_headings": ["Status", "Context", "Decision", "Consequences"]
     }

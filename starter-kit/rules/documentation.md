@@ -42,16 +42,21 @@ description; leave at most a one-line pointer.
 
 ## ADR format (Michael Nygard)
 
-One file per decision under `docs/adr/`, four sections. Create it with
+One file per decision under `docs/adr/`. Create it with
 `registry_tool.py new --registry adr --title "..."` so the filename matches the
-project's identifier scheme — under the default that is
-`docs/adr/<date>-<slug>.md`, publishing as `ADR-<date>-<slug>`.
+convention declared in `registries.json` — the tool derives the name, and a
+hand-typed one is how a file ends up outside the grammar the gate enforces.
 
-A numbered filename (`NNN-<slug>.md`) is also supported and is the reason the
-identifier gate exists: the *file* never conflicts, because two decisions are
-two paths, but two branches both taking the next free number produce a
-duplicate that merges cleanly and is caught by nothing until something cites
-it. See the shared-registries rule.
+Two naming conventions ship. The **MADR** style is
+`adr-NNNN-short-title.md` (`filename_prefix: "adr-"`, `id_width: 4`),
+publishing as `ADR-0001`. The **date-slug** style is `<date>-<slug>.md`,
+publishing as `ADR-<date>-<slug>`; it needs no allocator and therefore cannot
+collide.
+
+A numbered convention is the reason the identifier gate exists: the *file*
+never conflicts, because two decisions are two paths, but two branches both
+taking the next free number produce a duplicate that merges cleanly and is
+caught by nothing until something cites it. See the shared-registries rule.
 
 The four sections, in [Michael Nygard's
 format](https://github.com/architecture-decision-record/architecture-decision-record):

@@ -412,6 +412,76 @@ class TestUniquenessGate(RegistryTestCase):
         self.assertEqual(self.run_tool("check", "--registry", "adr"), 0)
 
 
+class TestFilenamePrefix(RegistryTestCase):
+    """The MADR convention: adr-NNNN-short-title.md.
+
+    The prefix belongs to the filename only. The identifier still comes from
+    id_prefix plus the number, so `adr-` never leaks into a citation.
+    """
+
+    scheme = "numeric"
+
+    def setUp(self):
+        super().setUp()
+        config = json.loads(self.read("registries.json"))
+        for registry in config["registries"]:
+            if registry["name"] == "adr":
+                registry["filename_prefix"] = "adr-"
+                registry["id_width"] = 4
+        self.write("registries.json", json.dumps(config))
+
+    def registry(self):
+        args = rt.build_parser().parse_args(["check", "--registry", "adr"])
+        return rt.load_registries(args)[0][0]
+
+    def adr(self, name, body="# A decision\n\n## Context\n\nWhy.\n\n## Decision\n\nWhat.\n"):
+        return self.write(f"adr/{name}", body)
+
+    def test_prefix_stays_out_of_the_identifier(self):
+        path = self.adr("adr-0001-a-decision.md")
+        self.assertEqual(self.registry().id_for(path), "ADR-0001")
+
+    def test_a_filename_missing_the_prefix_is_rejected(self):
+        path = self.adr("0001-a-decision.md")
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.registry().id_for(path)
+        self.assertIn("adr-", str(caught.exception))
+
+    def test_wrong_width_is_still_rejected_under_a_prefix(self):
+        path = self.adr("adr-001-a-decision.md")
+        with self.assertRaises(rt.RegistryError):
+            self.registry().id_for(path)
+
+    def test_allocation_respects_the_prefix(self):
+        self.adr("adr-0001-first.md")
+        self.adr("adr-0014-fourteenth.md")
+        self.assertEqual(rt.next_number(self.registry()), "0015")
+
+    def test_new_writes_a_madr_filename(self):
+        self.assertEqual(
+            self.run_tool("new", "--registry", "adr", "--title", "Adopt an outbox"),
+            0,
+        )
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.root, "adr/adr-0001-adopt-an-outbox.md")))
+
+    def test_duplicate_numbers_are_still_caught_under_a_prefix(self):
+        self.adr("adr-0001-one.md")
+        self.adr("adr-0001-also-one.md")
+        self.assertEqual(self.run_tool("check", "--registry", "adr"), 1)
+
+    def test_prefix_works_with_the_slug_scheme_too(self):
+        config = json.loads(self.read("registries.json"))
+        for registry in config["registries"]:
+            if registry["name"] == "adr":
+                registry["id_scheme"] = "slug"
+        self.write("registries.json", json.dumps(config))
+        path = self.adr("adr-2026-08-29-a-decision.md")
+        self.assertEqual(
+            self.registry().id_for(path), "ADR-2026-08-29-a-decision"
+        )
+
+
 class TestConfiguration(RegistryTestCase):
     def test_unknown_registry_names_the_declared_ones(self):
         with self.assertRaises(rt.RegistryError) as caught:

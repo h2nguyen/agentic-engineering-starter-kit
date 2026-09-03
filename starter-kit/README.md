@@ -114,7 +114,7 @@ confirm the gates pass, enable further common skills from
   companion artifact rather than hard-coding its repository path.
   Target-*project* paths (where an artifact reads or writes in the adopting
   repo) stay explicit. This is what keeps a future plugin conversion
-  mechanical — see `docs/adr/001-repo-canonical-plugin-as-future-channel.md`.
+  mechanical — see `docs/adr/adr-0001-repo-canonical-plugin-as-future-channel.md`.
 - An umbrella lint target (`make lint` or equivalent) that CI runs on every PR —
   every `check-*` script gets chained into it, **and CI invokes that aggregate
   target rather than re-listing its parts**. A workflow that enumerates
