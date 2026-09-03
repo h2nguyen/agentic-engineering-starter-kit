@@ -54,7 +54,7 @@
       "kind": "documents",
       "id_prefix": "ADR",
       "fragments": "docs/adr",
-      "required_headings": ["Context", "Decision", "Alternatives", "Consequences"]
+      "required_headings": ["Status", "Context", "Decision", "Consequences"]
     }
   ]
 }

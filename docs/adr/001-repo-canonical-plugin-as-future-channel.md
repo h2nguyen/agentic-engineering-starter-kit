@@ -1,5 +1,9 @@
 # ADR-001: The repository is canonical; an agent plugin is a future distribution channel
 
+## Status
+
+Accepted
+
 ## Context
 
 This project ships two kinds of content with **opposite distribution needs**:
@@ -16,6 +20,21 @@ Agentic coding tools (e.g. Claude Code) offer plugin systems that bundle
 skills, agents, commands and hooks into an installable, centrally-updatable
 unit. The question is whether this project should become such a plugin.
 
+Three options were weighed:
+
+- **Plugin-first (plugin is the primary artifact).** A plugin is tool-specific,
+  which breaks the project's tool-agnostic commitment (guide
+  § 3.10 — Claude Code, `AGENTS.md`-convention tools, Cursor, GitHub Copilot).
+  It also cannot host the scaffolding: guardrails only bite when the rules and
+  enforcement scripts live in the adopting repo and its CI runs them
+  (guide § 1.2, principle P3).
+- **Split the source of truth (skills in a plugin, scaffolding in the repo).**
+  Two homes drift apart, and the guide's own anti-pattern table
+  names duplicated-and-drifting content as a failure mode.
+- **Build the plugin now, alongside the repo.** Runs against the project's
+  own doctrine: no consumer exists yet, and speculative artifacts are
+  maintenance load (guide § 4.5).
+
 ## Decision
 
 **The repository stays canonical. A plugin is a future *distribution channel*
@@ -25,21 +44,6 @@ Concretely: installation paths remain (1) paste `SETUP-PROMPT.md` into an agent
 session, (2) run `bootstrap.sh`, (3) manual copy. A plugin, if built later,
 becomes a fourth path that ships the portable tools plus a setup command which
 writes the project-resident scaffolding into the target repo.
-
-## Alternatives considered
-
-- **Plugin-first (plugin is the primary artifact).** Rejected: a plugin is
-  tool-specific, which breaks the project's tool-agnostic commitment (guide
-  § 3.10 — Claude Code, `AGENTS.md`-convention tools, Cursor, GitHub Copilot).
-  It also cannot host the scaffolding: guardrails only bite when the rules and
-  enforcement scripts live in the adopting repo and its CI runs them
-  (guide § 1.2, principle P3).
-- **Split the source of truth (skills in a plugin, scaffolding in the repo).**
-  Rejected: two homes drift apart, and the guide's own anti-pattern table
-  names duplicated-and-drifting content as a failure mode.
-- **Build the plugin now, alongside the repo.** Rejected under the project's
-  own doctrine: no consumer exists yet, and speculative artifacts are
-  maintenance load (guide § 4.5).
 
 ## Consequences
 

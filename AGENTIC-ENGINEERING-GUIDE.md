@@ -299,7 +299,7 @@ make lint         # lint + enforcement checks (must pass before any PR)
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR-lite format, comment hygiene
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), comment hygiene
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
 - [`security.md`](.claude/rules/security.md) — AuthN/AuthZ defaults, secret handling, data classification

@@ -40,7 +40,7 @@ show: one line, plus a pointer to the durable home.
 lines? Reference a ticket by ID? Any yes → relocate to an ADR or the PR
 description; leave at most a one-line pointer.
 
-## ADR-lite format
+## ADR format (Michael Nygard)
 
 One file per decision under `docs/adr/`, four sections. Create it with
 `registry_tool.py new --registry adr --title "..."` so the filename matches the
@@ -53,12 +53,17 @@ two paths, but two branches both taking the next free number produce a
 duplicate that merges cleanly and is caught by nothing until something cites
 it. See the shared-registries rule.
 
-The four sections:
+The four sections, in [Michael Nygard's
+format](https://github.com/architecture-decision-record/architecture-decision-record):
 
-1. **Context** — why a decision was needed
-2. **Decision** — what was chosen
-3. **Alternatives** — what was rejected, one line + trade-off each
-4. **Consequences** — what becomes easier, what becomes harder
+1. **Status** — proposed / accepted / deprecated / superseded by ADR-X
+2. **Context** — the forces at play: what made a decision necessary, and the
+   options weighed against each other. Value-neutral; describe the tension
+   rather than arguing for the outcome. Rejected options belong here, one line
+   and its trade-off each — they are part of the forces, not a separate topic.
+3. **Decision** — what was chosen, in active voice: "We will …"
+4. **Consequences** — the resulting context once the decision is applied, good
+   and bad alike. What becomes easier, what becomes harder.
 
 Accepted ADRs are immutable; changing course means a new ADR that supersedes
 the old one by identifier. **Never renumber an ADR that is already on the

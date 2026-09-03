@@ -63,8 +63,10 @@ Then fill it in:
   diagnosis. `Prevention` names the rule or check that now encodes the lesson;
   if neither exists yet, that is a signal worth raising rather than a field to
   leave vague.
-- **Decision record** — Context, Decision, Alternatives (one line and its
-  trade-off each), Consequences (what gets easier, what gets harder).
+- **Decision record** — Michael Nygard format: Status, Context, Decision,
+  Consequences. Rejected options go inside Context, one line and its trade-off
+  each, because they are part of the forces that made the decision necessary —
+  not a separate section. Write the Decision in active voice: "We will …".
 
 ## Phase 3 — Generate and verify
 

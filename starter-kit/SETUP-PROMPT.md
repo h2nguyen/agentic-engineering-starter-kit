@@ -328,7 +328,8 @@ silent. Non-trivial scripts get their own tests.
 - **working-principles** — the five directives in A.3.
 - **documentation** — docs are part of the change (same-PR updates); >30-minute
   bugs become KB entries; cross-file design decisions become ADR-lite records
-  (Context → Decision → Alternatives → Consequences; immutable once accepted,
+  (Michael Nygard format: Status → Context → Decision → Consequences, with
+  rejected options recorded inside Context as part of the forces; immutable once accepted,
   superseded by number); decision rationale never lives in shipped-source
   comments — a one-line pointer to the ADR/KB entry is the maximum.
 - **shared-registries** — the A.9 pattern as a rule: fragment layout, the
