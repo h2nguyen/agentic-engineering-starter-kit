@@ -645,8 +645,8 @@ The third tier deserves its demotion for a specific reason. An agent resolving t
 |---|---|
 | `.gitattributes` | `merge=union` on the generated artifacts, with both hazards documented inline |
 | fragment directories | `<artifact>.d/` and `changelog.d/` — one file per entry (per *change*, for changelogs), named so two branches cannot collide |
-| `registry_tool.py` | creates fragments, assembles them deterministically, promotes a release, gates identifiers |
-| drift check | regenerate, diff against the committed artifact, fail on difference |
+| `registry_tool.py` | creates fragments, assembles them deterministically, promotes a release, gates identifiers, adopts an existing hand-maintained artifact |
+| drift check | regenerate and compare what the artifact *says* to its fragments — same entries, same content, any order — so a union merge that only reorders is green, and one that mangles an entry is not |
 | identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
 | `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
 | coverage check | proves every check in that target actually runs in CI |

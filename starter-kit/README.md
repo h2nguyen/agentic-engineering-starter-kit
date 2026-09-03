@@ -56,14 +56,14 @@ confirm the gates pass, enable further common skills from
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
 | `registries.json.template` | `registries.json` | Delete the registries you don't have; pick the identifier scheme |
 | `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config` |
-| `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — add the generated-region markers to it instead |
+| `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — run `registry_tool.py adopt --registry changelog` on it instead |
 | `changelog.d/` | `changelog.d/` | One fragment per change; categories are `## ` headings inside it |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | One file per entry — the authored source of the KB |
 | `Makefile.template` | `Makefile` | Merge the targets into your existing one if you have it |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
-| `scripts/registry_tool.py` | `scripts/registry_tool.py` | Ready to run — `new` / `generate` / `check` / `release` |
+| `scripts/registry_tool.py` | `scripts/registry_tool.py` | Ready to run — `new` / `generate` / `check` / `release` / `adopt` (brownfield: moves an existing artifact into fragments) |
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |

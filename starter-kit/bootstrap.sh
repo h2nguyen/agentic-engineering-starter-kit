@@ -217,6 +217,14 @@ echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape chec
 echo "     the CI-coverage check are already chained into it, and the installed"
 echo "     workflow invokes that same target so nothing can fall out of CI."
 echo "     Merge the targets into your existing Makefile if you had one."
+for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
+  if printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept "; then
+    echo "     NOTE: your existing $_kept was left untouched. It has no generated"
+    echo "     region yet, so the drift gate will fail until it is adopted:"
+    echo "         python3 scripts/registry_tool.py adopt --registry <name>"
+    echo "     moves its current entries into fragments and installs the markers."
+  fi
+done
 echo "  4. Grow by signal: the placeholder templates (rules/_rule-template.md,"
 echo "     skills/_template/, agents/, commands/) stay in the kit for later."
 case "$TOOL" in

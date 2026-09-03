@@ -322,6 +322,120 @@ contract_kb() { # $1 = id_scheme
   fi
 }
 
+contract_no_round_trip_after_merge() {
+  # "Stable for parallel developers" is only true if a clean merge is also a
+  # GREEN merge. Union merge keeps both branches' generated blocks but not in
+  # canonical order or spacing, so a byte-equality drift check would fail on
+  # every concurrent pair and demand a regenerate commit each time. The check
+  # therefore compares what the artifact SAYS. Entries here have distinct
+  # bodies, as real ones do; the boundary where union merge stops being safe
+  # is pinned separately below.
+  local repo="$WORK/no-round-trip"
+  scaffold_fragment_repo "$repo" slug
+  add_on_branch "$repo" branch-a new --registry debugging-kb \
+      --title "Zulu entry sorts last" --date 2026-08-29
+  sed -i 's/^\*\*Symptom:\*\* .*/**Symptom:** Stale config is served for thirty seconds after a deploy./; s/^\*\*Fix:\*\* .*/**Fix:** Warm the cache after the config has loaded, not before./' \
+      "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-zulu-entry-sorts-last.md"
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "a: real body"
+  add_on_branch "$repo" branch-b new --registry debugging-kb \
+      --title "Alpha entry sorts first" --date 2026-08-29
+  sed -i 's/^\*\*Symptom:\*\* .*/**Symptom:** A request hangs instead of failing fast on timeout./; s/^\*\*Fix:\*\* .*/**Fix:** Propagate the timeout error out of the retry loop./' \
+      "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-alpha-entry-sorts-first.md"
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "b: real body"
+  add_on_branch "$repo" branch-c new --registry changelog --category added \
+      --title "Zulu change" --date 2026-08-29
+  cat > "$repo/changelog.d/2026-08-29-zulu-change.md" <<'EOF'
+# Zulu change
+
+## Added
+
+- The zulu endpoint.
+
+## Fixed
+
+- The zulu leak.
+EOF
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "c: two categories"
+  add_on_branch "$repo" branch-d new --registry changelog --category added \
+      --title "Alpha change" --date 2026-08-29
+  cat > "$repo/changelog.d/2026-08-29-alpha-change.md" <<'EOF'
+# Alpha change
+
+## Added
+
+- The alpha endpoint.
+
+## Fixed
+
+- The alpha leak.
+EOF
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "d: two categories"
+
+  git -C "$repo" checkout -q branch-a
+  for b in branch-b branch-c branch-d; do
+    [ "$(merge_result "$repo" $b)" = "clean" ] || { bad "[no-round-trip] merging $b conflicted"; return; }
+  done
+
+  # Deliberately NO regenerate. This is what CI sees on the merge commit.
+  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+    ok "[no-round-trip] four concurrent branches (KB + two-category changelog) merge GREEN with no regenerate commit"
+  else
+    bad "[no-round-trip] a clean merge still needs a follow-up regenerate commit before CI passes"
+    [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && python3 scripts/registry_tool.py generate --check )
+  fi
+  local misfiled; misfiled="$(awk '/### Fixed/{f=1} f && /endpoint\./' "$repo/CHANGELOG.md" | wc -l)"
+  if [ "$misfiled" -eq 0 ]; then
+    ok "[no-round-trip] no changelog bullet was filed under the wrong category by the merge"
+  else
+    bad "[no-round-trip] $misfiled bullet(s) misfiled under ### Fixed by the union merge"
+  fi
+
+  # A real corruption must still be caught: hand-edit an entry body.
+  sed -i 's/thirty seconds/thirty minutes/' "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.md"
+  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+    bad "[no-round-trip] a hand-edited entry body passed the drift check"
+  else
+    ok "[no-round-trip] a hand-edited entry body is still rejected"
+  fi
+}
+
+contract_union_boundary_is_loud() {
+  # Where union merge stops being safe: two concurrent entries that share two
+  # or more CONSECUTIVE identical lines get interleaved by git's conflict
+  # refinement. That cannot be prevented by a merge attribute. What the
+  # design guarantees instead is that it is never SILENT: the semantic drift
+  # check rejects the interleaved artifact, and a regenerate restores it.
+  # (The `check` gate also refuses unfilled template placeholders, which is
+  # the common way two entries end up with identical adjacent lines.)
+  local repo="$WORK/union-boundary"
+  scaffold_fragment_repo "$repo" slug
+  for b in a b; do
+    git -C "$repo" checkout -q main; git -C "$repo" checkout -q -b "branch-$b"
+    mkdir -p "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d"   # git drops the dir once it is empty on main
+    cat > "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-entry-$b.md" <<EOF
+# Entry $b
+
+**Symptom:** Unique to $b.
+
+**Root Cause:** Identical boilerplate line one.
+
+**Fix:** Identical boilerplate line two.
+EOF
+    ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "$b"
+  done
+  git -C "$repo" checkout -q branch-a
+  [ "$(merge_result "$repo" branch-b)" = "clean" ] || { bad "[union-boundary] unexpected conflict"; return; }
+  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+    bad "[union-boundary] an interleaved artifact passed the drift check (SILENT corruption)"
+  else
+    ok "[union-boundary] entries sharing 2+ identical consecutive lines: merge clean, drift check LOUD"
+  fi
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 \
+      && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ) \
+    && ok "[union-boundary] one regenerate restores a drift-free artifact with both entries" \
+    || bad "[union-boundary] regenerate did not recover"
+}
+
 contract_changelog() {
   local repo="$WORK/fragment-changelog"
   scaffold_fragment_repo "$repo" slug
@@ -507,6 +621,8 @@ if [ ! -f "$TOOL" ]; then
 else
   contract_kb slug
   contract_kb numeric
+  contract_no_round_trip_after_merge
+  contract_union_boundary_is_loud
   contract_changelog
   contract_one_fragment_many_categories
   contract_append_vs_release

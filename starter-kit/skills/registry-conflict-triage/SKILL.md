@@ -46,6 +46,7 @@ python3 scripts/registry_tool.py generate --check   # what drifted, and how
 | **Duplicate identifier**, neither side merged | an allocator handed both branches the same number | Phase 3 |
 | **Duplicate identifier**, both sides already on the default branch | too late to prevent; both may be cited | Phase 4 |
 | Add/add conflict on the **same fragment path** | two branches wrote the same entry independently | Phase 3 |
+| **Modify/delete** on a changelog fragment | one branch edited a bullet that a concurrent release already promoted and consumed | Phase 3 |
 
 ## Phase 2 — Conflicts in generated artifacts
 
@@ -94,6 +95,17 @@ grep -rn "ISSUE-007" --exclude-dir=.git .
 
 Any hit outside the fragment itself means the identifier is in use — treat it
 as landed and go to Phase 4.
+
+**Modify/delete: an edit to a bullet the release already shipped.** The
+fragment is gone because its bullet now lives in a released section, which is
+immutable. Do not restore the fragment — that would ship the bullet twice.
+Take the deletion, and if the edit still matters, record it as an erratum
+under `[Unreleased]`, the mechanism the versioning rule prescribes:
+
+```bash
+git rm changelog.d/2026-08-20-the-feature.md
+python3 scripts/registry_tool.py new --registry changelog --title "Erratum for 1.5.0"
+```
 
 **Same fragment path from both branches.** Two independent write-ups of one
 event. Keep the fuller one, fold anything the other adds into it, and delete

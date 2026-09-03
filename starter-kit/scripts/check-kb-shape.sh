@@ -20,9 +20,33 @@
 #   5. Every '**Related:**' line uses valid typed-link tokens
 set -euo pipefail
 
-KB="${1:-docs/DEBUGGING-KNOWLEDGE-BASE.md}"
-PREFIX="${KB_ID_PREFIX:-ISSUE}"
-WIDTH="${KB_ID_WIDTH:-3}"
+# One source of truth. When registries.json declares the knowledge base, its
+# output path, identifier prefix and digit width come from there — otherwise
+# this gate and registry_tool.py disagree the moment a project changes the
+# width, and one of them is wrong about the same file. Env vars and the
+# defaults below apply only where no registry is declared.
+_cfg=""
+if [ -f registries.json ] && command -v python3 >/dev/null 2>&1; then
+  _cfg="$(python3 - <<'PY' 2>/dev/null
+import json
+cfg = json.load(open("registries.json"))
+for r in cfg.get("registries", []):
+    if r.get("kind", "entries") == "entries" and r.get("output"):
+        print(r["output"], r.get("id_prefix", "ISSUE"),
+              r.get("id_width", cfg.get("id_width", 3)))
+        break
+PY
+)"
+fi
+if [ -n "$_cfg" ]; then
+  set -- ${1:+"$1"}
+  read -r _out _prefix _width <<< "$_cfg"
+  KB="${1:-$_out}"; PREFIX="${KB_ID_PREFIX:-$_prefix}"; WIDTH="${KB_ID_WIDTH:-$_width}"
+else
+  KB="${1:-docs/DEBUGGING-KNOWLEDGE-BASE.md}"
+  PREFIX="${KB_ID_PREFIX:-ISSUE}"
+  WIDTH="${KB_ID_WIDTH:-3}"
+fi
 
 if [ ! -f "$KB" ]; then
   echo "FAIL: knowledge base not found at $KB"

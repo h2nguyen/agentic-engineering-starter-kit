@@ -124,9 +124,12 @@ Create, at the locations your detected tool expects (Appendix A.1):
    and the rule file. Install this on day one even though the registries are
    empty: it is the one component whose retrofit cost grows with every entry
    written, because identifiers become citation targets the moment they exist.
-   For a brownfield repo with registries already in use, freeze the existing
-   identifiers and apply the new scheme only to new entries — never renumber
-   what is already cited.
+   For a brownfield repo with registries already in use, run
+   `registry_tool.py adopt --registry <name>` on each existing artifact: it
+   moves the current entries into fragments losslessly and installs the
+   generated region. It refuses to renumber — set the numeric scheme first to
+   freeze identifiers that are already cited, and apply the slug scheme only
+   to new registries.
 
 ## Phase 3 — Seed the guardrails (Level 2)
 

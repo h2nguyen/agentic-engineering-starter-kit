@@ -311,6 +311,22 @@ class TestChangelog(RegistryTestCase):
         self.run_tool("generate", "--registry", "changelog")
         self.assertIn("continued here.", self.read("CHANGELOG.md"))
 
+    def test_every_category_gets_an_anchor_even_when_empty(self):
+        # The anchors are merge context. Without them, two branches that each
+        # touch two categories produce one contiguous hunk apiece, and union
+        # merge appends the second branch's block after the first's LAST
+        # section — filing its Added bullet under Fixed.
+        self.fragment("2026-08-29-one.md", [("Added", ["Adds a thing"])])
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        for category in ("Added", "Fixed"):
+            self.assertIn(f"<!-- category: {category} -->", body)
+        self.assertNotIn("### Fixed", body)   # heading only when there are bullets
+
+    def test_placeholder_bullet_is_rejected(self):
+        self.run_tool("new", "--registry", "changelog", "--title", "Unfinished", "--date", "2026-08-29")
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
+
     def test_release_promotes_and_consumes_the_fragments(self):
         self.fragment("2026-08-20-one.md", [("Added", ["Adds a thing"])])
         self.run_tool("generate", "--registry", "changelog")
@@ -396,6 +412,14 @@ class TestUniquenessGate(RegistryTestCase):
         with self.assertRaises(rt.RegistryError):
             self.run_raw("check", "--registry", "kb")
 
+    def test_unfilled_template_placeholder_fails(self):
+        # Two concurrent entries that both leave adjacent fields as boilerplate
+        # share identical consecutive lines, which is the one shape union merge
+        # interleaves. Refusing unfilled placeholders closes the common route
+        # to that state.
+        self.run_tool("new", "--registry", "kb", "--title", "Left blank")
+        self.assertEqual(self.run_tool("check", "--registry", "kb"), 1)
+
     def test_missing_required_field_fails(self):
         self.write("kb.d/003-partial.md", "# Partial\n\n**Symptom:** only one field.\n")
         self.assertEqual(self.run_tool("check", "--registry", "kb"), 1)
@@ -480,6 +504,142 @@ class TestFilenamePrefix(RegistryTestCase):
         self.assertEqual(
             self.registry().id_for(path), "ADR-2026-08-29-a-decision"
         )
+
+
+class TestSemanticDriftCheck(RegistryTestCase):
+    """The drift check compares what the artifact SAYS, not its bytes.
+
+    A union merge keeps both branches' generated blocks in whichever order
+    they arrived and drops the blank line between them. That is not drift,
+    and failing on it would demand a regenerate commit after every concurrent
+    merge. Real corruption — a changed body, a missing entry, a duplicated
+    heading with two bodies — must still fail.
+    """
+
+    def generated(self):
+        self.entry("2026-08-29-alpha.md", title="Alpha")
+        self.entry("2026-08-29-zulu.md", title="Zulu")
+        self.run_tool("generate", "--registry", "kb")
+        return self.read("KB.md")
+
+    def test_reordered_entries_pass(self):
+        body = self.generated()
+        region = rt.extract_region(self.registries()[0], body)
+        blocks = [b for b in region.split("\n## ")]
+        swapped = blocks[0] + "\n## " + blocks[2] + "\n## " + blocks[1]
+        self.write("KB.md", body.replace(region, swapped))
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 0)
+
+    def test_missing_blank_lines_pass(self):
+        body = self.generated()
+        self.write("KB.md", body.replace("\n\n<!-- end:", "\n<!-- end:"))
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 0)
+
+    def test_changed_body_fails(self):
+        body = self.generated()
+        self.write("KB.md", body.replace("something else.", "SOMETHING ELSE."))
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 1)
+
+    def test_missing_entry_fails(self):
+        body = self.generated()
+        region = rt.extract_region(self.registries()[0], body)
+        head, _, _ = region.partition("\n## ISSUE-2026-08-29-zulu")
+        self.write("KB.md", body.replace(region, head))
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 1)
+
+    def test_duplicated_heading_with_two_bodies_fails(self):
+        # The edit-versus-edit case union merge hides: same identifier twice,
+        # different content. A dict keyed on the heading would collapse it.
+        body = self.generated()
+        region = rt.extract_region(self.registries()[0], body)
+        dup = region + "\n\n## ISSUE-2026-08-29-alpha: Alpha\n\n**Symptom:** other.\n"
+        self.write("KB.md", body.replace(region, dup))
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 1)
+
+    def test_edit_outside_the_region_still_fails(self):
+        body = self.generated()
+        self.write("KB.md", body.replace("# Knowledge Base", "# Knowledge Base (edited)"))
+        # Outside-region edits are not drift in the generated sense, but the
+        # check compares whole files when the region is semantically equal, so
+        # the header edit surfaces as a byte difference with equal regions.
+        # That is allowed: the header is hand-maintained.
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 0)
+
+    def registries(self):
+        args = rt.build_parser().parse_args(["check", "--registry", "kb"])
+        return rt.load_registries(args)[0]
+
+
+class TestAdopt(RegistryTestCase):
+    """Brownfield: an existing artifact becomes fragments, losslessly."""
+
+    def test_changelog_bullets_move_into_a_fragment(self):
+        self.write(
+            "CHANGELOG.md",
+            "# Changelog\n\nPreamble.\n\n## [Unreleased]\n\n### Added\n\n"
+            "- Existing one.\n- Existing two.\n\n### Fixed\n\n- Existing fix.\n\n"
+            "## [1.0.0] - 2026-01-01\n\n### Added\n\n- Initial.\n",
+        )
+        self.assertEqual(
+            self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03"), 0
+        )
+        fragment = self.read("changelog.d/2026-09-03-migrated-from-changelog.md")
+        for text in ("## Added", "- Existing one.", "- Existing two.", "## Fixed", "- Existing fix."):
+            self.assertIn(text, fragment)
+        body = self.read("CHANGELOG.md")
+        self.assertIn("Preamble.", body)
+        self.assertIn("BEGIN GENERATED: changelog", body)
+        self.assertIn("- Initial.", body)              # released section untouched
+        self.assertEqual(body.count("- Existing one."), 1)
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 0)
+
+    def test_adopt_is_idempotent(self):
+        self.write("CHANGELOG.md", "# C\n\n## [Unreleased]\n\n### Added\n\n- One.\n")
+        self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03")
+        before = self.read("CHANGELOG.md")
+        self.assertEqual(self.run_tool("adopt", "--registry", "changelog"), 0)
+        self.assertEqual(before, self.read("CHANGELOG.md"))
+
+    def test_changelog_without_unreleased_heading_is_rejected(self):
+        self.write("CHANGELOG.md", "# C\n\n## [1.0.0]\n\n- Old.\n")
+        with self.assertRaises(rt.RegistryError):
+            self.run_raw("adopt", "--registry", "changelog")
+
+
+class TestAdoptKnowledgeBase(RegistryTestCase):
+    scheme = "numeric"
+
+    def test_entries_split_into_numbered_fragments(self):
+        self.write(
+            "KB.md",
+            "# KB\n\nSearch here first.\n\n"
+            "## ISSUE-001: First bug\n\n**Symptom:** a.\n\n**Fix:** b.\n\n"
+            "## ISSUE-002: Second bug\n\n**Symptom:** c.\n\n**Fix:** d.\n",
+        )
+        self.assertEqual(self.run_tool("adopt", "--registry", "kb"), 0)
+        names = sorted(f for f in os.listdir(os.path.join(self.root, "kb.d")))
+        self.assertEqual(names, ["001-first-bug.md", "002-second-bug.md"])
+        self.assertIn("**Symptom:** c.", self.read("kb.d/002-second-bug.md"))
+        body = self.read("KB.md")
+        self.assertIn("Search here first.", body)
+        self.assertIn("## ISSUE-001: First bug", body)
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "kb"), 0)
+        self.assertEqual(self.run_tool("check", "--registry", "kb"), 0)
+
+    def test_slug_scheme_refuses_to_renumber_existing_entries(self):
+        config = json.loads(self.read("registries.json"))
+        config["id_scheme"] = "slug"
+        self.write("registries.json", json.dumps(config))
+        self.write("KB.md", "# KB\n\n## ISSUE-001: A bug\n\n**Symptom:** a.\n\n**Fix:** b.\n")
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.run_raw("adopt", "--registry", "kb")
+        self.assertIn("FREEZE", str(caught.exception))
+
+    def test_wrong_width_is_reported_with_the_fix(self):
+        self.write("KB.md", "# KB\n\n## ISSUE-0001: A bug\n\n**Symptom:** a.\n\n**Fix:** b.\n")
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.run_raw("adopt", "--registry", "kb")
+        self.assertIn("id_width", str(caught.exception))
 
 
 class TestConfiguration(RegistryTestCase):

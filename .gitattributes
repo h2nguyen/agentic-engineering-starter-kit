@@ -9,10 +9,12 @@
 CHANGELOG.md          merge=union linguist-generated=true
 
 # Fragments are one file per entry, so two branches add two different paths and
-# git merges them without being asked. Stated explicitly: an absent entry would
-# read as an oversight rather than a decision.
-changelog.d/**        -merge
+# git merges them without being asked. Two branches editing the SAME fragment
+# get the ordinary three-way text merge, which is the right behaviour: clean
+# for non-overlapping edits, a loud conflict for overlapping ones. `merge=text`
+# is that default, stated so an absent line does not read as an oversight.
+changelog.d/**        merge=text
 
 # Decision records are already one file per decision. The file cannot conflict;
 # only the allocated number can, which is what check-registry-ids.sh is for.
-docs/adr/**           -merge
+docs/adr/**           merge=text

@@ -139,6 +139,34 @@ see the damage. Here that is the drift check: a mangled generated file stops
 matching its fragments, and CI says so. Remove the drift check and the union
 entries in `.gitattributes` have to go with it.
 
+The drift check compares what the artifact **says** — the same entries with
+the same content, in any order — not its bytes. A union merge keeps both
+branches' generated blocks in whichever order they arrived and drops the blank
+line between them; that is not drift, and failing on it would demand a
+regenerate commit after every concurrent merge, which is most of the friction
+this layout exists to remove. Real corruption still fails: a changed body, a
+missing entry, the same identifier twice with two bodies.
+
+### Where union merge stops being safe
+
+Git refines a conflict by diffing the two sides against each other and keeping
+whatever they have in common. Two concurrently added entries that share **two
+or more consecutive identical lines** are therefore interleaved — each keeps
+its unique lines, the shared run appears once, and both entries are wrong. No
+merge attribute prevents this. Three things contain it:
+
+- every rendered entry ends with a line unique to it, and every changelog
+  category is preceded by a stable anchor, so the common case has no shared
+  run to find;
+- the `check` gate refuses unfilled template placeholders, which is the usual
+  way two entries acquire identical adjacent lines;
+- the drift check catches the rest — loudly, never silently — and one
+  regenerate restores the artifact.
+
+So the guarantee is precise: a concurrent merge is never a *conflict* and never
+*silent*. In the common case it is also green with nothing to do; in the rare
+case above it costs one `make registry-generate` commit.
+
 ### A release moves the anchor other branches are appending to
 
 Promoting `[Unreleased]` into a version section relocates the heading concurrent
@@ -197,3 +225,6 @@ branch is open. Read this rule before proposing the collapse.
 - [ ] No identifier renamed that was already on the default branch?
 - [ ] If a new registry was added: declared in `registries.json`, its fragment
       directory created, and its generated region marked in the artifact?
+- [ ] Bringing an existing artifact under the layout: used
+      `registry_tool.py adopt --registry <name>` rather than moving entries by
+      hand, so nothing was dropped and no identifier changed?

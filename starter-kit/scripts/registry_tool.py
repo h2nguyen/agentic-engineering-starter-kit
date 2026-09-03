@@ -26,6 +26,7 @@ subcommand for its options.
   registry_tool.py generate  [--registry <name>] [--check]
   registry_tool.py check     [--registry <name>]
   registry_tool.py release   --registry <name> --version X.Y.Z
+  registry_tool.py adopt     --registry <name>      (brownfield: existing artifact -> fragments)
   registry_tool.py list
 """
 
@@ -376,6 +377,14 @@ def render(reg: Registry) -> str:
         block = f"## {entry_id}: {title}"
         if body:
             block += f"\n\n{body}"
+        # A closing line unique to this entry. When two branches each add an
+        # entry, git's union merge trims lines that are identical at the edges
+        # of the conflict region — and template-driven entries routinely end
+        # with the same line (a default **Related:** link, say). Without a
+        # unique last line the two entries collapse into each other and one
+        # loses its tail, silently. The heading already makes the first line
+        # unique; this makes the last one unique too.
+        block += f"\n\n<!-- end: {entry_id} -->"
         blocks.append(block)
     return "\n\n".join(blocks)
 
@@ -387,11 +396,100 @@ def _render_changelog(reg: Registry, paths: list[str]) -> str:
             by_category.setdefault(category, []).extend(bullets)
     sections = []
     for category in reg.categories:
+        # Every category gets an anchor line, ALWAYS, even when empty — an
+        # HTML comment, so nothing shows when rendered. It is merge context:
+        # when two branches each add bullets to two categories, git sees one
+        # contiguous change per branch and union merge appends the second
+        # branch's whole block after the first branch's LAST section, filing
+        # its earlier bullets under the wrong heading. With a stable anchor
+        # between categories, each category is its own hunk and bullets can
+        # only ever land under their own heading.
+        block = f"<!-- category: {category} -->"
         bullets = by_category.get(category)
         if bullets:
             body = "\n".join(f"- {b}" for b in bullets)
-            sections.append(f"### {category}\n\n{body}")
+            block += f"\n### {category}\n\n{body}"
+        sections.append(block)
     return "\n\n".join(sections)
+
+
+def extract_region(reg: Registry, text: str) -> str | None:
+    """The lines between the BEGIN and END markers, or None if absent."""
+    lines = text.splitlines()
+    begin = end = None
+    for index, line in enumerate(lines):
+        if begin is None and f"BEGIN GENERATED: {reg.name}" in line:
+            begin = index
+        elif begin is not None and f"END GENERATED: {reg.name}" in line:
+            end = index
+            break
+    if begin is None or end is None:
+        return None
+    return "\n".join(lines[begin + 1:end])
+
+
+def _normalise(lines: list[str]) -> str:
+    """Trailing whitespace and runs of blank lines carry no meaning."""
+    out: list[str] = []
+    for line in lines:
+        line = line.rstrip()
+        if not line and out and not out[-1]:
+            continue
+        out.append(line)
+    while out and not out[0]:
+        out.pop(0)
+    while out and not out[-1]:
+        out.pop()
+    return "\n".join(out)
+
+
+def canonical(reg: Registry, region: str) -> list[tuple[str, str]]:
+    """What a generated region SAYS, independent of order and spacing.
+
+    A union merge keeps both branches' generated blocks but not in canonical
+    order, and it drops the blank line between them. Byte-equality would fail
+    on every concurrent merge and demand a regenerate commit each time — a
+    round-trip on every pair, which is most of the friction this whole layout
+    exists to remove. So the drift check compares meaning: the same entries
+    with the same content, in any order. Returned as a SORTED LIST rather than
+    a dict so that a duplicated heading with two different bodies — the
+    edit-versus-edit case union merge hides — shows up as two items and fails.
+    """
+    items: list[tuple[str, str]] = []
+    if reg.kind == "changelog":
+        category = None
+        bullets: list[str] = []
+
+        def flush():
+            for bullet in bullets:
+                items.append((category or "", _normalise(bullet.splitlines())))
+
+        for line in region.splitlines():
+            if line.startswith("<!-- category: "):
+                continue
+            if line.startswith("### "):
+                flush()
+                category, bullets = line[4:].strip(), []
+            elif line.startswith("- "):
+                bullets.append(line[2:])
+            elif bullets and line[:1].isspace() and line.strip():
+                bullets[-1] += "\n" + line
+        flush()
+    else:
+        heading = None
+        body: list[str] = []
+        for line in region.splitlines():
+            if line.startswith("<!-- end: "):
+                continue
+            if line.startswith("## "):
+                if heading is not None:
+                    items.append((heading, _normalise(body)))
+                heading, body = line[3:].strip(), []
+            elif heading is not None:
+                body.append(line)
+        if heading is not None:
+            items.append((heading, _normalise(body)))
+    return sorted(items)
 
 
 def splice(reg: Registry, existing: str, body: str) -> str:
@@ -544,6 +642,23 @@ def cmd_generate(args) -> int:
         updated = splice(reg, current, render(reg))
         if args.check:
             if current != updated:
+                before = extract_region(reg, current)
+                after = extract_region(reg, updated)
+                if (
+                    before is not None
+                    and after is not None
+                    and canonical(reg, before) == canonical(reg, after)
+                    and current.replace(before, "", 1) == updated.replace(after, "", 1)
+                ):
+                    # Same entries, same content, same surroundings — only the
+                    # order or spacing inside the region differs. That is what
+                    # a union merge leaves behind, and it is not drift.
+                    print(
+                        f"OK: {reg.rel(reg.output_path)} matches its fragments "
+                        f"(order/spacing is non-canonical after a merge; the "
+                        f"next `{reg.regen_command}` will normalise it)"
+                    )
+                    continue
                 failures += 1
                 print(
                     f"FAIL: {reg.rel(reg.output_path)} is out of date with "
@@ -620,6 +735,14 @@ def cmd_check(args) -> int:
                     failures += 1
                     print(f"FAIL: {exc}", file=sys.stderr)
                     continue
+                if any("<what an operator" in b for bs in sections.values() for b in bs):
+                    failures += 1
+                    print(
+                        f"FAIL: {reg.rel(path)}:1 — still contains the template "
+                        f"placeholder bullet. Replace it with what changed. "
+                        f"See {reg.rule_pointer}.",
+                        file=sys.stderr,
+                    )
                 if not sections:
                     failures += 1
                     print(
@@ -660,6 +783,14 @@ def cmd_check(args) -> int:
                 failures += 1
                 print(f"FAIL: {exc}", file=sys.stderr)
                 continue
+            if "<fill in>" in body:
+                failures += 1
+                print(
+                    f"FAIL: {reg.rel(path)}:1 — still contains the template "
+                    f"placeholder '<fill in>'. Complete or delete the field. "
+                    f"See {reg.rule_pointer}.",
+                    file=sys.stderr,
+                )
             for field in reg.required_fields:
                 if f"**{field}:**" not in body:
                     failures += 1
@@ -762,6 +893,117 @@ def cmd_release(args) -> int:
     return 0
 
 
+def cmd_adopt(args) -> int:
+    """Bring an existing hand-maintained artifact under the fragment layout.
+
+    The brownfield case: a repository already has a CHANGELOG.md with bullets
+    under [Unreleased], or a knowledge base full of entries, and no generated
+    region. This moves the existing content into fragments, installs the
+    markers, and regenerates — losslessly, and only once: if the markers are
+    already present there is nothing to do.
+    """
+    registries, _, _ = load_registries(args)
+    if len(registries) != 1:
+        raise RegistryError("--registry is required for `adopt`")
+    reg = registries[0]
+    if not reg.output_path:
+        raise RegistryError(f"{reg.name} has no output artifact to adopt")
+    if not os.path.isfile(reg.output_path):
+        raise RegistryError(f"{reg.rel(reg.output_path)} does not exist")
+
+    with open(reg.output_path, encoding="utf-8") as fh:
+        text = fh.read()
+    if extract_region(reg, text) is not None:
+        print(f"{reg.rel(reg.output_path)} already has a generated region — nothing to adopt")
+        return 0
+
+    begin, end = markers(reg)
+    lines = text.splitlines()
+    date = args.date or _dt.date.today().isoformat()
+    os.makedirs(reg.fragments_dir, exist_ok=True)
+
+    if reg.kind == "changelog":
+        # Everything between "## [Unreleased]" and the next "## [" heading
+        # becomes one migration fragment, category by category.
+        start = next((i for i, l in enumerate(lines) if l.startswith("## [Unreleased]")), None)
+        if start is None:
+            raise RegistryError(
+                f"{reg.rel(reg.output_path)}:1 — no '## [Unreleased]' heading to adopt under"
+            )
+        stop = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## [")), len(lines))
+        section = lines[start + 1:stop]
+        moved: list[str] = []
+        category = None
+        for line in section:
+            if line.startswith("### "):
+                category = line[4:].strip()
+                moved.append(f"## {category}")
+            elif line.startswith("- ") or (line[:1].isspace() and line.strip()):
+                if category is None:
+                    raise RegistryError(
+                        f"{reg.rel(reg.output_path)} — a bullet under [Unreleased] "
+                        f"sits above any '### Category' heading; file it first"
+                    )
+                moved.append(line)
+            elif line.strip():
+                moved.append(line)  # prose; kept verbatim inside the fragment
+        fragment = os.path.join(reg.fragments_dir, f"{date}-migrated-from-changelog.md")
+        if any(l.startswith("- ") for l in moved):
+            with open(fragment, "w", encoding="utf-8") as fh:
+                fh.write("# Migrated from CHANGELOG.md [Unreleased]\n\n" + "\n".join(moved).rstrip() + "\n")
+            print(f"moved {sum(1 for l in moved if l.startswith('- '))} bullets into {reg.rel(fragment)}")
+        lines[start + 1:stop] = ["", begin, "", end, ""]
+    else:
+        # Every "## <ID>: <title>" block becomes its own fragment; the prose
+        # above the first entry stays in the artifact as its header.
+        heads = [i for i, l in enumerate(lines) if l.startswith("## ")]
+        if not heads:
+            raise RegistryError(f"{reg.rel(reg.output_path)} — no '## ' entries to adopt")
+        pattern = re.compile(rf"^## {re.escape(reg.id_prefix)}-(\S+): (.+)$")
+        if reg.id_scheme == "slug":
+            raise RegistryError(
+                f"{reg.name} uses the slug scheme, but existing entries carry "
+                f"allocated identifiers. Set id_scheme \"numeric\" for this "
+                f"registry to FREEZE them (never renumber what is cited), then "
+                f"re-run adopt."
+            )
+        count = 0
+        for n, head in enumerate(heads):
+            stop = heads[n + 1] if n + 1 < len(heads) else len(lines)
+            match = pattern.match(lines[head])
+            if not match:
+                raise RegistryError(
+                    f"{reg.rel(reg.output_path)}:{head + 1} — heading does not "
+                    f"match '## {reg.id_prefix}-<id>: <title>': {lines[head]}"
+                )
+            number, title = match.group(1), match.group(2).strip()
+            if not number.isdigit() or len(number) != reg.id_width:
+                raise RegistryError(
+                    f"{reg.rel(reg.output_path)}:{head + 1} — identifier "
+                    f"{reg.id_prefix}-{number} is not {reg.id_width} digits; "
+                    f"set id_width to match the existing entries"
+                )
+            body = _normalise(lines[head + 1:stop])
+            slug = slugify(title) or "entry"
+            fragment = os.path.join(reg.fragments_dir, f"{reg.filename_prefix}{number}-{slug}.md")
+            if os.path.exists(fragment):
+                raise RegistryError(f"{reg.rel(fragment)} already exists — adopt would overwrite it")
+            with open(fragment, "w", encoding="utf-8") as fh:
+                fh.write(f"# {title}\n\n{body}\n" if body else f"# {title}\n")
+            count += 1
+        lines[heads[0]:] = [begin, "", end]
+        print(f"moved {count} entries into {reg.fragments}/")
+
+    with open(reg.output_path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines).rstrip("\n") + "\n")
+    with open(reg.output_path, encoding="utf-8") as fh:
+        current = fh.read()
+    with open(reg.output_path, "w", encoding="utf-8") as fh:
+        fh.write(splice(reg, current, render(reg)))
+    print(f"installed the generated region in {reg.rel(reg.output_path)} and regenerated")
+    return 0
+
+
 def cmd_list(args) -> int:
     registries, root, _ = load_registries(args)
     print(f"registries declared in {os.path.join(root, CONFIG_NAME)}:")
@@ -813,6 +1055,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_rel.add_argument("--version", required=True)
     p_rel.add_argument("--date", help="YYYY-MM-DD (default: today)")
     p_rel.set_defaults(func=cmd_release)
+
+    p_adopt = sub.add_parser(
+        "adopt", help="move an existing hand-maintained artifact into fragments"
+    )
+    p_adopt.add_argument("--registry", required=True)
+    p_adopt.add_argument("--date", help="YYYY-MM-DD for the migration fragment (default: today)")
+    p_adopt.set_defaults(func=cmd_adopt)
 
     p_list = sub.add_parser("list", help="show the declared registries")
     p_list.add_argument("--registry")
