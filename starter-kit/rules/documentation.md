@@ -11,7 +11,7 @@ as the project grows.
 |---|---|
 | New feature | Feature doc (or README section) + CHANGELOG `[Unreleased]` bullet |
 | Behaviour or API change | The affected doc + CHANGELOG bullet |
-| Bug fix that took >30 min to diagnose | Debugging-KB entry (ISSUE-NNN) + CHANGELOG `Fixed` bullet |
+| Bug fix that took >30 min to diagnose | Debugging-KB entry + CHANGELOG `Fixed` bullet — both as fragment files |
 | Architectural decision (affects multiple files or future choices) | New ADR |
 | New convention agents must follow | Rule file + constitution index line |
 
@@ -40,17 +40,41 @@ show: one line, plus a pointer to the durable home.
 lines? Reference a ticket by ID? Any yes → relocate to an ADR or the PR
 description; leave at most a one-line pointer.
 
-## ADR-lite format
+## ADR format (Michael Nygard)
 
-One file per decision, `docs/adr/NNN-<slug>.md`, four sections:
+One file per decision under `docs/adr/`. Create it with
+`registry_tool.py new --registry adr --title "..."` so the filename matches the
+convention declared in `registries.json` — the tool derives the name, and a
+hand-typed one is how a file ends up outside the grammar the gate enforces.
 
-1. **Context** — why a decision was needed
-2. **Decision** — what was chosen
-3. **Alternatives** — what was rejected, one line + trade-off each
-4. **Consequences** — what becomes easier, what becomes harder
+Two naming conventions ship. The **MADR** style is
+`adr-NNNN-short-title.md` (`filename_prefix: "adr-"`, `id_width: 4`),
+publishing as `ADR-0001`. The **date-slug** style is `<date>-<slug>.md`,
+publishing as `ADR-<date>-<slug>`; it needs no allocator and therefore cannot
+collide.
+
+A numbered convention is the reason the identifier gate exists: the *file*
+never conflicts, because two decisions are two paths, but two branches both
+taking the next free number produce a duplicate that merges cleanly and is
+caught by nothing until something cites it. See the shared-registries rule.
+
+The four sections, in [Michael Nygard's
+format](https://github.com/architecture-decision-record/architecture-decision-record):
+
+1. **Status** — proposed / accepted / deprecated / superseded by ADR-X
+2. **Context** — the forces at play: what made a decision necessary, and the
+   options weighed against each other. Value-neutral; describe the tension
+   rather than arguing for the outcome. Rejected options belong here, one line
+   and its trade-off each — they are part of the forces, not a separate topic.
+3. **Decision** — what was chosen, in active voice: "We will …"
+4. **Consequences** — the resulting context once the decision is applied, good
+   and bad alike. What becomes easier, what becomes harder.
 
 Accepted ADRs are immutable; changing course means a new ADR that supersedes
-the old one by number.
+the old one by identifier. **Never renumber an ADR that is already on the
+default branch** — its identifier is cited from rule files, other ADRs, code
+comments and knowledge-base entries, and nothing checks that a citation still
+resolves.
 
 ## PR checklist
 

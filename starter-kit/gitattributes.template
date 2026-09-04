@@ -1,0 +1,79 @@
+# Merge behaviour for shared append-only registries.
+#
+# Copy to the repository root as `.gitattributes`. Everything here is built
+# into git — no `git config` in any clone, no hook installation, nothing that
+# can be silently missing on someone else's machine. That property is the whole
+# reason these entries are here rather than in a setup script.
+#
+# ---------------------------------------------------------------------------
+# What `merge=union` does, and the two ways it bites
+# ---------------------------------------------------------------------------
+# Union merge keeps BOTH sides of a conflicting hunk instead of raising a
+# conflict. For append-only lists that is usually what you want. Two hazards
+# come with it, and both are silent:
+#
+#   1. EDIT vs EDIT. Two branches rewording the same line yield both wordings,
+#      one after the other, with no conflict raised and nobody prompted.
+#
+#   2. APPEND vs PROMOTE. One branch appends to a section while another moves
+#      that whole section somewhere else (a release promoting [Unreleased] into
+#      a version heading). The appended line merges into a section that is no
+#      longer where it was, and no test fails when it lands in the wrong place.
+#
+# So union merge on its own converts a loud conflict into a quiet corruption.
+# It is only safe when a gate downstream can still see the damage. Here that
+# gate is the drift check, which compares what the generated file SAYS to what
+# its fragments say — same entries, same content, any order. A union merge
+# that merely reorders blocks passes; one that mangles an entry fails, with
+# the fix in the message. Union + drift check is self-healing; union alone is
+# a downgrade on doing nothing.
+#
+# Known boundary: git refines a conflict by keeping lines the two sides have
+# in common, so two concurrently added entries sharing two or more consecutive
+# identical lines get interleaved. The generator makes that rare (unique
+# closer per entry, stable per-category anchors) and the drift check makes it
+# loud; it cannot make it impossible.
+#
+# If you remove the drift check from CI, remove these entries too.
+
+# ---------------------------------------------------------------------------
+# Generated artifacts — assembled from the fragment directory beside each one.
+# Never hand-edited, so a union merge here cannot lose authored content: the
+# fragments are the source, and regenerating restores the file exactly.
+# `linguist-generated` collapses them in review so nobody reviews the assembly.
+# ---------------------------------------------------------------------------
+CHANGELOG.md                        merge=union linguist-generated=true
+docs/DEBUGGING-KNOWLEDGE-BASE.md    merge=union linguist-generated=true
+
+# ---------------------------------------------------------------------------
+# Fragments — one file per entry. Two branches adding entries add different
+# paths, and git merges disjoint additions without being asked. When two
+# branches edit the SAME fragment, the ordinary three-way text merge is exactly
+# right: non-overlapping edits merge cleanly, overlapping ones conflict loudly.
+# `merge=text` IS that default, stated explicitly so an absent line does not
+# read as an oversight. (Do not write `-merge` here: that disables the text
+# driver and makes every concurrent edit conflict, even non-overlapping ones.)
+# ---------------------------------------------------------------------------
+changelog.d/**                      merge=text
+docs/DEBUGGING-KNOWLEDGE-BASE.d/**  merge=text
+
+# ---------------------------------------------------------------------------
+# Registries you have not migrated yet
+# ---------------------------------------------------------------------------
+# Translation bundles, message-code catalogues and entity registries are the
+# same shape and fail the same way. Until they are fragment-backed, union merge
+# is the stopgap — but only alongside a uniqueness gate over their keys, for
+# the reason above. Uncomment and adapt:
+#
+# src/i18n/*.json                   merge=union
+# src/messages/message-codes.json   merge=union
+
+# ---------------------------------------------------------------------------
+# A warning about the obvious next step
+# ---------------------------------------------------------------------------
+# A CUSTOM merge driver (`merge=mydriver`) does NOT work from this file alone:
+# it needs `git config merge.mydriver.driver ...` in every clone, and when that
+# is missing git falls back silently — the file appears configured and is not.
+# `union` is built in and has no such requirement. If you ever ship a custom
+# driver, ship the bootstrap that configures it AND a check that verifies the
+# config actually took effect in the clone that is running.

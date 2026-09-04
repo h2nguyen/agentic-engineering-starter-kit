@@ -53,7 +53,8 @@ memory — all encoded as files under version control.
 2. **Materials.** Search the repo for `AGENTIC-ENGINEERING-GUIDE.md` and a
    `starter-kit/` directory (`bootstrap.sh`, `constitution.md.template`, the
    default rule files under `rules/`, `skills/common-catalog.md`,
-   `scripts/check-kb-shape.sh`). If found, the guide is your design authority
+   `scripts/check-kb-shape.sh`, `scripts/registry_tool.py`,
+   `registries.json.template`). If found, the guide is your design authority
    and the kit your template source — prefer running `bootstrap.sh` over
    hand-copying. If absent, build from Appendix A.
 3. **Existing setup.** If any agent config exists, note it — Phases 2–3 will be
@@ -77,6 +78,21 @@ For every project:
 - Identify infrastructure and cross-cutting facts: how the app runs locally,
   identity/AuthN/AuthZ approach, messaging or integration surfaces, deployment
   shape.
+- **Find the shared append-only registries.** Rank files by how many of the last
+  few hundred commits touched each one; anything near the top that many pull
+  requests *append* to, at a fixed anchor, under an allocated identifier is an
+  instance (Appendix A.9). Changelogs and knowledge bases are the obvious ones;
+  translation bundles, message-code catalogues and entity registries are the
+  ones teams forget, and they often out-churn the obvious ones:
+
+  ```bash
+  git log --format= --name-only -n 400 | sort | uniq -c | sort -rn | head -20
+  git log --oneline --all | wc -l   # how much parallel work this repo actually carries
+  ```
+
+  Report the measured churn rather than a guess — the numbers are what justify
+  the change to the team, and they decide which registries are worth migrating
+  first.
 
 Additionally for brownfield:
 
@@ -101,9 +117,19 @@ Create, at the locations your detected tool expects (Appendix A.1):
 2. **The universal rule files** — working principles (Appendix A.3) plus the
    documentation and versioning-and-changelog defaults (Appendix A.8) —
    project-agnostic, used verbatim.
-3. **The debugging knowledge base** — one file per Appendix A.4 (graph-ready
-   conventions included), empty except for the protocol header; the discipline
-   starts now.
+3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
+   included), empty except for the protocol header; the discipline starts now.
+4. **The shared-registry layer** — per Appendix A.9. Fragment directories for
+   the knowledge base and the changelog, `registries.json`, `.gitattributes`,
+   and the rule file. Install this on day one even though the registries are
+   empty: it is the one component whose retrofit cost grows with every entry
+   written, because identifiers become citation targets the moment they exist.
+   For a brownfield repo with registries already in use, run
+   `registry_tool.py adopt --registry <name>` on each existing artifact: it
+   moves the current entries into fragments losslessly and installs the
+   generated region. It refuses to renumber — set the numeric scheme first to
+   freeze identifiers that are already cited, and apply the slug scheme only
+   to new registries.
 
 ## Phase 3 — Seed the guardrails (Level 2)
 
@@ -111,10 +137,17 @@ Create, at the locations your detected tool expects (Appendix A.1):
    is self-contained: the imperative first, a WRONG/CORRECT code pair, gotchas
    with their source cited, and a runnable litmus check.
 2. **Enforcement** — wire an umbrella lint target that CI runs on every PR
-   (create it if the repo has none). The kit ships `scripts/check-kb-shape.sh`
-   as a ready-to-run first entry guarding the knowledge base's shape; add one
-   more check for the mined convention that is most valuable or most violated,
-   per the contract in Appendix A.5.
+   (create it if the repo has none), and **have the workflow invoke that
+   aggregate target rather than listing its parts**: a workflow that enumerates
+   sub-targets drifts away from the lint target one PR at a time, silently,
+   until checks the rule files call enforced have not run in months. The kit
+   ships `check-kb-shape.sh`, the registry drift and identifier gates, and
+   `check-ci-lint-coverage.sh` (which catches that divergence when per-path job
+   gating forces enumeration) already chained in. Add one more check for the
+   mined convention that is most valuable or most violated, per the contract in
+   Appendix A.5.
+   Verify by running the target — a check that is present but unreachable from
+   CI is indistinguishable from a check that does not exist.
 3. **Common generic skills** — the prompt-enhancer and semver skills ship in
    the kit itself; if `skills/common-catalog.md` is available, enable what else
    fits (architecture review, architecture docs). On tools without native
@@ -141,6 +174,17 @@ Appendix A.7 — the sequence:
 5. **Gap-fill** whatever the Phase 2–3 checklist covers and the existing setup
    lacks (working principles, KB, enforcement, common skills) — extending
    existing files where they exist, never creating duplicates.
+   For the shared-registry layer specifically (Appendix A.9), the sequence is:
+   `registry_tool.py init` to write `registries.json` **from the conventions
+   already on disk** (an adr-tools directory of `0001-title.md` files stays
+   exactly that; a knowledge base of `ISSUE-042` entries keeps its identifiers
+   frozen) → review what it inferred → `adopt --registry <name>` for each
+   existing artifact → chain the gates into the existing lint target with the
+   two lines bootstrap prints → confirm `make lint` **actually runs** the
+   gates (`make -n lint | grep check-registry`), because an installed gate that
+   the umbrella target never reaches is green and checks nothing. Never
+   renumber an existing record to fit a convention; change the config to fit
+   the record.
 6. **Plan → approval → apply.** Present the full change plan (including the
    ledger items each change touches) and wait for explicit approval before
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
@@ -158,20 +202,26 @@ Appendix A.7 — the sequence:
 2. Every command documented in the constitution has been executed successfully
    in this session.
 3. Every internal link in the new files resolves.
-4. Harmonize-track runs only: cross-check the ledger — every item is preserved
+4. The umbrella lint target passes, and every check chained into it is reachable
+   from a CI workflow step.
+5. Harmonize-track runs only: cross-check the ledger — every item is preserved
    in place, preserved elsewhere (relocated/merged), or its removal is
    justified in writing. Zero silent losses.
-5. Write the handoff summary: what was installed; what was deliberately
+6. Write the handoff summary: what was installed; what was deliberately
    deferred (specialist reviewer agents, hooks, external tool servers, the meta
    layer) and — from Appendix A.6 — the **signal** that should trigger each
    deferred artifact later.
-6. Commit on the feature branch with a clear message and propose the PR.
+7. Commit on the feature branch with a clear message and propose the PR.
 
 ## Success criteria
 
 - A fresh agent session in this repo starts from the contract and can state the
   project's non-negotiable rules without being told.
-- The umbrella lint target runs the first enforcement check locally and in CI.
+- The umbrella lint target runs the first enforcement check locally and in CI,
+  and CI reaches it by invoking the aggregate target.
+- Two branches can each add a registry entry and both merge with zero conflicts
+  and zero duplicate identifiers. This is the acceptance test for the registry
+  layer; run it rather than assuming it.
 - The knowledge-base protocol (search before debugging, write after any
   >30-minute bug) is documented in the constitution, and KB entries are
   machine-parseable as graph nodes (stable IDs + typed `Related:` links).
@@ -229,7 +279,7 @@ table, the documentation wins.
 
 ### A.4 Knowledge-base entry format
 
-Append-only file; numbered `ISSUE-NNN` entries; fixed fields:
+Append-only registry, authored one file per entry (A.9); fixed fields:
 **Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
 Shortcut.** Protocol: search before investigating any bug; add an entry after
 resolving any bug that took over 30 minutes to diagnose.
@@ -292,9 +342,13 @@ silent. Non-trivial scripts get their own tests.
 - **working-principles** — the five directives in A.3.
 - **documentation** — docs are part of the change (same-PR updates); >30-minute
   bugs become KB entries; cross-file design decisions become ADR-lite records
-  (Context → Decision → Alternatives → Consequences; immutable once accepted,
+  (Michael Nygard format: Status → Context → Decision → Consequences, with
+  rejected options recorded inside Context as part of the forces; immutable once accepted,
   superseded by number); decision rationale never lives in shipped-source
   comments — a one-line pointer to the ADR/KB entry is the maximum.
+- **shared-registries** — the A.9 pattern as a rule: fragment layout, the
+  identifier schemes, the merge configuration, and the prohibition on renaming
+  an identifier that is already on the default branch.
 - **versioning-and-changelog** — SemVer 2.0.0: MAJOR = breaking, MINOR = new
   functionality (never PATCH), PATCH = bug fixes only; 0.y.z: breaking allowed
   in MINOR, PATCH stays fixes-only; releases are immutable — recover in the
@@ -302,3 +356,92 @@ silent. Non-trivial scripts get their own tests.
   bullets, exactly one of Added / Changed / Deprecated / Removed / Fixed /
   Security per bullet, written for the operator; declare bump intent via
   Conventional Commits (`fix:` / `feat:` / `feat!:`).
+
+### A.9 Shared append-only registries
+
+A file is a **shared append-only registry** when all three hold: many pull
+requests **append** to it, at a **fixed anchor**, under an **allocated
+identifier**. Changelogs, debugging knowledge bases, decision-record indexes,
+translation bundles, message-code catalogues and entity registries all qualify.
+
+**The constraint that ranks the options:** a merge conflict costs thirty
+seconds; a duplicate identifier is permanent, because the identifier is a
+citation target. Two branches both taking "the next free number" merge
+**cleanly**, fail no test, and are discovered once both are already cited. A
+dropped bullet is the same shape of failure: nothing reports a line that was
+never there.
+
+**Three tiers, in order of preference:**
+
+1. **Eliminate** — one file per entry plus a generator; the identifier comes
+   from the filename. The conflict and the collision cannot occur.
+2. **Automate** — `merge=union` in `.gitattributes`, *paired with a gate that
+   can still see the damage*. Union alone removes the loud failure and leaves
+   the quiet one, which is worse than no configuration at all.
+3. **Delegate** — an agent resolves conflicts mid-merge. Escalation only: an
+   agent cannot safely renumber anything, because the citations that would
+   break live in files the resolution never opens.
+
+**Minimum implementation, when the kit is not present:**
+
+- **Fragment directory** beside each artifact — `changelog.d/` and
+  `<artifact>.d/`. The filename carries the identifier and nothing else does,
+  so two branches cannot claim the same one. Pick the smallest unit that is
+  still a unit of meaning: for a changelog that is one file per *change*, with
+  the categories as `## ` headings inside it, not one file per bullet — a file
+  holding a single line carries no meaning and multiplies for no benefit. For a
+  knowledge base it is one file per entry, since each is already a document.
+- **Filenames.** Whatever convention the project uses, derive names with the
+  tool rather than by hand. For decision records the MADR convention is
+  `adr-NNNN-short-title.md`; the number lives in the filename and the
+  identifier (`ADR-0001`) is derived from it, never stored twice.
+- **Identifier scheme.** Default to `<date>-<slug>` (`2026-08-29-cache-warms`),
+  which is collision-free by construction because no allocator exists. A
+  numeric scheme is fine if the team prefers short identifiers, but then the
+  uniqueness gate is the mechanism rather than a safety net — the allocator can
+  only see the local checkout. Reject short commit SHAs: they solve collisions
+  and destroy readability in a file whose purpose is to be searched by a human
+  under time pressure.
+- **Generator** with deterministic ordering, writing into a marked region of
+  the artifact so hand-written preamble survives:
+
+  ```markdown
+  <!-- BEGIN GENERATED: <name> — do not edit inside; edit fragments in <dir>/ -->
+  <!-- END GENERATED: <name> -->
+  ```
+
+- **Drift check** — regenerate, diff against the committed artifact, fail on
+  difference. This is what makes `merge=union` safe: a union artefact stops
+  matching its fragments, and CI says so with the fix in the message.
+- **Identifier gate** — assert the **shape first** (an exact digit count, not
+  `[0-9]+`: `ISSUE-7` and `ISSUE-007` are one identifier to a reader and two to
+  a naive check), then uniqueness. Sanctioned duplicates go in an allowlist
+  keyed on the **filename pair**, never on the identifier — a number-keyed
+  entry reads as "this number is exempt" and would let a third file join a
+  legacy pair unnoticed.
+- **Release promotion** consumes the fragment files. That is what makes a
+  release safe while other branches are open: a branch that appended in
+  parallel still holds its own file, so its entry reappears in the new
+  unreleased section instead of merging into a section that has moved.
+- **Never rename an identifier already on the default branch.** When the gate
+  reports a collision, rename the fragment that has not landed. If both have
+  landed, allowlist the pair.
+- **Adopting, not imposing.** In a repository that already has these files,
+  infer the convention from what exists and declare *that*; move existing
+  content into fragments losslessly; append merge attributes to an existing
+  `.gitattributes` rather than replacing it; never edit an existing Makefile,
+  but verify the gates are reached and fail loudly if not. AsciiDoc artifacts
+  are outside the generator's grammar — declare them out of the layout rather
+  than half-adopting them.
+
+**Two traps.** A check chained into the lint target but not into a CI workflow
+step does not run, and nothing reports it — have CI invoke the aggregate target
+so coverage is total by construction. And a **custom** merge driver named in
+`.gitattributes` needs `git config` in every clone; when that is missing git
+falls back silently. `union` is built in and needs nothing, which is why it is
+the only driver worth putting in a file you expect other people to clone.
+
+**Acceptance test:** two branches each add a registry entry; both merge with
+zero conflicts and zero duplicate identifiers. Write it before the mechanism,
+and keep a control case that reproduces the defect on the shape you replaced —
+a test that cannot fail proves nothing.
