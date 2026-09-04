@@ -642,6 +642,125 @@ class TestAdoptKnowledgeBase(RegistryTestCase):
         self.assertIn("id_width", str(caught.exception))
 
 
+class TestInit(unittest.TestCase):
+    """registries.json is written from what the repository already has."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.previous = os.getcwd()
+        self.addCleanup(os.chdir, self.previous)
+        os.chdir(self.root)
+
+    def write(self, relative, text):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    def init(self, *extra):
+        args = rt.build_parser().parse_args(["init", *extra])
+        args.func(args)
+        with open("registries.json", encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def registry(self, cfg, name):
+        return next(r for r in cfg["registries"] if r["name"] == name)
+
+    def test_greenfield_gets_the_kit_defaults(self):
+        cfg = self.init()
+        self.assertEqual(cfg["id_scheme"], "slug")
+        adr = self.registry(cfg, "adr")
+        self.assertEqual((adr["filename_prefix"], adr["id_width"]), ("adr-", 4))
+
+    def test_adr_tools_naming_is_inferred(self):
+        self.write("docs/adr/0001-record-decisions.md", "# 1. x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/0002-retry-policy.md", "# 2. y\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual(adr["filename_prefix"], "")
+        self.assertEqual(adr["id_width"], 4)
+        self.assertEqual(adr["id_scheme"], "numeric")
+
+    def test_madr_prefixed_naming_is_inferred(self):
+        self.write("docs/adr/adr-0007-thing.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual((adr["filename_prefix"], adr["id_width"]), ("adr-", 4))
+
+    def test_docs_decisions_directory_is_found(self):
+        self.write("docs/decisions/0001-x.md", "# x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.assertEqual(self.registry(self.init(), "adr")["fragments"], "docs/decisions")
+
+    def test_missing_sections_relax_required_headings(self):
+        # Records that predate the Nygard convention must not fail the gate
+        # on day one; the config documents reality and can be tightened later.
+        self.write("docs/adr/0001-x.md", "# x\n\n## Context\nc\n## Decision\nd\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual(adr["required_headings"], ["Context", "Decision"])
+
+    def test_populated_kb_is_frozen_numeric(self):
+        self.write("docs/DEBUGGING-KNOWLEDGE-BASE.md", "# KB\n\n## ISSUE-041: a\n\n**Symptom:** s\n\n## ISSUE-042: b\n\n**Symptom:** s\n")
+        kb = self.registry(self.init(), "debugging-kb")
+        self.assertEqual((kb["id_scheme"], kb["id_width"]), ("numeric", 3))
+
+    def test_existing_config_is_not_overwritten_without_force(self):
+        self.write("registries.json", '{"registries":[{"name":"custom","kind":"changelog","fragments":"x.d","output":"X.md"}]}')
+        self.init()
+        with open("registries.json", encoding="utf-8") as fh:
+            self.assertIn("custom", fh.read())
+        cfg = self.init("--force")
+        self.assertNotIn("custom", [r["name"] for r in cfg["registries"]])
+
+    def test_inferred_config_passes_the_gate_on_existing_records(self):
+        self.write("docs/adr/0001-x.md", "# x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/0002-y.md", "# y\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.init()
+        self.assertEqual(rt.main(["check", "--registry", "adr"]), 0)
+
+
+class TestAdoptTolerance(RegistryTestCase):
+    """adopt accepts the shapes real changelogs and knowledge bases use."""
+
+    def test_unbracketed_unreleased_heading(self):
+        self.write("CHANGELOG.md", "# C\n\n## Unreleased\n\n### Added\n\n- One.\n\n## [1.0.0]\n")
+        self.assertEqual(self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03"), 0)
+        self.assertIn("## [Unreleased]", self.read("CHANGELOG.md"))
+        self.assertIn("- One.", self.read("changelog.d/2026-09-03-migrated-from-changelog.md"))
+
+    def test_uncategorised_bullets_are_filed_under_a_declared_category(self):
+        # This registry declares only Added and Fixed, so the fallback must be
+        # the first declared category — never a name the gate would reject.
+        self.write("CHANGELOG.md", "# C\n\n## [Unreleased]\n\n- Loose one.\n- Loose two.\n")
+        self.assertEqual(self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03"), 0)
+        fragment = self.read("changelog.d/2026-09-03-migrated-from-changelog.md")
+        self.assertIn("## Added", fragment)
+        self.assertIn("- Loose two.", fragment)
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 0)
+
+    def test_uncategorised_bullets_prefer_changed_when_declared(self):
+        config = json.loads(self.read("registries.json"))
+        for r in config["registries"]:
+            if r["name"] == "changelog":
+                r["categories"] = ["Added", "Changed", "Fixed"]
+        self.write("registries.json", json.dumps(config))
+        self.write("CHANGELOG.md", "# C\n\n## [Unreleased]\n\n- Loose one.\n")
+        self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03")
+        self.assertIn("## Changed", self.read("changelog.d/2026-09-03-migrated-from-changelog.md"))
+
+
+class TestAdoptKnowledgeBaseTolerance(RegistryTestCase):
+    scheme = "numeric"
+
+    def test_level_three_headings_and_dash_separators(self):
+        self.write(
+            "KB.md",
+            "# KB\n\n### ISSUE-001 - First\n\n**Symptom:** a.\n\n**Fix:** b.\n\n"
+            "## ISSUE-002 — Second\n\n**Symptom:** c.\n\n**Fix:** d.\n",
+        )
+        self.assertEqual(self.run_tool("adopt", "--registry", "kb"), 0)
+        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "kb.d"))), ["001-first.md", "002-second.md"])
+        self.assertIn("## ISSUE-002: Second", self.read("KB.md"))
+
+
 class TestConfiguration(RegistryTestCase):
     def test_unknown_registry_names_the_declared_ones(self):
         with self.assertRaises(rt.RegistryError) as caught:

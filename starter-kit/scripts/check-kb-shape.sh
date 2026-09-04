@@ -30,22 +30,28 @@ if [ -f registries.json ] && command -v python3 >/dev/null 2>&1; then
   _cfg="$(python3 - <<'PY' 2>/dev/null
 import json
 cfg = json.load(open("registries.json"))
-for r in cfg.get("registries", []):
-    if r.get("kind", "entries") == "entries" and r.get("output"):
-        print(r["output"], r.get("id_prefix", "ISSUE"),
-              r.get("id_width", cfg.get("id_width", 3)))
-        break
+kb = next((r for r in cfg.get("registries", []) if r.get("kind", "entries") == "entries" and r.get("output")), None)
+adr = next((r for r in cfg.get("registries", []) if r.get("kind") == "documents"), None)
+if kb:
+    print(kb["output"], kb.get("id_prefix", "ISSUE"), kb.get("id_width", cfg.get("id_width", 3)),
+          adr.get("id_prefix", "ADR") if adr else "ADR",
+          adr.get("id_width", cfg.get("id_width", 3)) if adr else "3,4")
 PY
 )"
 fi
 if [ -n "$_cfg" ]; then
   set -- ${1:+"$1"}
-  read -r _out _prefix _width <<< "$_cfg"
+  read -r _out _prefix _width _adr_prefix _adr_width <<< "$_cfg"
   KB="${1:-$_out}"; PREFIX="${KB_ID_PREFIX:-$_prefix}"; WIDTH="${KB_ID_WIDTH:-$_width}"
+  ADR_PREFIX="$_adr_prefix"; ADR_WIDTH="$_adr_width"
 else
   KB="${1:-docs/DEBUGGING-KNOWLEDGE-BASE.md}"
   PREFIX="${KB_ID_PREFIX:-ISSUE}"
   WIDTH="${KB_ID_WIDTH:-3}"
+  # Without a declared decision-record registry the width of a cited ADR is
+  # unknowable here; accept the two common widths and leave exactness to the
+  # ADR registry's own gate.
+  ADR_PREFIX="ADR"; ADR_WIDTH="3,4"
 fi
 
 if [ ! -f "$KB" ]; then
@@ -114,7 +120,7 @@ awk -v kb="$KB" '
 ' "$KB" || fail=1
 
 # 5. Related-line token syntax
-TOKEN="(${SLUG_ID}|${NUM_ID}|ADR-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*|ADR-[0-9]{${WIDTH}}|(RULE|SKILL|SCRIPT|DOC):[A-Za-z0-9._/-]+)"
+TOKEN="(${SLUG_ID}|${NUM_ID}|${ADR_PREFIX}-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*|${ADR_PREFIX}-[0-9]{${ADR_WIDTH}}|(RULE|SKILL|SCRIPT|DOC):[A-Za-z0-9._/-]+)"
 while IFS=: read -r lineno rest; do
   tokens="$(printf '%s' "$rest" | sed -E 's/^\*\*Related:\*\* *//')"
   IFS=',' read -ra toks <<< "$tokens"

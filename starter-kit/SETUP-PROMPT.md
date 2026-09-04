@@ -174,6 +174,17 @@ Appendix A.7 — the sequence:
 5. **Gap-fill** whatever the Phase 2–3 checklist covers and the existing setup
    lacks (working principles, KB, enforcement, common skills) — extending
    existing files where they exist, never creating duplicates.
+   For the shared-registry layer specifically (Appendix A.9), the sequence is:
+   `registry_tool.py init` to write `registries.json` **from the conventions
+   already on disk** (an adr-tools directory of `0001-title.md` files stays
+   exactly that; a knowledge base of `ISSUE-042` entries keeps its identifiers
+   frozen) → review what it inferred → `adopt --registry <name>` for each
+   existing artifact → chain the gates into the existing lint target with the
+   two lines bootstrap prints → confirm `make lint` **actually runs** the
+   gates (`make -n lint | grep check-registry`), because an installed gate that
+   the umbrella target never reaches is green and checks nothing. Never
+   renumber an existing record to fit a convention; change the config to fit
+   the record.
 6. **Plan → approval → apply.** Present the full change plan (including the
    ledger items each change touches) and wait for explicit approval before
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
@@ -415,6 +426,13 @@ never there.
 - **Never rename an identifier already on the default branch.** When the gate
   reports a collision, rename the fragment that has not landed. If both have
   landed, allowlist the pair.
+- **Adopting, not imposing.** In a repository that already has these files,
+  infer the convention from what exists and declare *that*; move existing
+  content into fragments losslessly; append merge attributes to an existing
+  `.gitattributes` rather than replacing it; never edit an existing Makefile,
+  but verify the gates are reached and fail loudly if not. AsciiDoc artifacts
+  are outside the generator's grammar — declare them out of the layout rather
+  than half-adopting them.
 
 **Two traps.** A check chained into the lint target but not into a CI workflow
 step does not run, and nothing reports it — have CI invoke the aggregate target

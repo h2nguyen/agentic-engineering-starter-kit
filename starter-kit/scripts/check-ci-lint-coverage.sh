@@ -22,6 +22,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 TARGET="${1:-lint}"
 MAKEFILE="${2:-Makefile}"
+fail=0
 ALLOWLIST=".ci-lint-coverage-allowlist"
 WORKFLOW_DIR=".github/workflows"
 
@@ -34,11 +35,31 @@ if [ ! -d "$WORKFLOW_DIR" ]; then
   exit 0
 fi
 
+# The kit's own gates must actually be reached by the umbrella target. On a
+# brownfield repository the installer cannot edit an existing Makefile, so the
+# scripts land in scripts/ while `make lint` keeps running only what it ran
+# before — green, and checking nothing of the registry layer. `make -n lint`
+# prints every command the target would run, transitively, which is the exact
+# question: would the drift and identifier gates execute?
+if [ -f registries.json ] && [ -f scripts/check-registry-drift.sh ]; then
+  dry="$(make -n "$TARGET" -f "$MAKEFILE" 2>/dev/null || true)"
+  for gate in check-registry-drift.sh check-registry-ids.sh; do
+    if ! printf '%s\n' "$dry" | grep -q "$gate"; then
+      echo "FAIL: scripts/$gate is installed but '$TARGET' never runs it."
+      echo "  The gate exists and gates nothing. Chain it into the umbrella target:"
+      echo "      include registry.mk"
+      echo "      lint: registry-drift registry-ids kb-shape ci-lint-coverage <your existing prerequisites>"
+      echo "  See the shared-registries rule § 'A Makefile target is not a CI step'."
+      fail=1
+    fi
+  done
+fi
+
 # Prerequisites of the umbrella target, e.g. "lint: a b c" -> a b c
 prereqs="$(sed -n "s/^${TARGET}:[[:space:]]*//p" "$MAKEFILE" | head -1 | tr ' ' '\n' | sed '/^$/d' || true)"
 if [ -z "$prereqs" ]; then
-  echo "OK: '$TARGET' has no sub-targets to cover."
-  exit 0
+  [ "$fail" -eq 0 ] && echo "OK: '$TARGET' has no sub-targets to cover."
+  exit "$fail"
 fi
 
 workflows="$(find "$WORKFLOW_DIR" -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null || true)"
@@ -58,12 +79,15 @@ runs_target() { # $1 = make target name
 }
 
 # The simple, total case: CI runs the aggregate, so nothing can fall out of it.
+# Coverage of lint by CI says nothing about coverage of the registry gates BY
+# lint, so a failure recorded above still wins here.
 if runs_target "$TARGET"; then
-  echo "OK: CI invokes 'make $TARGET' directly — every sub-target is covered by construction."
-  exit 0
+  if [ "$fail" -eq 0 ]; then
+    echo "OK: CI invokes 'make $TARGET' directly — every sub-target is covered by construction."
+  fi
+  exit "$fail"
 fi
 
-fail=0
 uncovered=()
 for target in $prereqs; do
   if runs_target "$target"; then
@@ -91,7 +115,10 @@ if [ -f "$ALLOWLIST" ]; then
 
   # Shrink-only: the allowlist records debt being paid down, never taken on.
   base="$(git merge-base HEAD origin/HEAD 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || true)"
-  if [ -n "$base" ]; then
+  # Only compare when the allowlist already existed at the merge base. A branch
+  # that INTRODUCES the file is not growing it — treating that as growth made it
+  # impossible to add the file at all on a brownfield adoption.
+  if [ -n "$base" ] && git cat-file -e "$base:$ALLOWLIST" 2>/dev/null; then
     before="$(git show "$base:$ALLOWLIST" 2>/dev/null | sed 's/#.*//; s/[[:space:]]*$//; /^$/d' | wc -l | tr -d ' ' || echo 0)"
     after="$(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$ALLOWLIST" | wc -l | tr -d ' ')"
     if [ "$after" -gt "$before" ]; then

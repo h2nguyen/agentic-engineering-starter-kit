@@ -14,9 +14,11 @@
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
 #   all     → docs/DEBUGGING-KNOWLEDGE-BASE.md + its fragment directory,
-#             changelog.d/, CHANGELOG.md, registries.json, .gitattributes,
-#             Makefile, .github/workflows/lint.yml, scripts/ (registry_tool.py,
-#             check-kb-shape.sh, check-registry-*.sh, check-ci-lint-coverage.sh)
+#             changelog.d/, CHANGELOG.md, registries.json (INFERRED from what the
+#             repo already has), .gitattributes (appended to if present),
+#             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
+#             scripts/ (registry_tool.py, check-kb-shape.sh, check-registry-*.sh,
+#             check-ci-lint-coverage.sh)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-changelog
 #             skeleton (Claude Code; other tools get the changelog only)
@@ -69,6 +71,7 @@ esac
 
 INSTALLED=()
 SKIPPED=()
+MAKEFILE_KEPT=0
 
 install_file() { # $1 = kit-relative src, $2 = target-relative dst, $3 = "x" for executable
   local src="$KIT_DIR/$1" dst="$TARGET/$2"
@@ -158,13 +161,48 @@ install_file docs/DEBUGGING-KNOWLEDGE-BASE.md docs/DEBUGGING-KNOWLEDGE-BASE.md |
 install_tree docs/DEBUGGING-KNOWLEDGE-BASE.d docs/DEBUGGING-KNOWLEDGE-BASE.d || true
 install_tree changelog.d changelog.d || true
 install_file CHANGELOG.md.template CHANGELOG.md || true
-install_file registries.json.template registries.json || true
-install_file gitattributes.template .gitattributes || true
 install_file registry-id-duplicate-allowlist.template .registry-id-duplicate-allowlist || true
 install_file ci-lint-coverage-allowlist.template .ci-lint-coverage-allowlist || true
-install_file Makefile.template Makefile || true
+install_file registry.mk registry.mk || true
 install_file ci/lint.yml.template .github/workflows/lint.yml || true
 install_file scripts/registry_tool.py scripts/registry_tool.py x || true
+
+# Makefile: only install the template where none exists. An existing Makefile
+# is never edited — but the registry targets ship in registry.mk precisely so
+# that adopting them is one `include` line, and the coverage gate fails loudly
+# until the umbrella target actually reaches them.
+if ! install_file Makefile.template Makefile; then
+  MAKEFILE_KEPT=1
+fi
+
+# .gitattributes is additive: later lines win for the same path, so appending
+# the kit's block to an existing file is safe, and a marker keeps it idempotent.
+if [ -f "$TARGET/.gitattributes" ]; then
+  if ! grep -q '>>> starter-kit registries >>>' "$TARGET/.gitattributes"; then
+    {
+      printf '\n# >>> starter-kit registries >>>\n'
+      grep -vE '^#|^$' "$KIT_DIR/gitattributes.template"
+      printf '# <<< starter-kit registries <<<\n'
+    } >> "$TARGET/.gitattributes"
+    INSTALLED+=(".gitattributes (registry block appended to your existing file)")
+  else
+    SKIPPED+=(".gitattributes (registry block already present)")
+  fi
+else
+  install_file gitattributes.template .gitattributes || true
+fi
+
+# registries.json is WRITTEN FROM WHAT EXISTS, not copied from a template. On a
+# brownfield repository that means an adr-tools directory of 0001-title.md
+# files is declared as numeric/width 4/no prefix, and a knowledge base full of
+# ISSUE-042 entries keeps its identifiers frozen — instead of the identifier
+# gate rejecting every existing record on day one.
+if [ -e "$TARGET/registries.json" ]; then
+  SKIPPED+=("registries.json (already exists — left untouched)")
+else
+  ( cd "$TARGET" && python3 scripts/registry_tool.py init ) | sed 's/^/  init: /'
+  INSTALLED+=("registries.json (inferred from the repository's existing conventions)")
+fi
 install_file scripts/check-kb-shape.sh scripts/check-kb-shape.sh x || true
 install_file scripts/check-registry-drift.sh scripts/check-registry-drift.sh x || true
 install_file scripts/check-registry-ids.sh scripts/check-registry-ids.sh x || true
@@ -217,12 +255,25 @@ echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape chec
 echo "     the CI-coverage check are already chained into it, and the installed"
 echo "     workflow invokes that same target so nothing can fall out of CI."
 echo "     Merge the targets into your existing Makefile if you had one."
+if [ "$MAKEFILE_KEPT" -eq 1 ]; then
+  echo "     Your existing Makefile was left untouched. Chain the registry gates in"
+  echo "     with two lines (registry.mk was installed next to it):"
+  echo "         include registry.mk"
+  echo "         lint: registry-drift registry-ids kb-shape ci-lint-coverage <your existing prerequisites>"
+  if make -n -C "$TARGET" lint 2>/dev/null | grep -q check-registry-drift.sh; then
+    echo "     (verified: 'make lint' already reaches the registry gates)"
+  else
+    echo "     Until then 'make lint' is green and checks nothing of the registry layer;"
+    echo "     check-ci-lint-coverage.sh reports exactly that once it is chained in."
+  fi
+fi
 for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
   if printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept "; then
-    echo "     NOTE: your existing $_kept was left untouched. It has no generated"
-    echo "     region yet, so the drift gate will fail until it is adopted:"
-    echo "         python3 scripts/registry_tool.py adopt --registry <name>"
-    echo "     moves its current entries into fragments and installs the markers."
+    _reg=changelog; [ "$_kept" = docs/DEBUGGING-KNOWLEDGE-BASE.md ] && _reg=debugging-kb
+    echo "     Your existing $_kept was left untouched. Bring it into the layout with"
+    echo "         python3 scripts/registry_tool.py adopt --registry $_reg"
+    echo "     — it moves the current entries into fragments losslessly, keeps every"
+    echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi
 done
 echo "  4. Grow by signal: the placeholder templates (rules/_rule-template.md,"

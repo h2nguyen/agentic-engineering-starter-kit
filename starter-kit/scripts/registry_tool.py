@@ -26,6 +26,7 @@ subcommand for its options.
   registry_tool.py generate  [--registry <name>] [--check]
   registry_tool.py check     [--registry <name>]
   registry_tool.py release   --registry <name> --version X.Y.Z
+  registry_tool.py init      [--force]              (write registries.json from what exists)
   registry_tool.py adopt     --registry <name>      (brownfield: existing artifact -> fragments)
   registry_tool.py list
 """
@@ -893,6 +894,166 @@ def cmd_release(args) -> int:
     return 0
 
 
+def _infer_numbered_convention(paths: list[str]) -> tuple[str, int] | None:
+    """From existing filenames, the (filename_prefix, id_width) they all share.
+
+    Recognises the shapes real repositories use: adr-tools' 0001-title.md, the
+    MADR-style adr-0001-title.md, ADR-001-title.md, and 001-title.md. Returns
+    None when the files disagree with each other or none are numbered — the
+    caller then keeps the default rather than guessing.
+    """
+    seen: set[tuple[str, int]] = set()
+    for path in paths:
+        stem = os.path.splitext(os.path.basename(path))[0]
+        match = re.match(r"^([A-Za-z]+[-_])?(\d+)-", stem)
+        if not match:
+            return None
+        seen.add((match.group(1) or "", len(match.group(2))))
+    return next(iter(seen)) if len(seen) == 1 else None
+
+
+def cmd_init(args) -> int:
+    """Write registries.json to match what the repository ALREADY has.
+
+    Greenfield gets the kit's defaults. Brownfield gets its own conventions
+    back: an adr-tools directory of 0001-title.md files is declared as
+    numeric, width 4, no prefix, so the identifier gate passes on day one
+    instead of rejecting every existing record; a knowledge base full of
+    ISSUE-042 entries is declared numeric at width 3, freezing the
+    identifiers that are already cited. Document reality, not aspiration.
+    """
+    root = os.getcwd()
+    target = os.path.join(root, CONFIG_NAME)
+    if os.path.exists(target) and not args.force:
+        print(f"{CONFIG_NAME} already exists — leaving it alone (use --force to rewrite)")
+        return 0
+
+    notes: list[str] = []
+    registries: list[dict] = []
+
+    # --- knowledge base ----------------------------------------------------
+    kb_out = "docs/DEBUGGING-KNOWLEDGE-BASE.md"
+    kb: dict = {
+        "name": "debugging-kb", "kind": "entries", "id_prefix": "ISSUE",
+        "fragments": "docs/DEBUGGING-KNOWLEDGE-BASE.d", "output": kb_out,
+        "required_fields": ["Symptom", "Investigation Trail", "Root Cause",
+                            "Fix", "Prevention", "Debug Shortcut"],
+    }
+    adoc = os.path.join(root, "docs/DEBUGGING-KNOWLEDGE-BASE.adoc")
+    if os.path.isfile(os.path.join(root, kb_out)):
+        with open(os.path.join(root, kb_out), encoding="utf-8") as fh:
+            heads = re.findall(r"^#{2,3} ([A-Z]+)-(\d+)[:\s]", fh.read(), re.M)
+        if heads:
+            prefix = heads[0][0]
+            widths = {len(n) for _, n in heads}
+            if len(widths) == 1:
+                kb["id_prefix"] = prefix
+                kb["id_scheme"] = "numeric"
+                kb["id_width"] = widths.pop()
+                notes.append(
+                    f"knowledge base: {len(heads)} existing {prefix}-NNN entries -> "
+                    f"numeric scheme, width {kb['id_width']} (identifiers frozen; "
+                    f"run `adopt --registry debugging-kb` to move them into fragments)"
+                )
+            else:
+                notes.append(
+                    f"knowledge base: existing entries use MIXED identifier widths "
+                    f"{sorted(widths)} — left at the default; fix the headings, then re-run init --force"
+                )
+        else:
+            notes.append("knowledge base: present, no entries yet -> slug scheme (default)")
+    elif os.path.isfile(adoc):
+        notes.append(
+            "knowledge base: found docs/DEBUGGING-KNOWLEDGE-BASE.adoc — AsciiDoc is not "
+            "supported by the generator; the registry is declared against the .md path "
+            "and the .adoc file is left untouched. Convert, or leave it out of the layout."
+        )
+    else:
+        notes.append("knowledge base: none found -> declared at the default path, slug scheme")
+    registries.append(kb)
+
+    # --- changelog ---------------------------------------------------------
+    registries.append({
+        "name": "changelog", "kind": "changelog", "fragments": "changelog.d",
+        "output": "CHANGELOG.md",
+        "categories": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"],
+    })
+    if os.path.isfile(os.path.join(root, "CHANGELOG.md")):
+        notes.append("changelog: CHANGELOG.md exists -> run `adopt --registry changelog` to move its [Unreleased] bullets into a fragment")
+    else:
+        notes.append("changelog: none found -> install CHANGELOG.md.template, or let bootstrap do it")
+
+    # --- decision records --------------------------------------------------
+    adr_dir = next(
+        (d for d in ("docs/adr", "docs/decisions", "doc/adr", "adr", "docs/architecture/decisions")
+         if os.path.isdir(os.path.join(root, d))),
+        "docs/adr",
+    )
+    adr: dict = {
+        "name": "adr", "kind": "documents", "id_prefix": "ADR", "id_width": 4,
+        "filename_prefix": "adr-", "fragments": adr_dir,
+        "required_headings": ["Status", "Context", "Decision", "Consequences"],
+    }
+    existing = [
+        os.path.join(root, adr_dir, n) for n in
+        (os.listdir(os.path.join(root, adr_dir)) if os.path.isdir(os.path.join(root, adr_dir)) else [])
+        if _is_fragment(n)
+    ]
+    if existing:
+        inferred = _infer_numbered_convention(existing)
+        if inferred:
+            adr["filename_prefix"], adr["id_width"] = inferred
+            adr["id_scheme"] = "numeric"
+            shown = f"{inferred[0]}{'N' * inferred[1]}-<slug>.md"
+            notes.append(
+                f"decision records: {len(existing)} existing files in {adr_dir}/ named "
+                f"{shown} -> numeric, width {inferred[1]}, filename_prefix "
+                f"{inferred[0]!r} (existing names and identifiers preserved)"
+            )
+        else:
+            notes.append(
+                f"decision records: {len(existing)} files in {adr_dir}/ with no single "
+                f"numbering convention — declared with the kit default; the identifier "
+                f"gate will name each file that does not match"
+            )
+        # Which section headings do they actually use?
+        with open(existing[0], encoding="utf-8") as fh:
+            heads = [l[3:].strip() for l in fh.read().splitlines() if l.startswith("## ")]
+        present = [h for h in adr["required_headings"] if any(x.lower().startswith(h.lower()) for x in heads)]
+        if len(present) < len(adr["required_headings"]):
+            missing = [h for h in adr["required_headings"] if h not in present]
+            adr["required_headings"] = present
+            notes.append(
+                f"decision records: existing records lack {missing} sections — "
+                f"required_headings relaxed to {present} so the gate matches reality; "
+                f"tighten it once the records carry them"
+            )
+    else:
+        notes.append(f"decision records: none found -> {adr_dir}/, MADR naming adr-NNNN-<slug>.md")
+    registries.append(adr)
+
+    scheme = "numeric" if any(r.get("id_scheme") == "numeric" for r in registries) else "slug"
+    config = {
+        "_readme": [
+            "Written by `registry_tool.py init` from what this repository already had.",
+            "Edit freely; re-run `init --force` to regenerate from the files on disk.",
+            "See the shared-registries rule for what each field means.",
+        ],
+        "id_scheme": scheme,
+        "id_width": 3,
+        "regen_command": "make registry-generate",
+        "rule_pointer": ".claude/rules/shared-registries.md",
+        "registries": registries,
+    }
+    with open(target, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+        fh.write("\n")
+    print(f"wrote {CONFIG_NAME}")
+    for note in notes:
+        print(f"  - {note}")
+    return 0
+
+
 def cmd_adopt(args) -> int:
     """Bring an existing hand-maintained artifact under the fragment layout.
 
@@ -925,11 +1086,16 @@ def cmd_adopt(args) -> int:
     if reg.kind == "changelog":
         # Everything between "## [Unreleased]" and the next "## [" heading
         # becomes one migration fragment, category by category.
-        start = next((i for i, l in enumerate(lines) if l.startswith("## [Unreleased]")), None)
+        unreleased = re.compile(r"^##\s+\[?unreleased\]?\s*$", re.I)
+        start = next((i for i, l in enumerate(lines) if unreleased.match(l)), None)
         if start is None:
             raise RegistryError(
-                f"{reg.rel(reg.output_path)}:1 — no '## [Unreleased]' heading to adopt under"
+                f"{reg.rel(reg.output_path)}:1 — no '## [Unreleased]' (or '## Unreleased') "
+                f"heading to adopt under"
             )
+        if lines[start].strip() != "## [Unreleased]":
+            lines[start] = "## [Unreleased]"
+            print("normalised the heading to '## [Unreleased]' (Keep a Changelog form)")
         stop = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## [")), len(lines))
         section = lines[start + 1:stop]
         moved: list[str] = []
@@ -940,9 +1106,17 @@ def cmd_adopt(args) -> int:
                 moved.append(f"## {category}")
             elif line.startswith("- ") or (line[:1].isspace() and line.strip()):
                 if category is None:
-                    raise RegistryError(
-                        f"{reg.rel(reg.output_path)} — a bullet under [Unreleased] "
-                        f"sits above any '### Category' heading; file it first"
+                    # Bullets with no category heading are common in changelogs
+                    # that never used Keep a Changelog subsections. File them
+                    # under a category THIS registry declares — Changed where it
+                    # exists, else the first one — rather than failing, which
+                    # would lose the adoption, or naming one the gate rejects.
+                    category = "Changed" if "Changed" in reg.categories else reg.categories[0]
+                    moved.append(f"## {category}")
+                    print(
+                        f"note: bullets under [Unreleased] had no '### Category' "
+                        f"heading — filed under {category}; move them in the "
+                        f"fragment if another category fits"
                     )
                 moved.append(line)
             elif line.strip():
@@ -956,10 +1130,14 @@ def cmd_adopt(args) -> int:
     else:
         # Every "## <ID>: <title>" block becomes its own fragment; the prose
         # above the first entry stays in the artifact as its header.
-        heads = [i for i, l in enumerate(lines) if l.startswith("## ")]
+        pattern = re.compile(
+            rf"^#{{2,3}} {re.escape(reg.id_prefix)}-(\S+?)\s*(?::|—|-)\s+(.+)$"
+        )
+        heads = [i for i, l in enumerate(lines) if pattern.match(l)]
         if not heads:
-            raise RegistryError(f"{reg.rel(reg.output_path)} — no '## ' entries to adopt")
-        pattern = re.compile(rf"^## {re.escape(reg.id_prefix)}-(\S+): (.+)$")
+            raise RegistryError(
+                f"{reg.rel(reg.output_path)} — no '## {reg.id_prefix}-<id>: <title>' entries to adopt"
+            )
         if reg.id_scheme == "slug":
             raise RegistryError(
                 f"{reg.name} uses the slug scheme, but existing entries carry "
@@ -1055,6 +1233,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_rel.add_argument("--version", required=True)
     p_rel.add_argument("--date", help="YYYY-MM-DD (default: today)")
     p_rel.set_defaults(func=cmd_release)
+
+    p_init = sub.add_parser(
+        "init", help="write registries.json to match what the repository already has"
+    )
+    p_init.add_argument("--force", action="store_true", help="rewrite an existing config")
+    p_init.set_defaults(func=cmd_init)
 
     p_adopt = sub.add_parser(
         "adopt", help="move an existing hand-maintained artifact into fragments"

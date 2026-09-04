@@ -1,49 +1,19 @@
-# Umbrella lint target + registry maintenance.
+# Umbrella lint target.
 #
-# Copy to the repository root as `Makefile`, or merge these targets into the
-# one you already have. If the project uses a different task runner (npm
-# scripts, just, task, tox), the shape carries over unchanged — what matters is
-# that ONE aggregate target chains every check, and that CI invokes THAT
-# target rather than re-listing its parts.
+# Copy to the repository root as `Makefile`. The registry targets themselves
+# live in registry.mk (installed alongside) so that a repository which already
+# HAS a Makefile can adopt them with one `include` line rather than a merge.
 #
-# That last point is the whole reason check-ci-lint-coverage exists. A workflow
-# that enumerates sub-targets drifts away from the Makefile one pull request at
-# a time, silently, until checks the rule files describe as enforced have not
-# run in months.
+# CI must invoke the AGGREGATE target. A workflow that enumerates sub-targets
+# drifts away from the Makefile one pull request at a time, silently, until
+# checks the rule files describe as enforced have not run in months.
 
-.PHONY: lint test registry-generate registry-drift registry-ids \
-        kb-shape ci-lint-coverage registry-list
+include registry.mk
+
+.PHONY: lint test
 
 ## lint — everything CI runs. Add every new check here, and nowhere else.
 lint: registry-drift registry-ids kb-shape ci-lint-coverage test
 
-## test — the registry layer's own suites. Delete this target only if you also
-## delete scripts/tests/; a gate with no test is a gate nobody has checked.
-test:
-	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-	./scripts/tests/test-ci-lint-coverage.sh
-	./scripts/tests/test-parallel-merge.sh
-
-## registry-generate — assemble every registry artifact from its fragments.
-registry-generate:
-	python3 scripts/registry_tool.py generate
-
-## registry-list — show the declared registries and their entry counts.
-registry-list:
-	python3 scripts/registry_tool.py list
-
-## registry-drift — the generated artifacts match their fragments.
-registry-drift:
-	./scripts/check-registry-drift.sh
-
-## registry-ids — identifiers are well-shaped and unique.
-registry-ids:
-	./scripts/check-registry-ids.sh
-
-## kb-shape — the assembled knowledge base parses as graph nodes.
-kb-shape:
-	./scripts/check-kb-shape.sh
-
-## ci-lint-coverage — every sub-target above actually runs in CI.
-ci-lint-coverage:
-	./scripts/check-ci-lint-coverage.sh
+## test — the registry layer's suites; add your project's own after them.
+test: registry-test

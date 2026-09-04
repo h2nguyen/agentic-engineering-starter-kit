@@ -54,12 +54,13 @@ confirm the gates pass, enable further common skills from
 | `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR-lite, comment hygiene) |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
-| `registries.json.template` | `registries.json` | Delete the registries you don't have; pick the identifier scheme |
-| `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config` |
+| `registries.json.template` | `registries.json` | Reference only — bootstrap runs `registry_tool.py init`, which writes the file from the conventions your repo already has |
+| `registry.mk` | `registry.mk` | The registry targets; `include registry.mk` from an existing Makefile and add the gates to your `lint` prerequisites |
+| `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config`. An existing file gets the block appended under a marker, idempotently |
 | `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — run `registry_tool.py adopt --registry changelog` on it instead |
 | `changelog.d/` | `changelog.d/` | One fragment per change; categories are `## ` headings inside it |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | One file per entry — the authored source of the KB |
-| `Makefile.template` | `Makefile` | Merge the targets into your existing one if you have it |
+| `Makefile.template` | `Makefile` | Greenfield only — includes `registry.mk`. An existing Makefile is never touched; bootstrap prints the two lines to add and verifies they took effect |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
@@ -67,7 +68,7 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, and the parallel-merge acceptance test — chained into `make lint` |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption test (runs from the kit) — chained into `make lint` |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | — (keep as template) | Copy per new domain rule file |

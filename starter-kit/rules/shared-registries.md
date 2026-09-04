@@ -92,6 +92,28 @@ changelog.d/2026-08-29-ledger-export.md
 docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-cache-warms-before-config.md
 ```
 
+## Adopting in a repository that already has these files
+
+Infer, then adopt, then verify — never impose:
+
+1. `registry_tool.py init` writes `registries.json` **from what is on disk**. An
+   `adr-tools` directory of `0001-title.md` files is declared numeric, width 4,
+   no prefix; a knowledge base of `ISSUE-042` entries is declared numeric with
+   its identifiers frozen. Existing records are never renamed to fit a
+   convention; the convention is written to fit the records.
+2. `registry_tool.py adopt --registry <name>` moves each existing artifact's
+   entries into fragments, losslessly, and installs the generated region.
+   Released changelog sections are left exactly as they are.
+3. Chain the gates into the **existing** lint target — `include registry.mk`
+   plus the gate names on the `lint` line — then confirm they are reached:
+   `make -n lint | grep check-registry`. An installed gate the umbrella target
+   never runs is green and checks nothing; `check-ci-lint-coverage.sh` reports
+   that state instead of tolerating it.
+
+AsciiDoc artifacts are outside the generator's grammar. Declare them out of
+the layout (delete the registry from `registries.json`) rather than adopting
+them halfway; `.gitattributes` still gives them `merge=union` as a stopgap.
+
 ## Choosing the granularity
 
 The layout says *files, not line ranges*. It does not say how much goes in a
