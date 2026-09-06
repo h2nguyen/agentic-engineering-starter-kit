@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [1.0.0] — 2026-09-06
+
+<!-- category: Added -->
 ### Added
 
 - ADR-0002 recording why the registry layer is a day-1 default rather than a grown-by-signal artifact
@@ -37,6 +53,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The debugging knowledge base and the changelog now ship in the fragment layout: entries and bullets are authored as files, and the readable artifact is generated. The rule files, constitution template, setup prompt and bootstrap installer were updated to match
 - Decision records now use [Michael Nygard's format](https://github.com/architecture-decision-record/architecture-decision-record) — Status, Context, Decision, Consequences — replacing the previous four-section ADR-lite. Rejected options move into Context as part of the forces, where Nygard puts them. The identifier gate's `required_headings`, the documentation rule, the setup prompt and the authoring skill all follow, so the repository and the kit it ships prescribe the same format
 - Changelog fragments are now **one file per change** rather than one per bullet, with the Keep a Changelog categories as `## ` headings inside the file. The six category directories are gone. The earlier granularity satisfied every merge guarantee but was still the wrong shape: a file held one line and no unit of meaning, a change spanning three categories became three near-empty files, and 2.5 KB of content occupied 56 KB once filesystem blocks were counted. Disjoint paths — the property that makes concurrent authorship safe — are unaffected. Knowledge-base entries stay one file per entry, since each is already a document whose identifier is cited elsewhere.
+- **First stable release.** The surface this kit ships — the fragment layouts, the `registries.json` schema, the `registry_tool.py` subcommands, and the generated-region markers — is now covered by Semantic Versioning: breaking changes to it require a major version, not a minor one. Repositories bootstrapped from 0.1.0 migrate with `registry_tool.py init` followed by `adopt` per registry, which infers the conventions already on disk rather than renaming anything already cited.
 
 <!-- category: Deprecated -->
 
@@ -56,8 +73,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - Bootstrapping into a repository that already has an agentic workspace and populated registries now adopts rather than imposes. `registry_tool.py init` writes `registries.json` from the conventions on disk — an `adr-tools` directory of `0001-title.md` files, a knowledge base of `ISSUE-042` entries — so the identifier gate passes on existing records without renaming any. `adopt` accepts `## Unreleased` without brackets, files uncategorised bullets under Changed, and reads `###` entry headings with `-`/`—` separators. An existing `.gitattributes` gets the registry block appended under an idempotent marker; an existing `Makefile` is never edited, but the registry targets ship in `registry.mk` for a one-line include and bootstrap verifies the gates are reached. `check-ci-lint-coverage.sh` now fails when the registry gates are installed but the lint target never runs them — the previous behaviour was a green lint that checked nothing — and no longer rejects the commit that introduces the allowlist file. A brownfield acceptance test covers the whole sequence.
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [0.1.0] — 2026-08-02
 
