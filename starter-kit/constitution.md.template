@@ -31,6 +31,7 @@ Full text + litmus tests: [`.claude/rules/working-principles.md`](.claude/rules/
 make dev          # start local stack
 make test         # full test suite
 make lint         # lint + enforcement checks (must pass before any PR)
+make registry-generate   # rebuild CHANGELOG.md and the knowledge base from fragments
 ```
 
 ## Non-Negotiable Rules
@@ -42,6 +43,7 @@ make lint         # lint + enforcement checks (must pass before any PR)
 | **Security** | <e.g. every endpoint authenticated by default; secrets only via env/secret manager> — see rule file |
 | **Documentation** | Docs are part of the change — updated in the same PR — see [`documentation.md`](.claude/rules/documentation.md) |
 | **Versioning** | SemVer 2.0.0; new functionality = MINOR, never PATCH; changelog bullet in the same PR — see [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) |
+| **Registries** | Changelog, knowledge-base and decision-record entries are new files under a fragment directory, never appended lines; run `make registry-generate` — see [`shared-registries.md`](.claude/rules/shared-registries.md) |
 | **<Domain rule 1>** | <one-line imperative> — see [`.claude/rules/<domain>.md`](.claude/rules/<domain>.md) |
 | **<Domain rule 2>** | <one-line imperative> — see rule file |
 
@@ -50,12 +52,21 @@ make lint         # lint + enforcement checks (must pass before any PR)
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
 - [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR-lite format, comment hygiene
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
+- [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
 - [`security.md`](.claude/rules/security.md) — AuthN/AuthZ defaults, secret handling, data classification
 - <add one line per rule file as they accumulate — infrastructure, messaging/integration, and other cross-cutting concerns earn one early>
 
 ## Debugging
 
-Before investigating any bug, search `docs/DEBUGGING-KNOWLEDGE-BASE.md` (ISSUE-001+).
-After resolving a non-obvious bug (>30 min), add a new ISSUE-NNN entry:
-Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug Shortcut.
+Before investigating any bug, search `docs/DEBUGGING-KNOWLEDGE-BASE.md`.
+After resolving a non-obvious bug (>30 min), add an entry — as a new file, not
+an appended line:
+
+```bash
+python3 scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
+make registry-generate
+```
+
+Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
+Shortcut.

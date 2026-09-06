@@ -1,0 +1,46 @@
+{
+  "_readme": [
+    "This project's own shared append-only registries — the kit applied to the",
+    "repository that ships it. See starter-kit/rules/shared-registries.md.",
+    "",
+    "id_scheme is 'numeric' rather than the kit's 'slug' default because this",
+    "repository's decision records are numbered, and filenames follow the MADR",
+    "convention adr-NNNN-short-title.md — hence filename_prefix 'adr-' and",
+    "id_width 4. The filename_prefix is part of the path only; the identifier",
+    "stays ADR-0001, carried by id_prefix.",
+    "",
+    "The widening from three digits to four did renumber ADR-001 to ADR-0001.",
+    "That was a deliberate, approved exception to the never-renumber rule: every",
+    "citation was updated in the same change except the one inside the released",
+    "[0.1.0] changelog section, which is immutable, so it is corrected by an",
+    "erratum bullet under [Unreleased] instead.",
+    "",
+    "There is no debugging-knowledge-base registry here: this repository ships",
+    "the knowledge-base skeleton as a template rather than keeping one of its",
+    "own. A registry is declared when it exists, never speculatively."
+  ],
+
+  "id_scheme": "numeric",
+  "id_width": 3,
+  "regen_command": "make registry-generate",
+  "rule_pointer": "starter-kit/rules/shared-registries.md",
+
+  "registries": [
+    {
+      "name": "changelog",
+      "kind": "changelog",
+      "fragments": "changelog.d",
+      "output": "CHANGELOG.md",
+      "categories": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
+    },
+    {
+      "name": "adr",
+      "kind": "documents",
+      "id_prefix": "ADR",
+      "id_width": 4,
+      "filename_prefix": "adr-",
+      "fragments": "docs/adr",
+      "required_headings": ["Status", "Context", "Decision", "Consequences"]
+    }
+  ]
+}

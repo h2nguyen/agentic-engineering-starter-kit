@@ -1,0 +1,19 @@
+# Umbrella lint target.
+#
+# Copy to the repository root as `Makefile`. The registry targets themselves
+# live in registry.mk (installed alongside) so that a repository which already
+# HAS a Makefile can adopt them with one `include` line rather than a merge.
+#
+# CI must invoke the AGGREGATE target. A workflow that enumerates sub-targets
+# drifts away from the Makefile one pull request at a time, silently, until
+# checks the rule files describe as enforced have not run in months.
+
+include registry.mk
+
+.PHONY: lint test
+
+## lint — everything CI runs. Add every new check here, and nowhere else.
+lint: registry-drift registry-ids kb-shape ci-lint-coverage test
+
+## test — the registry layer's suites; add your project's own after them.
+test: registry-test

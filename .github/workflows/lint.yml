@@ -1,0 +1,37 @@
+# This repository's own lint workflow — the kit's ci/lint.yml.template applied.
+# you already have). Adapt the runner, the checkout action version and the
+# language setup to the project; the load-bearing part is the last step.
+#
+# It invokes the AGGREGATE target. That is deliberate and it is the entire
+# design: a workflow that lists sub-targets individually starts correct and
+# decays, because adding a check to the Makefile and adding a step here are two
+# separate edits and only the first one is ever remembered. Invoking `make
+# lint` makes coverage total by construction — a check added to the Makefile
+# runs in CI the same day, with no second edit and no way to forget it.
+#
+# If per-path job gating forces enumeration later, keep
+# check-ci-lint-coverage.sh in the lint target: it is what notices the drift.
+
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check-ci-lint-coverage.sh compares the allowlist against the merge
+          # base, so it needs more than the default single-commit checkout.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run every check
+        run: make lint

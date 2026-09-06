@@ -1,0 +1,19 @@
+# Sanctioned duplicate registry identifiers.
+#
+# Copy to the repository root as `.registry-id-duplicate-allowlist`. One line
+# per sanctioned pair, naming BOTH fragment paths separated by whitespace:
+#
+#   docs/adr/095-outbox-for-integration-events.md docs/adr/095-pin-image-by-digest.md
+#
+# Keyed on the FILENAME PAIR, never on the identifier. That distinction is the
+# point of the file. A line saying only "095" reads as "this number is exempt"
+# and would let a *third* file claim 095 without anyone noticing — which is the
+# exact drift the gate exists to catch. Naming both files makes the exemption
+# say what it means: these two, already merged, already cited, stay as they are.
+#
+# Only ever add a pair that is ALREADY on the default branch and already cited.
+# A collision caught before merge is fixed by renaming the fragment that has not
+# landed yet — never by exempting it here, and never by renumbering the one that
+# has landed, because that breaks every citation pointing at it.
+#
+# Empty by default.
