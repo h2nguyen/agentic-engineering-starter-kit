@@ -51,7 +51,7 @@ make registry-generate   # rebuild CHANGELOG.md and the knowledge base from frag
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR-lite format, where rationale lives
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
