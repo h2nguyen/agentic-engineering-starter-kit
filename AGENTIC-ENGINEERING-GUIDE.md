@@ -282,6 +282,7 @@ Full text + litmus tests: [`.claude/rules/working-principles.md`](.claude/rules/
 make dev          # start local stack
 make test         # full test suite
 make lint         # lint + enforcement checks (must pass before any PR)
+make registry-generate   # rebuild CHANGELOG.md and the knowledge base from fragments
 ```
 
 ## Non-Negotiable Rules
@@ -294,24 +295,34 @@ make lint         # lint + enforcement checks (must pass before any PR)
 | **Documentation** | Docs are part of the change — updated in the same PR — see [`documentation.md`](.claude/rules/documentation.md) |
 | **Comments & annotations** | Front matter stays; narration goes; what survives is one line plus a pointer. Never strip protected marker shapes; no sweeps — see [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) |
 | **Versioning** | SemVer 2.0.0; new functionality = MINOR, never PATCH; changelog bullet in the same PR — see [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) |
+| **Registries** | Changelog, knowledge-base and decision-record entries are new files under a fragment directory, never appended lines; run `make registry-generate` — see [`shared-registries.md`](.claude/rules/shared-registries.md) |
 | **<Domain rule 1>** | <one-line imperative> — see [`.claude/rules/<domain>.md`](.claude/rules/<domain>.md) |
 | **<Domain rule 2>** | <one-line imperative> — see rule file |
 
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR-lite format, where rationale lives
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
+- [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
 - [`security.md`](.claude/rules/security.md) — AuthN/AuthZ defaults, secret handling, data classification
 - <add one line per rule file as they accumulate — infrastructure, messaging/integration, and other cross-cutting concerns earn one early>
 
 ## Debugging
 
-Before investigating any bug, search `docs/DEBUGGING-KNOWLEDGE-BASE.md` (ISSUE-001+).
-After resolving a non-obvious bug (>30 min), add a new ISSUE-NNN entry:
-Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug Shortcut.
+Before investigating any bug, search `docs/DEBUGGING-KNOWLEDGE-BASE.md`.
+After resolving a non-obvious bug (>30 min), add an entry — as a new file, not
+an appended line:
+
+```bash
+python3 scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
+make registry-generate
+```
+
+Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
+Shortcut.
 ````
 
 ### 3.3 Rule files
@@ -339,7 +350,7 @@ Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug 
 
 ## Canonical Example
 
-```<lang>
+```
 // WRONG — <why this fails>
 <minimal failing example>
 
@@ -351,8 +362,8 @@ Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug 
 
 ### <Short symptom-style title> (ISSUE-NNN)
 
-<What goes wrong, why, and the canonical fix shape. Cite the KB entry
-or ticket that produced this knowledge.>
+<What goes wrong, why, and the canonical fix shape. Cite the knowledge-base
+entry or ticket that produced this knowledge.>
 
 **Litmus test:** <a question or runnable command that verifies compliance>
 
@@ -429,9 +440,7 @@ as done.>
 ```markdown
 ---
 name: <agent-name>
-description: <What it enforces/reviews. When to use it — phrased so the main
-  agent knows to delegate to it ("Use when reviewing X", "Use before any PR
-  that touches Y").>
+description: <What it enforces/reviews. When to use it — phrased so the main agent knows to delegate to it ("Use when reviewing X", "Use before any PR that touches Y").>
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -453,7 +462,7 @@ You are the <Role Name> for <project>. Your job is to <mandate in one sentence>.
 
 ## Known Traps in This Domain
 
-- <trap + the KB entry / rule section that documents it>
+- <trap + the knowledge-base entry / rule section that documents it>
 
 ## Cross-cutting checks (every reviewer)
 
@@ -506,8 +515,9 @@ argument-hint: "[optional args]"
 <For a self-contained checklist command: the checklist, in execution order,
 with runnable commands.>
 
-<For a workflow command: one line —
-"Invoke the <skill-name> skill with arguments: $ARGUMENTS">
+<For a workflow command backed by a skill, keep it a thin pointer — one line:
+"Invoke the <skill-name> skill with arguments: $ARGUMENTS".
+Duplicated procedure text between a command and a skill WILL drift.>
 ```
 
 ### 3.7 Hooks & settings
@@ -567,6 +577,11 @@ fi
 #!/bin/bash
 # Enforces: <rule name> — see .claude/rules/<domain>.md § <section>
 # Escape: commit-message marker [<marker>] anywhere on the branch.
+#
+# Design rules (guide § 3.8):
+#   - Fail with a file:line trail AND a pointer to the rule being enforced.
+#   - Wire into the umbrella lint target that CI runs on every PR.
+#   - Escape hatches are greppable commit-message markers, never silent.
 set -euo pipefail
 
 violations=$(grep -rn "<forbidden-pattern>" <path-scope> || true)
@@ -597,7 +612,7 @@ A fixed entry format with stable identifiers, read as one file and *written* as 
 ```markdown
 # <Short symptom-style title>
 
-**Symptom:** What the developer/agent observes.
+**Symptom:** What the developer or agent observes.
 
 **Investigation Trail:** What was checked; what was misleading.
 
@@ -605,10 +620,10 @@ A fixed entry format with stable identifiers, read as one file and *written* as 
 
 **Fix:** What was changed.
 
-**Prevention:** The design rule or pattern that avoids recurrence
-(and which rule file / enforcement script now encodes it).
+**Prevention:** The design rule or pattern that avoids recurrence (and which
+rule file or enforcement script now encodes it).
 
-**Debug Shortcut:** The quick check to confirm this issue next time.
+**Debug Shortcut:** The quick check that confirms this issue next time.
 
 **Related:** RULE:working-principles
 ```
