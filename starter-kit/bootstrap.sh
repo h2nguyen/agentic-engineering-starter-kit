@@ -260,7 +260,11 @@ if [ "$MAKEFILE_KEPT" -eq 1 ]; then
   echo "     with two lines (registry.mk was installed next to it):"
   echo "         include registry.mk"
   echo "         lint: registry-drift registry-ids kb-shape ci-lint-coverage <your existing prerequisites>"
-  if make -n -C "$TARGET" lint 2>/dev/null | grep -q check-registry-drift.sh; then
+  # Capture before matching: `grep -q` exits at its first hit, and under
+  # `pipefail` the SIGPIPE that kills `make` becomes the pipeline's status, so
+  # a correctly chained lint target would be reported to the user as unchained.
+  _dry_lint="$(make -n -C "$TARGET" lint 2>/dev/null || true)"
+  if [ "${_dry_lint#*check-registry-drift.sh}" != "$_dry_lint" ]; then
     echo "     (verified: 'make lint' already reaches the registry gates)"
   else
     echo "     Until then 'make lint' is green and checks nothing of the registry layer;"

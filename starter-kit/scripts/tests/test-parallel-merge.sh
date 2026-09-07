@@ -27,6 +27,26 @@ trap '[ "$VERBOSE" -eq 1 ] || rm -rf "$WORK"' EXIT
 pass=0
 fail=0
 
+# `sed -i` is not portable, and the failure is silent. GNU sed takes no argument
+# after -i; BSD/macOS sed REQUIRES one, so `sed -i 's/x/y/' file` there reads the
+# script as the backup suffix and the file path as the script:
+#     sed: 1: "/var/folders/…": invalid command code f
+# Writing through a temp file avoids -i altogether, behaves identically on both,
+# and — unlike `-i.bak` — leaves no backup file that a fragment directory would
+# then pick up as an entry.
+sed_i() { # $1 = sed script, $2… = files
+  local script="$1"; shift
+  local f
+  for f in "$@"; do
+    if sed "$script" "$f" > "$f.sedtmp"; then
+      mv "$f.sedtmp" "$f"
+    else
+      rm -f "$f.sedtmp"
+      return 1
+    fi
+  done
+}
+
 ok()   { printf '  ok   — %s\n' "$1"; pass=$((pass + 1)); }
 bad()  { printf '  FAIL — %s\n' "$1"; fail=$((fail + 1)); }
 
@@ -252,11 +272,17 @@ add_on_branch() { # $1 = repo, $2 = branch, $3... = registry_tool args
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b "$branch"
   ( cd "$repo" && python3 scripts/registry_tool.py "$@" >/dev/null 2>&1 )
-  # Fill the template placeholders so the shape gate sees real content.
-  find "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" -name '*.md' ! -name '_*' \
-    -exec sed -i 's/<fill in>/Recorded by the acceptance test./g' {} + 2>/dev/null || true
-  find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*' \
-    -exec sed -i 's/^- <what an operator.*/- Recorded by the acceptance test./' {} + 2>/dev/null || true
+  # Fill the template placeholders so the shape gate sees real content. This
+  # must NOT swallow its own errors: when the substitution silently no-ops the
+  # placeholders survive, the identifier gate rejects them exactly as designed,
+  # and the resulting FAILs read as defects in the mechanism under test.
+  local frag
+  while IFS= read -r frag; do
+    sed_i 's/<fill in>/Recorded by the acceptance test./g' "$frag"
+  done < <(find "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" -name '*.md' ! -name '_*')
+  while IFS= read -r frag; do
+    sed_i 's/^- <what an operator.*/- Recorded by the acceptance test./' "$frag"
+  done < <(find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*')
   ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "registry: entry from $branch"
 }
@@ -334,12 +360,12 @@ contract_no_round_trip_after_merge() {
   scaffold_fragment_repo "$repo" slug
   add_on_branch "$repo" branch-a new --registry debugging-kb \
       --title "Zulu entry sorts last" --date 2026-08-29
-  sed -i 's/^\*\*Symptom:\*\* .*/**Symptom:** Stale config is served for thirty seconds after a deploy./; s/^\*\*Fix:\*\* .*/**Fix:** Warm the cache after the config has loaded, not before./' \
+  sed_i 's/^\*\*Symptom:\*\* .*/**Symptom:** Stale config is served for thirty seconds after a deploy./; s/^\*\*Fix:\*\* .*/**Fix:** Warm the cache after the config has loaded, not before./' \
       "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-zulu-entry-sorts-last.md"
   ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "a: real body"
   add_on_branch "$repo" branch-b new --registry debugging-kb \
       --title "Alpha entry sorts first" --date 2026-08-29
-  sed -i 's/^\*\*Symptom:\*\* .*/**Symptom:** A request hangs instead of failing fast on timeout./; s/^\*\*Fix:\*\* .*/**Fix:** Propagate the timeout error out of the retry loop./' \
+  sed_i 's/^\*\*Symptom:\*\* .*/**Symptom:** A request hangs instead of failing fast on timeout./; s/^\*\*Fix:\*\* .*/**Fix:** Propagate the timeout error out of the retry loop./' \
       "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-alpha-entry-sorts-first.md"
   ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "b: real body"
   add_on_branch "$repo" branch-c new --registry changelog --category added \
@@ -391,7 +417,7 @@ EOF
   fi
 
   # A real corruption must still be caught: hand-edit an entry body.
-  sed -i 's/thirty seconds/thirty minutes/' "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.md"
+  sed_i 's/thirty seconds/thirty minutes/' "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.md"
   if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     bad "[no-round-trip] a hand-edited entry body passed the drift check"
   else
@@ -514,7 +540,7 @@ contract_append_vs_release() {
   git -C "$repo" checkout -q -b branch-release
   ( cd "$repo" && python3 scripts/registry_tool.py new --registry changelog \
       --category added --title "Initial public interface" --date 2026-08-20 >/dev/null 2>&1
-    sed -i 's/^- <what an operator.*/- Initial public interface./' \
+    sed_i 's/^- <what an operator.*/- Initial public interface./' \
       changelog.d/2026-08-20-initial-public-interface.md
     python3 scripts/registry_tool.py release --registry changelog \
       --version 1.0.0 --date 2026-08-28 >/dev/null )
