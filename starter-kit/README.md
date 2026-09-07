@@ -34,12 +34,15 @@ conventions beat the blueprint's defaults (guide § 4.4).
 `bootstrap.sh` detects which agentic tool the repo uses (`.claude`/`CLAUDE.md`,
 `.cursor`, `.github/copilot-instructions.md`, `AGENTS.md`), asks when nothing is
 detected, installs the constitution + the universal rule files (working
-principles, documentation, versioning & changelog, shared registries) + the
+principles, documentation, comments & annotations, versioning & changelog,
+shared registries) + the
 knowledge-base and changelog skeletons in their fragment layout + the
 `.gitattributes`, `Makefile` and CI workflow that make the registry gates run
 (+ the prompt-enhancer, semver, registry-entry and registry-conflict-triage
 skills on Claude Code) to that tool's locations, and never overwrites existing
-files. Then: fill in the constitution's `<placeholders>`, run `make lint` to
+files. Then: fill in the constitution's `<placeholders>` and the project rows of
+the comments-and-annotations rule
+([how](#adopting-the-comments-and-annotations-rule)), run `make lint` to
 confirm the gates pass, enable further common skills from
 `skills/common-catalog.md`, and commit.
 
@@ -51,7 +54,8 @@ confirm the gates pass, enable further common skills from
 | `bootstrap.sh` | — (run it, don't copy it into the repo) | `--help` for options |
 | `constitution.md.template` | `CLAUDE.md` / `AGENTS.md` / tool equivalent | Fill in every `<placeholder>` |
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
-| `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR-lite, comment hygiene) |
+| `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR-lite, where rationale lives) |
+| `rules/comments-and-annotations.md` | `.claude/rules/comments-and-annotations.md` | Fill in the project half of its protected-shapes table and its four `<placeholders>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule) |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
 | `registries.json.template` | `registries.json` | Reference only — bootstrap runs `registry_tool.py init`, which writes the file from the conventions your repo already has |
@@ -93,7 +97,8 @@ confirm the gates pass, enable further common skills from
 1. Run `bootstrap.sh` (or copy manually per the table above).
 2. Fill in the constitution: identity, stack table (including the infrastructure,
    auth, and messaging/integration rows), commands, and the 3–5 rules you already
-   know are non-negotiable.
+   know are non-negotiable. Then the project rows of the comments-and-annotations
+   rule — next section.
 3. Run `make lint`. All four gates should pass on a fresh install with no
    `git config` and no other setup — that is the check that the registry layer
    actually landed rather than merely being present.
@@ -105,6 +110,49 @@ confirm the gates pass, enable further common skills from
    when you repeat a workflow, agents when you repeat a review comment,
    enforcement scripts when a documented rule gets violated anyway. See the
    guide § 4–§ 5.
+
+## Adopting the comments-and-annotations rule
+
+The rule installs as-is and is complete except for the rows only your project
+can fill. Two things to do once, right after bootstrap:
+
+1. **Fill the project half of its "Protected shapes" table.** The first table
+   is already filled with the markers the kit's own tooling parses. For the
+   second, grep your own tooling once for the tokens it reads out of comments
+   and list each one — a marker is anything a linter, a build step, a test
+   runner, a template engine or a CI script matches on:
+
+   ```bash
+   # once, from the repo root: which comment tokens does my tooling read?
+   grep -rnoE 'noqa|eslint-disable|prettier-ignore|pragma|@ts-(ignore|expect-error)|<!-- *[a-zA-Z-]+ *-->' \
+     .github/ Makefile* *.toml *.cfg *.config.* .*rc* 2>/dev/null | sort -u
+   ```
+
+   Adapt the pattern and the paths to the tools you actually run; the point is
+   the list, not the command. Every shape that turns up is configuration, not
+   commentary, and goes into the table with the gate that reads it in the last
+   column.
+2. **Resolve the pointers.** Four placeholders stay in the file on purpose,
+   because their value belongs to the adopting project:
+
+   | Placeholder | Fill with |
+   |---|---|
+   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records (MADR numbering, or the date-slug form) |
+   | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
+   | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key) |
+   | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence |
+
+   `<EVAL-RECORD-ID>` appears in the prompt-file example and the survivors
+   table: fill it with wherever your project records evaluation evidence for
+   prompts, or leave it if you keep none. `<product>`, `<vendor>`,
+   `<regulation>` and `<TIER>`, like the other angle-bracket tokens inside the
+   examples, are illustrative and need no filling — so a leftover-placeholder
+   grep for `<` will still hit this file after it is filled in; read the hits
+   rather than counting them.
+
+Nothing else in the file is project-specific. The rule is deliberately
+ungated — its enforcement section says why — so there is no script to wire
+into `make lint`.
 
 ## Conventions the templates assume
 

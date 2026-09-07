@@ -39,7 +39,7 @@ for every artifact type, the adoption playbook, and the maintenance flywheel.
 | [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The full guide: § 1 concepts → § 2 reference anatomy → § 3 blueprint → § 4 adoption → § 5 maintenance (+ § 5.6 agentic-graph-engineering outlook) |
 | [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md) | Self-contained prompt that makes an agent drive the whole setup — with fallback specs, so it works even without the rest of this kit |
 | [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop |
-| [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, versioning & changelog, shared registries — plus a rule-file template |
+| [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, comments & annotations, versioning & changelog, shared registries — plus a rule-file template |
 | [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage), the common-skills catalog, the workspace-audit skill (Level 4), and a skill template |
 | [`starter-kit/agents/`](starter-kit/agents/) | Agent template + the agent-coach meta-agent (Level 4, propose-never-silently-change) |
 | [`starter-kit/commands/`](starter-kit/commands/) | Slash-command template + the audit command entry point |

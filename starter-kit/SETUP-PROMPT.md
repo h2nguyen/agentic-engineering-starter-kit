@@ -115,8 +115,11 @@ Create, at the locations your detected tool expects (Appendix A.1):
 1. **The constitution** — always-loaded contract, ≤ ~200 lines, per the outline
    in Appendix A.2. Every claim in it must be true today.
 2. **The universal rule files** — working principles (Appendix A.3) plus the
-   documentation and versioning-and-changelog defaults (Appendix A.8) —
-   project-agnostic, used verbatim.
+   documentation, comments-and-annotations and versioning-and-changelog
+   defaults (Appendix A.8) — project-agnostic, used verbatim. The one
+   project-specific part is the comments-and-annotations rule's
+   protected-shapes table: fill it from the lint, test and CI tooling found in
+   Phase 1.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for
@@ -225,8 +228,8 @@ Appendix A.7 — the sequence:
 - The knowledge-base protocol (search before debugging, write after any
   >30-minute bug) is documented in the constitution, and KB entries are
   machine-parseable as graph nodes (stable IDs + typed `Related:` links).
-- The documentation and versioning/changelog defaults are installed as rule
-  files and indexed from the constitution.
+- The documentation, comments-and-annotations and versioning/changelog defaults
+  are installed as rule files and indexed from the constitution.
 - The growth path for deferred artifacts is written down, each with its trigger
   signal.
 - If a workspace pre-existed: nothing that was working got removed, every kept
@@ -344,8 +347,20 @@ silent. Non-trivial scripts get their own tests.
   bugs become KB entries; cross-file design decisions become ADR-lite records
   (Michael Nygard format: Status → Context → Decision → Consequences, with
   rejected options recorded inside Context as part of the forces; immutable once accepted,
-  superseded by number); decision rationale never lives in shipped-source
-  comments — a one-line pointer to the ADR/KB entry is the maximum.
+  superseded by number); decision rationale is routed to the ADR, the KB entry
+  or the PR description, never written into the artifact's body.
+- **comments-and-annotations** — front matter stays (doc comments, purpose
+  paragraphs, description blocks); narration inside the body goes: rename,
+  extract and restructure before annotating; what survives is one line (three
+  at most), a constraint or WHY, plus a pointer to its durable home; protected
+  marker shapes (tooling-parsed directives with their reasons, test-phase
+  markers, licence text, classification tags, ordering headers) are never
+  removed or shortened — grep the tooling before deleting anything that looks
+  like a marker; artifacts-you-touch only, never a sweep, and a request to
+  strip all comments from a module is declined; audience-visible surfaces carry
+  no decision narrative, vendor names, ticket ids or compliance claims; every
+  TODO carries a tracking id; deliberately ungated, because a density linter
+  cannot tell a mandated marker from narration.
 - **shared-registries** — the A.9 pattern as a rule: fragment layout, the
   identifier schemes, the merge configuration, and the prohibition on renaming
   an identifier that is already on the default branch.
