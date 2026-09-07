@@ -23,6 +23,27 @@ pass=0; fail=0
 ok()  { printf '  ok   — %s\n' "$1"; pass=$((pass + 1)); }
 bad() { printf '  FAIL — %s\n' "$1"; fail=$((fail + 1)); }
 
+# `sed -i` is not portable, and the failure is silent. GNU sed takes no argument
+# after -i; BSD/macOS sed REQUIRES one, so `sed -i 's/x/y/' file` there reads the
+# script as the backup suffix and the file path as the script:
+#     sed: 1: "/var/folders/…": invalid command code f
+# Writing through a temp file avoids -i altogether, behaves identically on both,
+# and — unlike `-i.bak` — leaves no backup file that a fragment directory would
+# then pick up as an entry.
+sed_i() { # $1 = sed script, $2… = files
+  local script="$1"; shift
+  local f
+  for f in "$@"; do
+    if sed "$script" "$f" > "$f.sedtmp"; then
+      mv "$f.sedtmp" "$f"
+    else
+      rm -f "$f.sedtmp"
+      return 1
+    fi
+  done
+}
+
+
 # Where the kit's installable files live: the kit itself, or a repo it was
 # installed into (then bootstrap.sh is not present and this test is skipped).
 BOOTSTRAP="$KIT_DIR/bootstrap.sh"
@@ -149,18 +170,26 @@ if ( cd "$R" && make lint >/dev/null 2>&1 ); then
 else
   bad "'make lint' red after adoption:"; ( cd "$R" && make lint 2>&1 | grep -E '^FAIL' | head -5 | sed 's/^/         /' )
 fi
-( cd "$R" && make -n lint 2>/dev/null | grep -q check-registry-drift.sh ) && ok "and it really reaches the registry gates" || bad "lint still does not run the gates"
+# Capture before matching. `grep -q` exits at its first hit, and under
+# `pipefail` the SIGPIPE that then kills `make` becomes the pipeline's status
+# (141) — so a lint target that DOES reach the gates is reported as one that
+# does not. The producer here is large enough for that to happen every time.
+_dry="$( cd "$R" && make -n lint 2>/dev/null || true )"
+case "$_dry" in
+  *check-registry-drift.sh*) ok "and it really reaches the registry gates" ;;
+  *) bad "lint still does not run the gates" ;;
+esac
 
 # 5. Parallel work is clean and green on the adopted repository.
 git -C "$R" checkout -q -b feat-a
 ( cd "$R" && python3 scripts/registry_tool.py new --registry changelog --title "Feature A" --date 2026-09-04 >/dev/null 2>&1
-  sed -i 's/^- <what an operator.*/- Feature A shipped./' changelog.d/2026-09-04-feature-a.md
+  sed_i 's/^- <what an operator.*/- Feature A shipped./' changelog.d/2026-09-04-feature-a.md
   python3 scripts/registry_tool.py new --registry debugging-kb --title "Feature A bug" >/dev/null 2>&1
-  sed -i 's/<fill in>/Specific to feature A./g' docs/DEBUGGING-KNOWLEDGE-BASE.d/003-feature-a-bug.md 2>/dev/null
+  sed_i 's/<fill in>/Specific to feature A./g' docs/DEBUGGING-KNOWLEDGE-BASE.d/003-feature-a-bug.md
   make registry-generate >/dev/null 2>&1 ); git -C "$R" add -A; git -C "$R" commit -q -m "feat a"
 git -C "$R" checkout -q main; git -C "$R" checkout -q -b feat-b
 ( cd "$R" && python3 scripts/registry_tool.py new --registry changelog --title "Feature B" --date 2026-09-04 >/dev/null 2>&1
-  sed -i 's/^- <what an operator.*/- Feature B shipped./' changelog.d/2026-09-04-feature-b.md
+  sed_i 's/^- <what an operator.*/- Feature B shipped./' changelog.d/2026-09-04-feature-b.md
   make registry-generate >/dev/null 2>&1 ); git -C "$R" add -A; git -C "$R" commit -q -m "feat b"
 git -C "$R" checkout -q feat-a
 if git -C "$R" merge --no-edit -q feat-b >/dev/null 2>&1; then
