@@ -9,7 +9,7 @@
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
-#   claude  → CLAUDE.md, .claude/rules/ (4 default rules), .claude/settings.json, .claude/hooks/, .claude/skills/ (prompt-enhancer, semver)
+#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/, .claude/skills/ (prompt-enhancer, semver)
 #   agents  → AGENTS.md, docs/agent-rules/          (AGENTS.md-convention tools)
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
@@ -125,35 +125,31 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
   return $any
 }
 
+# One decision per tool — where the constitution goes and where rule files
+# go — then one install line per rule. A new default rule is one entry in
+# DEFAULT_RULES rather than one edit per tool arm; test-bootstrap-rerun.sh
+# checks that every shipped rule lands for every tool.
 case "$TOOL" in
-  claude)
-    install_file constitution.md.template CLAUDE.md || true
-    install_file rules/working-principles.md .claude/rules/working-principles.md || true
-    install_file rules/documentation.md .claude/rules/documentation.md || true
-    install_file rules/comments-and-annotations.md .claude/rules/comments-and-annotations.md || true
-    install_file rules/versioning-and-changelog.md .claude/rules/versioning-and-changelog.md || true
-    install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
-    install_dir skills/semver .claude/skills/semver || true
-    install_file settings.json.template .claude/settings.json || true
-    install_file hooks/session-start.sh.template .claude/hooks/session-start.sh x || true
-    ;;
-  agents|cursor)
-    if install_file constitution.md.template AGENTS.md; then retarget_rule_links AGENTS.md; fi
-    install_file rules/working-principles.md docs/agent-rules/working-principles.md || true
-    install_file rules/documentation.md docs/agent-rules/documentation.md || true
-    install_file rules/comments-and-annotations.md docs/agent-rules/comments-and-annotations.md || true
-    install_file rules/versioning-and-changelog.md docs/agent-rules/versioning-and-changelog.md || true
-    ;;
-  copilot)
-    if install_file constitution.md.template .github/copilot-instructions.md; then
-      retarget_rule_links .github/copilot-instructions.md
-    fi
-    install_file rules/working-principles.md docs/agent-rules/working-principles.md || true
-    install_file rules/documentation.md docs/agent-rules/documentation.md || true
-    install_file rules/comments-and-annotations.md docs/agent-rules/comments-and-annotations.md || true
-    install_file rules/versioning-and-changelog.md docs/agent-rules/versioning-and-changelog.md || true
-    ;;
+  claude)        CONSTITUTION=CLAUDE.md;                       RULES_DIR=.claude/rules ;;
+  agents|cursor) CONSTITUTION=AGENTS.md;                       RULES_DIR=docs/agent-rules ;;
+  copilot)       CONSTITUTION=.github/copilot-instructions.md; RULES_DIR=docs/agent-rules ;;
 esac
+DEFAULT_RULES=(working-principles documentation comments-and-annotations versioning-and-changelog)
+
+# The constitution links its rules as .claude/rules/…; every other layout keeps
+# them under docs/agent-rules/, so the links are rewritten on those tools.
+if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
+  retarget_rule_links "$CONSTITUTION"
+fi
+for rule in "${DEFAULT_RULES[@]}"; do
+  install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
+done
+if [ "$TOOL" = claude ]; then
+  install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
+  install_dir skills/semver .claude/skills/semver || true
+  install_file settings.json.template .claude/settings.json || true
+  install_file hooks/session-start.sh.template .claude/hooks/session-start.sh x || true
+fi
 # --- shared append-only registries -----------------------------------------
 # Tool-independent: this layer is git configuration, a generator and CI checks.
 # It installs for every tool, and it is the reason a repo scaffolded from this
@@ -180,6 +176,8 @@ fi
 
 # .gitattributes is additive: later lines win for the same path, so appending
 # the kit's block to an existing file is safe, and a marker keeps it idempotent.
+# The template carries the same marker, so a fresh install is recognised on a
+# re-run too.
 if [ -f "$TARGET/.gitattributes" ]; then
   if ! grep -q '>>> starter-kit registries >>>' "$TARGET/.gitattributes"; then
     {
@@ -213,11 +211,8 @@ install_file scripts/check-ci-lint-coverage.sh scripts/check-ci-lint-coverage.sh
 install_tree scripts/tests scripts/tests || true
 
 # The changelog rule is only correct once the registry layer is present, so it
-# ships alongside it rather than with the tool-specific rule files above.
-case "$TOOL" in
-  claude) install_file rules/shared-registries.md .claude/rules/shared-registries.md || true ;;
-  *)      install_file rules/shared-registries.md docs/agent-rules/shared-registries.md || true ;;
-esac
+# ships alongside it rather than with the default rules above.
+install_file rules/shared-registries.md "$RULES_DIR/shared-registries.md" || true
 if [ "$TOOL" = "claude" ]; then
   install_file skills/registry-entry/SKILL.md .claude/skills/registry-entry/SKILL.md || true
   install_file skills/registry-conflict-triage/SKILL.md .claude/skills/registry-conflict-triage/SKILL.md || true

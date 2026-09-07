@@ -8,14 +8,18 @@
 #
 # CI invokes `make lint` — the aggregate target — so a check added here runs in
 # CI the same day, with no second edit and no way to forget it.
+#
+# The top-level scripts/ directory holds gates that check this repository's
+# own documents and are not part of the kit: check-guide-templates.sh keeps
+# the guide's embedded templates identical to the kit files they name.
 
 KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
-        ci-lint-coverage kit-smoke
+        ci-lint-coverage guide-templates kit-smoke
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids ci-lint-coverage test
+lint: registry-drift registry-ids ci-lint-coverage guide-templates test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
@@ -23,6 +27,7 @@ test:
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
+	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
@@ -43,6 +48,10 @@ registry-ids:
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:
 	$(KIT)/scripts/check-ci-lint-coverage.sh
+
+## guide-templates — every template the guide embeds matches its kit file.
+guide-templates:
+	scripts/check-guide-templates.sh
 
 ## kit-smoke — bootstrap into a throwaway repo and run its gates there.
 kit-smoke:

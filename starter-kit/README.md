@@ -54,7 +54,7 @@ confirm the gates pass, enable further common skills from
 | `bootstrap.sh` | — (run it, don't copy it into the repo) | `--help` for options |
 | `constitution.md.template` | `CLAUDE.md` / `AGENTS.md` / tool equivalent | Fill in every `<placeholder>` |
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
-| `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR-lite, where rationale lives) |
+| `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR format (Michael Nygard), where rationale lives) |
 | `rules/comments-and-annotations.md` | `.claude/rules/comments-and-annotations.md` | Fill in the project half of its protected-shapes table and its four `<placeholders>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule) |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
@@ -72,7 +72,7 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption test (runs from the kit) — chained into `make lint` |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | — (keep as template) | Copy per new domain rule file |
