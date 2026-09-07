@@ -72,7 +72,7 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption test (runs from the kit) — chained into `make lint` |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | — (keep as template) | Copy per new domain rule file |

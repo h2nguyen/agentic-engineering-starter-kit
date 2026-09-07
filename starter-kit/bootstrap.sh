@@ -180,6 +180,8 @@ fi
 
 # .gitattributes is additive: later lines win for the same path, so appending
 # the kit's block to an existing file is safe, and a marker keeps it idempotent.
+# The template carries the same marker, so a fresh install is recognised on a
+# re-run too.
 if [ -f "$TARGET/.gitattributes" ]; then
   if ! grep -q '>>> starter-kit registries >>>' "$TARGET/.gitattributes"; then
     {

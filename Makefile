@@ -23,6 +23,7 @@ test:
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
+	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:

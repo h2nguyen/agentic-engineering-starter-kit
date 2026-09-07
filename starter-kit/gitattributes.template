@@ -35,7 +35,13 @@
 # loud; it cannot make it impossible.
 #
 # If you remove the drift check from CI, remove these entries too.
+#
+# The two marker lines below are what bootstrap.sh looks for on a re-run: when
+# it finds the opening marker it leaves this file alone, and when it appends
+# these entries to a .gitattributes that already existed it writes the same
+# pair around them. Keep them.
 
+# >>> starter-kit registries >>>
 # ---------------------------------------------------------------------------
 # Generated artifacts — assembled from the fragment directory beside each one.
 # Never hand-edited, so a union merge here cannot lose authored content: the
@@ -56,6 +62,7 @@ docs/DEBUGGING-KNOWLEDGE-BASE.md    merge=union linguist-generated=true
 # ---------------------------------------------------------------------------
 changelog.d/**                      merge=text
 docs/DEBUGGING-KNOWLEDGE-BASE.d/**  merge=text
+# <<< starter-kit registries <<<
 
 # ---------------------------------------------------------------------------
 # Registries you have not migrated yet
