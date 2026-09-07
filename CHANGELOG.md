@@ -25,11 +25,15 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 
 - `rules/comments-and-annotations.md`: a domain-agnostic rule for self-explaining work products — structure before annotation (rename, extract, restructure), a one-line brevity standard for what survives, protected marker shapes that are never stripped, an audience litmus for where rationale lives, and an explicit no-sweeps scope. `bootstrap.sh` installs it for every tool, the constitution template indexes it, and the setup prompt's fallback specs carry it for kit-less installs. Its protected-shapes table arrives pre-filled with the markers the kit's own tooling parses (generated-region and category anchors, knowledge-base field labels, the `.gitattributes` block markers, enforcement-script headers and escape markers, decision-record headings) and leaves four `<placeholders>` for the adopting project; `starter-kit/README.md` documents how to fill them.
 - The rule's reviewer bullets as cross-cutting checks in the agent template, and one pointer in the working-principles pre-PR litmus, so specialist reviewers and the pre-PR self-check inherit them.
+- `test-bootstrap-rerun.sh`: a second bootstrap run on a fresh repository changes nothing, and every tool layout receives the constitution and every shipped rule at its own rule location. Chained into the kit's `registry-test` target beside the brownfield-adoption test.
+- `check-guide-templates.sh` (this repository only, not part of the kit): `make lint` now fails when a template the guide embeds drifts from the kit file it names; a block whose lead-in does not say "template" is listed as an illustration and never compared.
 
 <!-- category: Changed -->
 ### Changed
 
 - The documentation rule's "decision rationale lives in ADRs, not in code comments" section now routes to the comments-and-annotations rule instead of carrying its own copy of the comment doctrine, so the doctrine has one home; its WRONG/CORRECT pair and audience litmus moved there.
+- `bootstrap.sh` decides the constitution path and the rules directory once per tool and installs the default rules from one list, so a new default rule is one edit rather than one per tool layout. Installed files, locations and order are unchanged.
+- The constitution template's index line for the documentation rule says "ADR format (Michael Nygard)" instead of the retired "ADR-lite"; the kit README's row for that rule follows.
 
 <!-- category: Deprecated -->
 
@@ -56,6 +60,8 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
   what it had found. The same shape produced `test-brownfield-adoption.sh`'s
   "lint still does not run the gates" failure. Both now capture the output
   before matching it.
+- `bootstrap.sh` no longer appends a second registry block to `.gitattributes` when re-run on a repository it bootstrapped from scratch: the template now carries the same marker lines the installer writes when it appends to an existing file, so both paths leave a file a re-run recognises.
+- The guide's embedded copies of the constitution, rule, agent, command, check-script and knowledge-base templates match the kit files again; the constitution copy had been missing the registry layer (the `make registry-generate` command, the Registries row and the shared-registries index line).
 
 <!-- category: Security -->
 
