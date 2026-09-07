@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [1.1.0] — 2026-09-07
+
+<!-- category: Added -->
 ### Added
 
 - `rules/comments-and-annotations.md`: a domain-agnostic rule for self-explaining work products — structure before annotation (rename, extract, restructure), a one-line brevity standard for what survives, protected marker shapes that are never stripped, an audience litmus for where rationale lives, and an explicit no-sweeps scope. `bootstrap.sh` installs it for every tool, the constitution template indexes it, and the setup prompt's fallback specs carry it for kit-less installs. Its protected-shapes table arrives pre-filled with the markers the kit's own tooling parses (generated-region and category anchors, knowledge-base field labels, the `.gitattributes` block markers, enforcement-script headers and escape markers, decision-record headings) and leaves four `<placeholders>` for the adopting project; `starter-kit/README.md` documents how to fill them.
@@ -60,12 +76,10 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
   what it had found. The same shape produced `test-brownfield-adoption.sh`'s
   "lint still does not run the gates" failure. Both now capture the output
   before matching it.
-- `bootstrap.sh` no longer appends a second registry block to `.gitattributes` when re-run on a repository it bootstrapped from scratch: the template now carries the same marker lines the installer writes when it appends to an existing file, so both paths leave a file a re-run recognises.
+- `bootstrap.sh` no longer appends a second registry block to `.gitattributes` when re-run on a repository it bootstrapped from scratch: the template now carries the same marker lines the installer writes when it appends to an existing file, so both paths leave a file a re-run recognises. The fix travels with the template, so it covers installs made from this release onwards; a repository bootstrapped earlier has an unmarked `.gitattributes` and still gains a duplicate block on each re-run — delete the older copy by hand once, or add the two marker lines around it.
 - The guide's embedded copies of the constitution, rule, agent, command, check-script and knowledge-base templates match the kit files again; the constitution copy had been missing the registry layer (the `make registry-generate` command, the Registries row and the shared-registries index line).
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [1.0.0] — 2026-09-06
 
