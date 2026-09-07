@@ -292,6 +292,7 @@ make lint         # lint + enforcement checks (must pass before any PR)
 | **TDD** | Failing test first. Bug fixes need a regression test before the fix. |
 | **Security** | <e.g. every endpoint authenticated by default; secrets only via env/secret manager> — see rule file |
 | **Documentation** | Docs are part of the change — updated in the same PR — see [`documentation.md`](.claude/rules/documentation.md) |
+| **Comments & annotations** | Front matter stays; narration goes; what survives is one line plus a pointer. Never strip protected marker shapes; no sweeps — see [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) |
 | **Versioning** | SemVer 2.0.0; new functionality = MINOR, never PATCH; changelog bullet in the same PR — see [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) |
 | **<Domain rule 1>** | <one-line imperative> — see [`.claude/rules/<domain>.md`](.claude/rules/<domain>.md) |
 | **<Domain rule 2>** | <one-line imperative> — see rule file |
@@ -299,7 +300,8 @@ make lint         # lint + enforcement checks (must pass before any PR)
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), comment hygiene
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives
+- [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
 - [`security.md`](.claude/rules/security.md) — AuthN/AuthZ defaults, secret handling, data classification
@@ -452,6 +454,34 @@ You are the <Role Name> for <project>. Your job is to <mandate in one sentence>.
 ## Known Traps in This Domain
 
 - <trap + the KB entry / rule section that documents it>
+
+## Cross-cutting checks (every reviewer)
+
+Whatever the domain above, run these on every artifact in the change — they
+are the reviewer half of the comments-and-annotations rule:
+
+- **Annotations pass the ladder** (rename, extract, restructure, compress). A
+  surviving annotation is one line (three at most), states a constraint or WHY,
+  and points to its durable home. Step narration, restated headings or lines,
+  section banners, and kept-but-disabled content (commented-out code,
+  struck-through text, hidden rows or slides) are rejected.
+- **Protected shapes are intact.** Tooling-parsed markers, test-phase markers,
+  licence and legal text, citations, alt text, classification tags and ordering
+  headers are never removed or shortened. When unsure whether something is a
+  marker, grep the tooling and templates for its token before accepting the
+  deletion.
+- **No sweeps.** Annotation deletions in artifacts the change did not otherwise
+  require are rejected, whatever the request said. Pre-existing narration is
+  MENTIONED in the review, never deleted.
+- **TODOs carry a tracking id.**
+- **Audience-visible surfaces** (templates, published documents, exported files,
+  slide notes, cell notes, changelogs) carry no decision narrative, no competitor
+  or vendor names, no ticket narratives, no compliance reassurances. A bare
+  ticket reference on a changelog bullet is the versioning rule's convention and
+  passes.
+- **Front matter is present** where the domain requires it: doc comments on
+  public code, a purpose paragraph on a document, a description block on a
+  prompt or skill.
 
 ## Output Format
 
@@ -697,8 +727,8 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 
 **Day 1 — Level 1 (≈ 1–2 hours):**
 
-1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
-2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling).
+1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, comments & annotations, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
+2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling). Then the project rows of the comments-and-annotations rule — the second half of its protected-shapes table and its pointer placeholders; the starter-kit README's adoption note says how.
 3. Enable the common generic skills worth having from day one — `starter-kit/skills/common-catalog.md` lists them with adoption notes; the prompt-enhancer and semver skills already ship in the kit, and architecture review / architecture docs are one copy away.
 4. Commit. The setup is live: every agent session now starts from the contract.
 

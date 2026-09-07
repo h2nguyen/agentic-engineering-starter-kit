@@ -104,5 +104,8 @@ bigger.
 - [ ] Can I describe success as a goal a test can verify?
 - [ ] For non-trivial tasks: did I publish the plan (open questions, chosen design and
       its alternative, task list) where the work is tracked — not only in chat?
+- [ ] Did every new inline annotation pass the ladder (rename → extract → restructure →
+      compress), and did I mention pre-existing narration rather than delete it? See
+      the comments-and-annotations rule.
 
 If any answer is "no", the loop isn't done — go back before pushing.

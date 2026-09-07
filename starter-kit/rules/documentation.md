@@ -20,25 +20,17 @@ who knows what to write, and the knowledge decays within days.
 
 ## Decision rationale lives in ADRs, not in code comments
 
-Shipped source — templates, styles, i18n bundles, anything that reaches a
-user's browser or a release artifact — must not carry decision-history
-narrative, third-party or competitor references, ticket-number stories, or
-multi-paragraph rationale. A code comment states a constraint the code cannot
-show: one line, plus a pointer to the durable home.
-
-```text
-// WRONG — decision narrative at the call site
-// We evaluated three retry libraries and chose X because Y's maintainer ...
-// (12 more lines)
-
-// CORRECT — constraint + pointer
-// Retries must be idempotent — see ADR-007
-```
-
-**Litmus before committing any comment:** read it as if a customer saw it via
-*View Source*. Does it name a third party? Narrate a decision? Exceed three
-lines? Reference a ticket by ID? Any yes → relocate to an ADR or the PR
-description; leave at most a one-line pointer.
+Not in the body of the artifact. An inline annotation states a constraint the
+work cannot show — one line, plus a pointer to the durable home — and the
+reasoning itself goes to an ADR (architectural or cross-cutting decision), a
+knowledge-base entry (investigation, root cause) or the pull-request
+description (per-change review context). Shipped source — templates, styles,
+i18n bundles, anything that reaches a user's browser or a release artifact —
+carries no decision narrative, third-party or competitor references, or
+ticket-number stories at all. The doctrine behind this — the structural ladder
+that comes before any annotation, the brevity standard, the WRONG/CORRECT pair,
+the audience litmus, the protected marker shapes and the no-sweeps scope —
+lives in `comments-and-annotations.md`; this rule only routes the rationale.
 
 ## ADR format (Michael Nygard)
 

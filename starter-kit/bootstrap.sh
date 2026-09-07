@@ -9,7 +9,7 @@
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
-#   claude  → CLAUDE.md, .claude/rules/ (3 default rules), .claude/settings.json, .claude/hooks/, .claude/skills/ (prompt-enhancer, semver)
+#   claude  → CLAUDE.md, .claude/rules/ (4 default rules), .claude/settings.json, .claude/hooks/, .claude/skills/ (prompt-enhancer, semver)
 #   agents  → AGENTS.md, docs/agent-rules/          (AGENTS.md-convention tools)
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
@@ -130,6 +130,7 @@ case "$TOOL" in
     install_file constitution.md.template CLAUDE.md || true
     install_file rules/working-principles.md .claude/rules/working-principles.md || true
     install_file rules/documentation.md .claude/rules/documentation.md || true
+    install_file rules/comments-and-annotations.md .claude/rules/comments-and-annotations.md || true
     install_file rules/versioning-and-changelog.md .claude/rules/versioning-and-changelog.md || true
     install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
     install_dir skills/semver .claude/skills/semver || true
@@ -140,6 +141,7 @@ case "$TOOL" in
     if install_file constitution.md.template AGENTS.md; then retarget_rule_links AGENTS.md; fi
     install_file rules/working-principles.md docs/agent-rules/working-principles.md || true
     install_file rules/documentation.md docs/agent-rules/documentation.md || true
+    install_file rules/comments-and-annotations.md docs/agent-rules/comments-and-annotations.md || true
     install_file rules/versioning-and-changelog.md docs/agent-rules/versioning-and-changelog.md || true
     ;;
   copilot)
@@ -148,6 +150,7 @@ case "$TOOL" in
     fi
     install_file rules/working-principles.md docs/agent-rules/working-principles.md || true
     install_file rules/documentation.md docs/agent-rules/documentation.md || true
+    install_file rules/comments-and-annotations.md docs/agent-rules/comments-and-annotations.md || true
     install_file rules/versioning-and-changelog.md docs/agent-rules/versioning-and-changelog.md || true
     ;;
 esac
@@ -250,6 +253,9 @@ fi
 echo ""
 echo "Next steps:"
 echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' <constitution-file>)."
+echo "     Then the project rows of the comments-and-annotations rule: the second half of"
+echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
+echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
 echo "  2. Enable common generic skills — see $(basename "$KIT_DIR")/skills/common-catalog.md."
 echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check and"
 echo "     the CI-coverage check are already chained into it, and the installed"
