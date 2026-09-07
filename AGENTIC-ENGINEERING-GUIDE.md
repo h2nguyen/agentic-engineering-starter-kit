@@ -476,7 +476,9 @@ are the reviewer half of the comments-and-annotations rule:
 - **TODOs carry a tracking id.**
 - **Audience-visible surfaces** (templates, published documents, exported files,
   slide notes, cell notes, changelogs) carry no decision narrative, no competitor
-  or vendor names, no ticket ids, no compliance reassurances.
+  or vendor names, no ticket narratives, no compliance reassurances. A bare
+  ticket reference on a changelog bullet is the versioning rule's convention and
+  passes.
 - **Front matter is present** where the domain requires it: doc comments on
   public code, a purpose paragraph on a document, a description block on a
   prompt or skill.

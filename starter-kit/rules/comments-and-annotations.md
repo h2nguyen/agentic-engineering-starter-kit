@@ -135,20 +135,23 @@ Respond as JSON: {"answer": "...", "escalate": true|false}
 After:
 
 ```text
-## Role
+ROLE
 You are a support assistant for <product>.
 
-## Rules
+RULES
 - Answer in the customer's language.
 - Never promise refunds.
 
-## Output format
+OUTPUT FORMAT
 # Keep the example: without it the model drifts to prose, see <EVAL-RECORD-ID>
 Respond as JSON: {"answer": "...", "escalate": true|false}
 ```
 
 Headings replaced the narration. The one annotation that survives states a
-constraint the text cannot show and points to the evidence.
+constraint the text cannot show and points to the evidence. `#` is this prompt
+format's comment syntax and the loader strips those lines; in a format with no
+comment syntax, the pointer goes into the description block that rule 1 keeps,
+not into the body the model reads.
 
 ### The same moves in other domains
 
@@ -230,6 +233,10 @@ forbidden outright, because the audience can read them:
   <regulation>". Compliance is proven by controls and evidence, not by inline
   claims a reader cannot verify.
 
+A bare ticket reference on a changelog bullet (`… (<TICKET-ID>)`) is the
+versioning-and-changelog rule's convention and is not an annotation; what this
+rule forbids is the story around it.
+
 ## Audience litmus: where rationale lives
 
 Run this pass after the ladder above. Read the annotation as if you saw it for
@@ -253,7 +260,7 @@ homes below, with at most a one-line pointer left in the artifact:
 | Cross-cutting pattern future work must follow | A rule file in this workspace |
 | Per-change review-feedback context | The change or pull-request description |
 | Investigation, root cause, lessons learned | Knowledge base (`<KB-ENTRY-ID>`) |
-| Audience-facing release note | One terse changelog bullet: what changed, never why |
+| Audience-facing release note | One terse changelog bullet: what changed and what the operator will observe, not the design history |
 
 Commit and change messages are the relaxed case: decision context there is fine
 and helps future archaeology. Prefer the same "behaviour, not company" framing
@@ -381,7 +388,7 @@ Run against the change. Every answer should be "yes" or "n/a":
 - [ ] Is the change free of step narration, banners, and kept-but-disabled
       content?
 - [ ] In audience-visible artifacts, is the change free of decision narrative,
-      vendor names, ticket ids, and auditor-bait?
+      vendor names, ticket narratives, and auditor-bait?
 - [ ] Does every TODO carry a tracking id?
 - [ ] Is front matter present where the domain requires it?
 
