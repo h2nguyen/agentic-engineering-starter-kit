@@ -115,6 +115,13 @@ class TestSlugify(unittest.TestCase):
     def test_strips_punctuation_and_accents(self):
         self.assertEqual(rt.slugify("Röt: 500 — retry!"), "rot-500-retry")
 
+    def test_letters_without_a_decomposition_are_transliterated_not_dropped(self):
+        # NFKD leaves ß, æ, ø, ł, đ … whole, so the ASCII step used to delete
+        # them: "Straße" became "strae". Slugs are identifiers, so a lost
+        # letter is permanent once the entry is cited.
+        self.assertEqual(rt.slugify("Straße gesperrt"), "strasse-gesperrt")
+        self.assertEqual(rt.slugify("Łódź, Ærø, Đà Nẵng"), "lodz-aero-da-nang")
+
     def test_truncates_on_a_word_boundary(self):
         result = rt.slugify("alpha beta gamma delta epsilon zeta", limit=20)
         self.assertLessEqual(len(result), 20)
