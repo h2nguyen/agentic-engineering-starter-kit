@@ -519,8 +519,18 @@ def splice(reg: Registry, existing: str, body: str) -> str:
 # subcommands
 # --------------------------------------------------------------------------
 
+# Latin letters that NFKD does not decompose, so the ASCII step below would drop
+# them outright: "Straße" became "strae", "Łódź" "odz". Accented letters need no
+# entry — NFKD splits them into base letter + mark ("Röt" -> "rot").
+_TRANSLITERATE = str.maketrans({
+    "ß": "ss", "ẞ": "SS", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE",
+    "ø": "o", "Ø": "O", "ł": "l", "Ł": "L", "đ": "d", "Đ": "D",
+    "ð": "d", "Ð": "D", "þ": "th", "Þ": "TH", "ı": "i",
+})
+
+
 def slugify(text: str, limit: int = 56) -> str:
-    normalized = unicodedata.normalize("NFKD", text)
+    normalized = unicodedata.normalize("NFKD", text.translate(_TRANSLITERATE))
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii").lower()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_only).strip("-")
     if len(slug) > limit:
