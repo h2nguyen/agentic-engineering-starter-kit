@@ -195,8 +195,12 @@ Promoting `[Unreleased]` into a version section relocates the heading concurrent
 branches were writing under. Under a plain text merge their bullet lands in a
 section that has moved, and nothing fails. Promotion here consumes the fragment
 *files*, so a branch that added one in parallel still holds its own file and its
-bullet reappears under `[Unreleased]` on the next generation. Never hand-edit a
-released section afterwards: errata go under a new `[Unreleased]` bullet.
+bullet reappears under `[Unreleased]` on the next generation. Under `merge=union`
+the merge can also leave a copy of that bullet — or a generated-region marker —
+inside the new release section; regenerating cannot repair what lies outside the
+region, so the drift check fails on it and names the line to delete. Never
+hand-edit a released section otherwise: errata go under a new `[Unreleased]`
+bullet.
 
 ### Assert the shape before asserting uniqueness
 

@@ -430,6 +430,58 @@ class TestChangelog(RegistryTestCase):
         with self.assertRaises(rt.RegistryError):
             self.run_raw("release", "--registry", "changelog", "--version", "1.0.0")
 
+    # What a merge can leave outside the region. Regenerating repairs only the
+    # region, so each of these must fail the drift check AND `generate`.
+
+    def released(self):
+        self.fragment("2026-08-20-released.md", [("Fixed", ["Shipped in 1.0.0"])])
+        self.run_tool("generate", "--registry", "changelog")
+        self.run_tool("release", "--registry", "changelog", "--version", "1.0.0", "--date", "2026-08-28")
+
+    def damage(self, old, new):
+        self.write("CHANGELOG.md", self.read("CHANGELOG.md").replace(old, new, 1))
+
+    def assert_outside_damage_fails(self):
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 1)
+        self.assertEqual(self.run_tool("generate", "--registry", "changelog"), 1)
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 1)
+
+    def test_an_unreleased_bullet_copied_into_the_newest_release_fails(self):
+        self.released()
+        self.fragment("2026-08-29-parallel.md", [("Fixed", ["From a parallel branch"])])
+        self.damage("- Shipped in 1.0.0", "- Shipped in 1.0.0\n- From a parallel branch")
+        self.assert_outside_damage_fails()
+
+    def test_a_released_bullet_whose_fragment_is_gone_is_fine(self):
+        self.released()
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 0)
+
+    def test_a_second_end_marker_fails(self):
+        self.released()
+        self.damage("- Shipped in 1.0.0", "- Shipped in 1.0.0\n\n<!-- END GENERATED: changelog -->")
+        self.assert_outside_damage_fails()
+
+    def test_an_empty_heading_in_a_release_the_tool_wrote_fails(self):
+        self.released()
+        self.damage("- Shipped in 1.0.0", "- Shipped in 1.0.0\n\n### Added\n")
+        self.assert_outside_damage_fails()
+
+    def test_a_hand_written_bullet_above_the_region_fails(self):
+        self.damage("## [Unreleased]\n", "## [Unreleased]\n\n- Written by hand.\n")
+        self.assert_outside_damage_fails()
+
+    def test_a_hand_written_bullet_below_the_region_fails(self):
+        self.released()
+        self.damage("<!-- END GENERATED: changelog -->\n", "<!-- END GENERATED: changelog -->\n\n- Written by hand.\n")
+        self.assert_outside_damage_fails()
+
+    def test_release_refuses_a_damaged_changelog(self):
+        self.released()
+        self.fragment("2026-08-29-parallel.md", [("Fixed", ["From a parallel branch"])])
+        self.damage("- Shipped in 1.0.0", "- Shipped in 1.0.0\n- From a parallel branch")
+        with self.assertRaises(rt.RegistryError):
+            self.run_raw("release", "--registry", "changelog", "--version", "1.1.0")
+
 
 class TestUniquenessGate(RegistryTestCase):
     scheme = "numeric"

@@ -18,7 +18,9 @@
 #   2. APPEND vs PROMOTE. One branch appends to a section while another moves
 #      that whole section somewhere else (a release promoting [Unreleased] into
 #      a version heading). The appended line merges into a section that is no
-#      longer where it was, and no test fails when it lands in the wrong place.
+#      longer where it was. The drift check also looks outside the generated
+#      region for exactly this — a live bullet or a marker in the newest
+#      release — so here it fails; on its own, union would stay silent.
 #
 # So union merge on its own converts a loud conflict into a quiet corruption.
 # It is only safe when a gate downstream can still see the damage. Here that

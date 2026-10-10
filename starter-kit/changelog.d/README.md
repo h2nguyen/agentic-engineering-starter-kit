@@ -49,8 +49,10 @@ conflict and nothing failing.
 
 Fragments fix that because a release consumes the *files*. A branch that added
 one in parallel still holds its own file, so its bullet reappears under
-`[Unreleased]` on the next generation instead of being absorbed into a section
-that moved.
+`[Unreleased]` on the next generation. The union merge may still leave a copy
+in the released section — git aligns the old `[Unreleased]` with the new
+version — and that copy, which regenerating cannot touch, fails the drift
+check with the line to delete. Quiet corruption becomes a one-line fix.
 
 ## Why per change rather than per bullet
 
