@@ -318,6 +318,58 @@ class TestChangelog(RegistryTestCase):
         self.run_tool("generate", "--registry", "changelog")
         self.assertIn("continued here.", self.read("CHANGELOG.md"))
 
+    # Lines the generator does not render used to vanish with every gate green.
+    # Each case below was a silent loss before the parser named the line.
+
+    def assert_rejected_at(self, text, line):
+        self.write("changelog.d/2026-08-29-one.md", text)
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 1)
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.run_raw("generate", "--registry", "changelog")
+        self.assertIn(f"2026-08-29-one.md:{line} —", str(caught.exception))
+
+    def test_a_level_three_heading_is_rejected_not_folded_into_the_section_above(self):
+        # CHANGELOG.md itself uses `### Fixed`, so it is the likely slip. It
+        # rendered the Fixed bullet under Added — the wrong semver signal.
+        self.assert_rejected_at("# A change\n\n## Added\n\n- A (#1).\n\n### Fixed\n\n- B (#2).\n", 7)
+
+    def test_an_unindented_second_line_of_a_bullet_is_rejected(self):
+        self.assert_rejected_at("# A change\n\n## Fixed\n\n- Uploads a PDF again\nlarger than 50 MB.\n", 6)
+
+    def test_a_paragraph_inside_a_section_is_rejected(self):
+        self.assert_rejected_at("# A change\n\n## Fixed\n\nSome context first.\n\n- A bullet.\n", 5)
+
+    def test_bullets_inside_a_multi_line_comment_are_not_rendered(self):
+        self.write(
+            "changelog.d/2026-08-29-one.md",
+            "# A change\n\n## Fixed\n\n- Real.\n\n<!-- authoring note\n- not a bullet\n-->\n",
+        )
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        self.assertIn("- Real.", body)
+        self.assertNotIn("not a bullet", body)
+
+    def test_a_comment_that_is_never_closed_is_rejected(self):
+        self.assert_rejected_at("# A change\n\n## Fixed\n\n- Real.\n<!-- note\n- swallowed\n", 6)
+
+    def test_star_and_plus_bullets_are_rendered_as_dash_bullets(self):
+        # Markdown treats them alike; dropping them was the generator's quirk.
+        self.write("changelog.d/2026-08-29-one.md", "# A change\n\n## Fixed\n\n* Star.\n+ Plus.\n")
+        self.run_tool("generate", "--registry", "changelog")
+        body = self.read("CHANGELOG.md")
+        self.assertIn("- Star.", body)
+        self.assertIn("- Plus.", body)
+        self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 0)
+
+    def test_notes_under_the_title_are_allowed_and_not_rendered(self):
+        self.write(
+            "changelog.d/2026-08-29-one.md",
+            "# A change\n\nWhy this matters, for the reviewer.\n\n## Added\n\n- Visible.\n",
+        )
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 0)
+        self.run_tool("generate", "--registry", "changelog")
+        self.assertNotIn("for the reviewer", self.read("CHANGELOG.md"))
+
     def test_every_category_gets_an_anchor_even_when_empty(self):
         # The anchors are merge context. Without them, two branches that each
         # touch two categories produce one contiguous hunk apiece, and union
@@ -599,6 +651,21 @@ class TestAdopt(RegistryTestCase):
         self.assertIn("- Initial.", body)              # released section untouched
         self.assertEqual(body.count("- Existing one."), 1)
         self.assertEqual(self.run_tool("generate", "--check", "--registry", "changelog"), 0)
+
+    def test_prose_and_star_bullets_under_unreleased_survive_adoption(self):
+        # The fragment rejects lines it cannot render, so adopt must not write
+        # any: `*` bullets stay bullets, prose is kept as a comment.
+        self.write(
+            "CHANGELOG.md",
+            "# Changelog\n\n## [Unreleased]\n\nNothing big yet.\n\n### Fixed\n\n"
+            "* Star fix.\n\nMore prose.\n\n## [1.0.0] - 2026-01-01\n\n- Initial.\n",
+        )
+        self.assertEqual(self.run_tool("adopt", "--registry", "changelog", "--date", "2026-09-03"), 0)
+        fragment = self.read("changelog.d/2026-09-03-migrated-from-changelog.md")
+        self.assertIn("<!-- Nothing big yet. -->", fragment)
+        self.assertIn("<!-- More prose. -->", fragment)
+        self.assertIn("- Star fix.", self.read("CHANGELOG.md"))
+        self.assertEqual(self.run_tool("check", "--registry", "changelog"), 0)
 
     def test_adopt_is_idempotent(self):
         self.write("CHANGELOG.md", "# C\n\n## [Unreleased]\n\n### Added\n\n- One.\n")

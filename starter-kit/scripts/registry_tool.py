@@ -272,6 +272,14 @@ def parse_changelog_fragment(reg: Registry, path: str) -> dict[str, list[str]]:
     naming the change, then one section per Keep a Changelog category it
     touches. That granularity is the point — a fragment is a unit of meaning
     ("what this change did"), not a line that happens to own an inode.
+
+    Inside a section every line must be one of: a bullet (`- `, or `* ` / `+ `,
+    rendered as `- `), an indented continuation of the bullet above, an HTML
+    comment (one line or several), a blank line, or the next `## ` heading.
+    Anything else would not reach the changelog, and used to vanish with every
+    gate green — a `### Fixed` heading, an unindented second line of a bullet,
+    a stray paragraph — so it is an error naming the line. Before the first
+    section, the title and notes for reviewers are allowed and never rendered.
     """
     known = {c.lower(): c for c in reg.categories}
     with open(path, encoding="utf-8") as fh:
@@ -280,13 +288,38 @@ def parse_changelog_fragment(reg: Registry, path: str) -> dict[str, list[str]]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
     bullets: list[str] = []
+    comment_from: int | None = None
 
     def flush():
         if current and bullets:
             sections.setdefault(current, []).extend(bullets)
 
+    def dropped(index: int, why: str) -> RegistryError:
+        return RegistryError(
+            f"{reg.rel(path)}:{index} — {why}; as written it would never reach "
+            f"the changelog.\n  See {reg.rule_pointer}."
+        )
+
     for index, raw in enumerate(lines, start=1):
-        if raw.startswith("# "):
+        if comment_from is not None:
+            if "-->" in raw:
+                comment_from = None
+            continue
+        stripped = raw.strip()
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped[4:]:
+                comment_from = index  # authoring guidance spanning lines
+            continue  # authoring guidance in the template; never rendered
+        if not stripped:
+            continue
+        if re.match(r"#{3,6}\s", stripped):
+            raise dropped(
+                index,
+                f"'{stripped}' — only '## <category>' headings are read, so this "
+                f"heading and the bullets under it would be filed under the "
+                f"section above (or nowhere). Write '## {stripped.lstrip('#').strip()}'",
+            )
+        if raw.startswith("# ") and current is None:
             continue  # the title; readability only, never rendered
         if raw.startswith("## "):
             flush()
@@ -301,9 +334,7 @@ def parse_changelog_fragment(reg: Registry, path: str) -> dict[str, list[str]]:
                 )
             current = known[heading.lower()]
             continue
-        if raw.lstrip().startswith("<!--"):
-            continue  # authoring guidance in the template; never rendered
-        if raw.startswith("- "):
+        if raw[:2] in ("- ", "* ", "+ "):
             if current is None:
                 raise RegistryError(
                     f"{reg.rel(path)}:{index} — bullet before any category "
@@ -313,11 +344,28 @@ def parse_changelog_fragment(reg: Registry, path: str) -> dict[str, list[str]]:
                     f"  See {reg.rule_pointer}."
                 )
             bullets.append(raw[2:].rstrip())
-        elif bullets and raw[:1].isspace() and raw.strip():
+        elif bullets and raw[:1].isspace():
             # Only an INDENTED line continues the bullet above it. Anything
             # else — prose, a stray comment — is not swept into the changelog,
             # which is how the template's own guidance used to leak into it.
             bullets[-1] += "\n" + raw.rstrip()
+        elif current is None:
+            continue  # notes under the title, before the first section
+        elif bullets:
+            raise dropped(
+                index,
+                "this line follows a bullet but is not indented, so it does not "
+                "continue it. Indent it by two spaces, or make it a '- ' bullet",
+            )
+        else:
+            raise dropped(
+                index,
+                f"this line sits in the '{current}' section but is not a '- ' "
+                f"bullet. Make it one, or move it above the first '## ' heading "
+                f"as a note",
+            )
+    if comment_from is not None:
+        raise dropped(comment_from, "this comment is never closed with '-->', so everything after it is swallowed")
     flush()
     return sections
 
@@ -1110,11 +1158,12 @@ def cmd_adopt(args) -> int:
         section = lines[start + 1:stop]
         moved: list[str] = []
         category = None
+        prose = 0
         for line in section:
             if line.startswith("### "):
                 category = line[4:].strip()
                 moved.append(f"## {category}")
-            elif line.startswith("- ") or (line[:1].isspace() and line.strip()):
+            elif line[:2] in ("- ", "* ", "+ ") or (line[:1].isspace() and line.strip()):
                 if category is None:
                     # Bullets with no category heading are common in changelogs
                     # that never used Keep a Changelog subsections. File them
@@ -1130,12 +1179,19 @@ def cmd_adopt(args) -> int:
                     )
                 moved.append(line)
             elif line.strip():
-                moved.append(line)  # prose; kept verbatim inside the fragment
+                # Prose is not a bullet, so the generator would not render it —
+                # and a fragment rejects what it cannot render. Kept verbatim as
+                # a comment: nothing is lost, and nothing is silently dropped.
+                moved.append(f"<!-- {line.strip().replace('-->', '-- >')} -->")
+                prose += 1
         fragment = os.path.join(reg.fragments_dir, f"{date}-migrated-from-changelog.md")
-        if any(l.startswith("- ") for l in moved):
+        if any(l[:2] in ("- ", "* ", "+ ") for l in moved):
             with open(fragment, "w", encoding="utf-8") as fh:
                 fh.write("# Migrated from CHANGELOG.md [Unreleased]\n\n" + "\n".join(moved).rstrip() + "\n")
-            print(f"moved {sum(1 for l in moved if l.startswith('- '))} bullets into {reg.rel(fragment)}")
+            print(f"moved {sum(1 for l in moved if l[:2] in ('- ', '* ', '+ '))} bullets into {reg.rel(fragment)}")
+            if prose:
+                print(f"note: {prose} line(s) of prose under [Unreleased] kept as comments in "
+                      f"{reg.rel(fragment)} — they are not bullets, so they are not rendered")
         lines[start + 1:stop] = ["", begin, "", end, ""]
     else:
         # Every "## <ID>: <title>" block becomes its own fragment; the prose
