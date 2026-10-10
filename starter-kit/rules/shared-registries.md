@@ -223,7 +223,11 @@ one pull request at a time and nothing reports it: the checks still pass
 locally, the rule files still describe the conventions as enforced, and a gate
 that quietly stopped running is discovered only by the bug it should have
 caught. Have CI invoke the aggregate target, or run `check-ci-lint-coverage.sh`
-to catch the divergence. A rules file claiming mechanical enforcement is only
+to catch the divergence. It counts only what a workflow really runs: the
+`run:` of a step, read as shell, in a workflow a push or pull request triggers,
+not switched off with `if: false`, in the repository root and not as `make -n`.
+A target named in a comment, an `echo`, a step name or another directory's
+Makefile covers nothing. A rules file claiming mechanical enforcement is only
 as true as the workflow step behind it.
 
 ### Custom merge drivers do not travel with the repository
