@@ -26,6 +26,14 @@ The level-1 title names the change and is never rendered — it is there so the
 directory is readable at a glance. Write the bullets for the operator reading
 them after a deploy, not as pasted commit messages.
 
+Inside a `## <category>` section the generator reads bullets (`- `; `* ` and
+`+ ` are rendered as `- `), their **indented** continuation lines, comments and
+blank lines — and nothing else. Every other line is an error naming the line,
+because it would otherwise vanish from the changelog with every check green:
+a `### Fixed` heading (write `## Fixed`), an unindented second line of a bullet,
+a paragraph, a comment that is never closed. Notes for the reviewer go between
+the title and the first `##` heading; they are allowed and never rendered.
+
 ## Why a file per change rather than a section in CHANGELOG.md
 
 A conventional changelog re-emits all six category headings on every release,
