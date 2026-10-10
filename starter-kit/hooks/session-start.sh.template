@@ -22,10 +22,12 @@ set -uo pipefail
 # 3. Start local daemons your tests need (database, docker, ...)
 #    e.g. if ! docker info >/dev/null 2>&1; then <start docker>; fi
 
-# 4. Persist env vars for subsequent tool calls
+# 4. Persist env vars for subsequent tool calls. SessionStart fires again on
+#    resume and after a compaction, so append each line once, not per start.
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "export PATH=$PATH" >> "$CLAUDE_ENV_FILE"
-  # echo "export JAVA_HOME=..." >> "$CLAUDE_ENV_FILE"
+  line="export PATH=\"$PATH\""
+  grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "$line" >> "$CLAUDE_ENV_FILE"
+  # same for e.g. export JAVA_HOME=...
 fi
 
 echo "session-start: toolchain ready"

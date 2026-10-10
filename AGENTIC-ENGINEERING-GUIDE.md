@@ -522,7 +522,16 @@ Duplicated procedure text between a command and a skill WILL drift.>
 
 ### 3.7 Hooks & settings
 
-Use a `SessionStart` hook when agent sessions need environment setup (toolchains, daemons, env vars) — agent shells are non-interactive and skip profile files. Keep hooks **idempotent** (re-runs are no-ops) and **degrading** (a blocked download warns and continues; the session still starts).
+Use a `SessionStart` hook when agent sessions need environment setup (toolchains, daemons, env vars) — agent shells are non-interactive and skip profile files. Keep hooks **idempotent** (re-runs are no-ops — `SessionStart` fires again on resume and after a compaction) and **degrading** (a blocked download warns and continues; the session still starts).
+
+A hook that cannot run is a guard that silently stops guarding: Claude Code treats its failure as a non-blocking error, and nothing turns red. Four ways that happens, each seen in a real adoption:
+
+- **An unquoted path.** Hook commands run through `sh -c`; `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` splits at a space in the project path and exits 127 — every hook at once. Write `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/x.sh"`.
+- **A lost executable bit.** A hook committed as mode `100644` does not run in any fresh clone. Gate it: every hook is `100755` in `git ls-files -s`.
+- **A missing tool.** A guard that parses its input with `jq` does nothing where `jq` is absent — including a Stop hook's `stop_hook_active` loop guard, which then fails *open* and forces continuation after continuation. Parse with what the gates already require (`python3`), or report the missing tool from `SessionStart`.
+- **The wrong checkout.** In a Claude Code worktree (`.claude/worktrees/<name>/`) `$CLAUDE_PROJECT_DIR` still names the main checkout; a hook that judges paths against it guards — or lints — the wrong tree. Derive the root from the file the tool touched (`git -C "$(dirname "$file")" rev-parse --show-toplevel`) or, in a Stop hook, from the input's `cwd`.
+
+All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite the same file — a formatter and a generator reading it — race; give each file kind one hook that does both, in order.
 
 **`settings.json` template** (starter kit: `settings.json.template`)
 
@@ -535,7 +544,7 @@ Use a `SessionStart` hook when agent sessions need environment setup (toolchains
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
           }
         ]
       }
@@ -556,9 +565,10 @@ set -uo pipefail
 # 1. Verify/install the pinned toolchain versions your build needs
 # 2. Install dependencies if the lockfile changed (no-op otherwise)
 # 3. Start local daemons your tests need (DB, docker, …)
-# 4. Persist env vars for subsequent tool calls:
+# 4. Persist env vars for subsequent tool calls (once — SessionStart re-fires on resume):
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "export PATH=$PATH" >> "$CLAUDE_ENV_FILE"
+  line="export PATH=\"$PATH\""
+  grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "$line" >> "$CLAUDE_ENV_FILE"
 fi
 ```
 
