@@ -74,7 +74,9 @@ feat: add /api/export endpoint        → v1.5.0
   `[Unreleased]` `Fixed` bullet. Consuming the *files* is what makes a release
   safe to run while other branches are open: a branch that added a bullet in
   parallel still holds its own file, so its bullet reappears under
-  `[Unreleased]` instead of merging into a section that has moved.
+  `[Unreleased]`; a copy a union merge leaves in the released section fails
+  the drift check, which names the line to delete. `release` refuses to run
+  on a changelog with such damage.
 - Internal refactors, test-only changes, and formatting sweeps need no bullet —
   when in doubt, add one anyway; an extra `Changed` line is cheaper than an
   unrecorded behaviour shift.

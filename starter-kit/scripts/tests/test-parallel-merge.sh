@@ -568,6 +568,48 @@ contract_append_vs_release() {
   fi
 }
 
+contract_append_vs_release_populated() { # $1 = category the parallel branch adds to
+  # The same race with a NON-EMPTY [Unreleased] at the fork point — the usual
+  # case. Git aligns the old region's lines with the new release section, so
+  # the parallel bullet merges cleanly INTO the released version (and, for a
+  # category below the base's, an END marker with it). The next generate puts
+  # the bullet under [Unreleased] too and the region is right again; the copy
+  # in the immutable section is what nothing used to see. It must be loud.
+  local category="$1" repo="$WORK/fragment-release-populated-$1"
+  scaffold_fragment_repo "$repo" slug
+  printf '# Base\n\n## Fixed\n\n- Base fix, already on main.\n' > "$repo/changelog.d/2026-08-20-base.md"
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  commit_all "$repo" "changelog: a pending bullet on main"
+
+  add_on_branch "$repo" branch-append new --registry changelog --category "$category" \
+      --title "Parallel change" --date 2026-08-29
+
+  git -C "$repo" checkout -q main
+  git -C "$repo" checkout -q -b branch-release
+  ( cd "$repo" && python3 scripts/registry_tool.py release --registry changelog \
+      --version 1.0.0 --date 2026-08-28 >/dev/null )
+  commit_all "$repo" "release: 1.0.0"
+
+  local result; result="$(merge_result "$repo" branch-append)"
+  if [ "$result" != "clean" ]; then
+    ok "[release/$category] a populated [Unreleased] and a release conflicted — loud, nothing hidden"
+    return
+  fi
+  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 )
+  local copies
+  copies="$(awk '/^## \[1\.0\.0\]/{f=1;next} /^## \[/{f=0} f' "$repo/CHANGELOG.md" | grep -c 'Recorded by the acceptance test' || true)"
+  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+    if [ "$copies" -eq 0 ]; then
+      ok "[release/$category] the parallel bullet stayed out of the released section"
+    else
+      bad "[release/$category] the parallel bullet sits in [1.0.0] and the drift check is green"
+      [ "$VERBOSE" -eq 1 ] && cat "$repo/CHANGELOG.md"
+    fi
+  else
+    ok "[release/$category] a bullet merged into the released section fails the drift check"
+  fi
+}
+
 contract_adr_numbers() { # $1 = id_scheme
   # Decision records are already one file per decision, so the FILE never
   # conflicts under either scheme. What differs is the identifier: the numeric
@@ -652,6 +694,8 @@ else
   contract_changelog
   contract_one_fragment_many_categories
   contract_append_vs_release
+  contract_append_vs_release_populated fixed
+  contract_append_vs_release_populated security
   contract_adr_numbers slug
   contract_adr_numbers numeric
   contract_gate_catches_duplicates

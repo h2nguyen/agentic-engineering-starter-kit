@@ -541,6 +541,92 @@ def canonical(reg: Registry, region: str) -> list[tuple[str, str]]:
     return sorted(items)
 
 
+def changelog_layout_problems(reg: Registry, text: str) -> list[str]:
+    """What a merge (or a hand edit) left OUTSIDE a changelog's generated region.
+
+    The drift check compares the region with the fragments, and that is the
+    whole of what it used to see. Union merge can damage the file around it:
+
+      * a release and a parallel fragment merge cleanly, and git — aligning the
+        old region with the new release section — files the parallel bullet
+        under the RELEASED version as well. After the next generate the region
+        is right again and the gate green, while an immutable section claims a
+        change it did not ship;
+      * the same merge can copy an END marker into the released section;
+      * a bullet written by hand under [Unreleased], above or below the region.
+
+    Each is reported with its line and what to delete.
+    """
+    lines = text.splitlines()
+    rel = reg.rel(reg.output_path)
+    problems: list[str] = []
+
+    begins = [i for i, l in enumerate(lines) if f"BEGIN GENERATED: {reg.name}" in l]
+    ends = [i for i, l in enumerate(lines) if f"END GENERATED: {reg.name}" in l]
+    for kind, found in (("BEGIN", begins), ("END", ends)):
+        for extra in found[1:]:
+            problems.append(
+                f"{rel}:{extra + 1} — a second {kind} GENERATED marker; a merge "
+                f"copied it out of the generated region. Delete this line."
+            )
+    if not begins or not ends or ends[0] < begins[0]:
+        return problems
+    begin, end = begins[0], ends[0]
+
+    # [Unreleased] holds the generated region and nothing else.
+    heading = next((i for i in range(begin - 1, -1, -1) if lines[i].startswith("## ")), None)
+    release = next((i for i in range(end + 1, len(lines)) if lines[i].startswith("## ")), None)
+    outside = list(range(heading + 1, begin)) if heading is not None else []
+    outside += range(end + 1, release if release is not None else len(lines))
+    for i in outside:
+        if lines[i][:2] in ("- ", "* ", "+ "):
+            problems.append(
+                f"{rel}:{i + 1} — a bullet outside the generated region, where no "
+                f"fragment produces it: written by hand or left by a merge. Put it "
+                f"in a fragment under {reg.fragments}/ and delete this line."
+            )
+
+    # The newest release must not hold a bullet whose fragment is unreleased.
+    if release is not None:
+        live = {
+            bullet.splitlines()[0].strip()
+            for path in fragment_paths(reg)
+            for bullets in parse_changelog_fragment(reg, path).values()
+            for bullet in bullets
+        }
+        stop = next((i for i in range(release + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+        heading_at, heading_bullets = None, 0
+        # Only a section `release` wrote (it carries the category anchors) is
+        # known never to hold an empty heading; a hand-written one may.
+        written_by_release = any(lines[i].startswith("<!-- category: ") for i in range(release + 1, stop))
+
+        def empty_heading():
+            if written_by_release and heading_at is not None and heading_bullets == 0:
+                problems.append(
+                    f"{rel}:{heading_at + 1} — '{lines[heading_at].strip()}' in the released "
+                    f"section has no bullet under it; release never writes one, a merge "
+                    f"did. Delete this line."
+                )
+
+        for i in range(release + 1, stop):
+            if lines[i].startswith("### "):
+                empty_heading()
+                heading_at, heading_bullets = i, 0
+            elif lines[i].startswith("- "):
+                if lines[i][2:].strip() in live:
+                    problems.append(
+                        f"{rel}:{i + 1} — '{lines[i][2:].strip()[:60]}' sits in the "
+                        f"released section '{lines[release].strip()}', but its fragment "
+                        f"is still unreleased: a merge with a parallel release put it "
+                        f"there. Delete this line (and its '### ' heading if nothing else "
+                        f"is left under it) — the bullet stays under [Unreleased]."
+                    )
+                else:
+                    heading_bullets += 1
+        empty_heading()
+    return problems
+
+
 def splice(reg: Registry, existing: str, body: str) -> str:
     """Replace the managed region of `existing` with `body`."""
     begin, end = markers(reg)
@@ -699,6 +785,12 @@ def cmd_generate(args) -> int:
         with open(reg.output_path, encoding="utf-8") as fh:
             current = fh.read()
         updated = splice(reg, current, render(reg))
+        # Outside the region regenerating repairs nothing, so these fail in
+        # both modes: `make registry-generate` must not turn the gate green.
+        layout = changelog_layout_problems(reg, updated) if reg.kind == "changelog" else []
+        for problem in layout:
+            failures += 1
+            print(f"FAIL: {problem}", file=sys.stderr)
         if args.check:
             if current != updated:
                 before = extract_region(reg, current)
@@ -708,6 +800,7 @@ def cmd_generate(args) -> int:
                     and after is not None
                     and canonical(reg, before) == canonical(reg, after)
                     and current.replace(before, "", 1) == updated.replace(after, "", 1)
+                    and not layout
                 ):
                     # Same entries, same content, same surroundings — only the
                     # order or spacing inside the region differs. That is what
@@ -921,6 +1014,12 @@ def cmd_release(args) -> int:
 
     with open(reg.output_path, encoding="utf-8") as fh:
         current = fh.read()
+    damage = changelog_layout_problems(reg, current)
+    if damage:
+        raise RegistryError(
+            "refusing to release on top of a damaged changelog — a release would "
+            "make it permanent:\n  " + "\n  ".join(damage)
+        )
     lines = current.splitlines()
     end_index = next(
         (i for i, line in enumerate(lines) if f"END GENERATED: {reg.name}" in line),
