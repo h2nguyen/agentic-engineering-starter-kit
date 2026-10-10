@@ -8,7 +8,9 @@
 #      present exactly once (test-brownfield-adoption.sh covers the case where
 #      the block was appended to a file that already existed);
 #   2. every tool layout gets the constitution and every shipped rule, at that
-#      tool's rule location, with the constitution's rule links retargeted.
+#      tool's rule location, with the constitution's rule links retargeted;
+#   3. the installed SessionStart hook runs from a project path with a space
+#      and appends its environment once, however often the session starts.
 #
 # Usage: test-bootstrap-rerun.sh [-v]
 set -uo pipefail
@@ -45,6 +47,19 @@ attrs="$(grep -c '^CHANGELOG.md .*merge=union' "$R/.gitattributes")"
 [ "$attrs" -eq 1 ] && ok "and the CHANGELOG.md merge attribute exactly once" || bad "CHANGELOG.md attribute present $attrs times"
 grep -q 'registry block already present' "$WORK/run2.log" \
   && ok "second run reports the block as already present" || bad "second run did not recognise its own block"
+
+echo "=== the installed SessionStart hook runs, also from a path with a space ==="
+# Hook commands run through `sh -c`. Unquoted, $CLAUDE_PROJECT_DIR splits at a
+# space and the hook exits 127 — a non-blocking error, so it is silently gone.
+R="$WORK/with space"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" >/dev/null 2>&1 || bad "bootstrap into a path with a space exited non-zero"
+cmd="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["SessionStart"][0]["hooks"][0]["command"])' "$R/.claude/settings.json")"
+env_file="$WORK/claude-env"; : > "$env_file"
+CLAUDE_PROJECT_DIR="$R" CLAUDE_ENV_FILE="$env_file" sh -c "$cmd" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "the hook command runs from a project path with a space" || bad "the hook command exited $rc from a path with a space"
+CLAUDE_PROJECT_DIR="$R" CLAUDE_ENV_FILE="$env_file" sh -c "$cmd" >/dev/null 2>&1
+lines="$(wc -l < "$env_file" | tr -d ' ')"
+[ "$lines" -eq 1 ] && ok "a second SessionStart (resume, compaction) appends nothing new" || bad "the env file has $lines lines after two starts"
 
 echo "=== every tool layout receives the constitution and every shipped rule ==="
 # Templates (leading underscore) stay in the kit; everything else under rules/
