@@ -20,9 +20,10 @@ obviously wrong.
 Identifiers are citation targets. Rule files, decision records, source
 comments, test names and other registry entries refer to them by name, and
 those citations live in places a conflict resolution does not look. Renaming one
-breaks every citation pointing at it — and it breaks them *silently*, because
-nothing checks that a cited identifier still resolves. That is strictly worse
-than the conflict it was meant to fix.
+breaks every citation pointing at it — and most of them *silently*: the link
+gate resolves the ones written as typed links, and nothing resolves a source
+comment, a test name or a sentence. That is strictly worse than the conflict it
+was meant to fix.
 
 When two entries genuinely collide and both have already landed: record the
 pair in `.registry-id-duplicate-allowlist`, keyed on both filenames, and leave
@@ -147,3 +148,9 @@ After any resolution beyond Phase 2's mechanical regeneration:
 - **Treating a duplicate-identifier failure as a formatting complaint.** It is
   the one failure this whole pattern exists to prevent, and it is permanent
   once cited.
+
+## Links
+
+**Related:** RULE:shared-registries, SCRIPT:registry_tool.py
+
+**Hands off to:** HUMAN — when a resolution would mean renumbering something already merged, or two edits of one fragment contradict

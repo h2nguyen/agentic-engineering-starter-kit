@@ -34,7 +34,12 @@ For each agent, collect concrete evidence:
   ```
 - **Escaped violations:** review misses found later (a bug the relevant agent should have caught). Pull from git history / PR review threads / debugging-knowledge-base ISSUE-NNN entries added after a merge.
 - **False positives:** patterns where an agent flags correct code (annoyance signal — erodes trust in the agent).
-- **Coverage holes:** rules or CI gates (the lint target's check scripts) that no agent references.
+- **Coverage holes:** rules or CI gates (the lint target's check scripts) that no agent references. Where the repo ships the graph tool, compute them rather than grep for them:
+  ```bash
+  make graph-coverage                  # rules no agent reviews; gates no agent cites
+  make graph-impact NODE=RULE:<name>   # which agents and scripts hold one rule
+  ```
+  The report sees typed links only, so an agent with no `Enforces` line shows up as owning nothing. That is itself a finding — propose the line.
 - **Staleness markers:** references to resolved tickets as if open, retired patterns, wrong version numbers.
 
 You may delegate fact-finding to a read-only explore agent or run the relevant agent against a known sample to observe its behaviour.
@@ -100,3 +105,7 @@ Once per cycle, turn the lens on yourself: were last cycle's proposals accepted?
 ```
 
 You are the only agent permitted to edit other agents' files — and only after approval. Wield that carefully.
+
+## Links
+
+**Hands off to:** HUMAN — every proposal waits for explicit approval before APPLY

@@ -32,6 +32,7 @@ make dev          # start local stack
 make test         # full test suite
 make lint         # lint + enforcement checks (must pass before any PR)
 make registry-generate   # rebuild CHANGELOG.md and the knowledge base from fragments
+make graph-impact NODE=RULE:testing   # what cites an artifact — run before renaming, deleting or rewriting it
 ```
 
 ## Non-Negotiable Rules
@@ -51,7 +52,7 @@ make registry-generate   # rebuild CHANGELOG.md and the knowledge base from frag
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives, typed links between artifacts
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
@@ -71,4 +72,4 @@ make registry-generate
 ```
 
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
-Shortcut.
+Shortcut, and a `Related:` line naming the rule or check that now prevents it.

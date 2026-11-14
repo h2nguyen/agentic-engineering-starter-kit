@@ -17,13 +17,31 @@
     "",
     "There is no debugging-knowledge-base registry here: this repository ships",
     "the knowledge-base skeleton as a template rather than keeping one of its",
-    "own. A registry is declared when it exists, never speculatively."
+    "own. A registry is declared when it exists, never speculatively.",
+    "",
+    "graph.nodes says where this repository keeps each kind of artifact, for",
+    "the typed-link gate (starter-kit/scripts/graph_tool.py). An installed",
+    "repository needs no such block — the tool's defaults are the installed",
+    "locations. This one keeps its rules, skills, agents and scripts under",
+    "starter-kit/, so the map points there and the shipped files are checked",
+    "here exactly as they will be once installed."
   ],
 
   "id_scheme": "numeric",
   "id_width": 3,
   "regen_command": "make registry-generate",
   "rule_pointer": "starter-kit/rules/shared-registries.md",
+
+  "graph": {
+    "nodes": {
+      "RULE": ["starter-kit/rules/*.md"],
+      "SKILL": ["starter-kit/skills/*/SKILL.md"],
+      "AGENT": ["starter-kit/agents/*.md"],
+      "COMMAND": ["starter-kit/commands/*.md"],
+      "SCRIPT": ["starter-kit/scripts/*", "scripts/*"],
+      "DOC": ["docs/**/*.md", "*.md", "starter-kit/docs/**/*.md", "starter-kit/*.md"]
+    }
+  },
 
   "registries": [
     {

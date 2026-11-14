@@ -13,7 +13,7 @@ include registry.mk
 .PHONY: lint test
 
 ## lint — everything CI runs. Add every new check here, and nowhere else.
-lint: registry-drift registry-ids kb-shape ci-lint-coverage test
+lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage test
 
 ## test — the registry layer's suites; add your project's own after them.
 test: registry-test

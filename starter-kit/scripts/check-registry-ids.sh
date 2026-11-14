@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Enforces: registry identifiers are well-shaped and unique —
-# see the shared-registries rule file.
+# Enforces: RULE:shared-registries — registry identifiers are well-shaped and
+# unique.
 #
 # Why this exists even where identifiers cannot collide: a repository on the
 # slug scheme gets uniqueness from the filesystem, but a repository on the

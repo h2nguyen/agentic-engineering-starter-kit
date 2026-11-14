@@ -54,7 +54,7 @@ memory — all encoded as files under version control.
    `starter-kit/` directory (`bootstrap.sh`, `constitution.md.template`, the
    default rule files under `rules/`, `skills/common-catalog.md`,
    `scripts/check-kb-shape.sh`, `scripts/registry_tool.py`,
-   `registries.json.template`). If found, the guide is your design authority
+   `scripts/graph_tool.py`, `registries.json.template`). If found, the guide is your design authority
    and the kit your template source — prefer running `bootstrap.sh` over
    hand-copying. If absent, build from Appendix A.
 3. **Existing setup.** If any agent config exists, note it — Phases 2–3 will be
@@ -147,7 +147,8 @@ Create, at the locations your detected tool expects (Appendix A.1):
    aggregate target rather than listing its parts**: a workflow that enumerates
    sub-targets drifts away from the lint target one PR at a time, silently,
    until checks the rule files call enforced have not run in months. The kit
-   ships `check-kb-shape.sh`, the registry drift and identifier gates, and
+   ships `check-kb-shape.sh`, the registry drift and identifier gates, the
+   typed-link gate (`check-graph-links.sh`, Appendix A.10), and
    `check-ci-lint-coverage.sh` (which catches that divergence when per-path job
    gating forces enumeration) already chained in. Add one more check for the
    mined convention that is most valuable or most violated, per the contract in
@@ -212,7 +213,9 @@ Appendix A.7 — the sequence:
    examples to make the search come back empty.
 2. Every command documented in the constitution has been executed successfully
    in this session.
-3. Every internal link in the new files resolves.
+3. Every internal link in the new files resolves — and every typed link
+   (Appendix A.10): `make graph-links` where the kit is present, by hand
+   otherwise.
 4. The umbrella lint target passes, and every check chained into it is reachable
    from a CI workflow step.
 5. Harmonize-track runs only: cross-check the ledger — every item is preserved
@@ -235,7 +238,8 @@ Appendix A.7 — the sequence:
   layer; run it rather than assuming it.
 - The knowledge-base protocol (search before debugging, write after any
   >30-minute bug) is documented in the constitution, and KB entries are
-  machine-parseable as graph nodes (stable IDs + typed `Related:` links).
+  machine-parseable as graph nodes (stable IDs + typed `Related:` links), and
+  every typed link in the workspace names an artifact that exists.
 - The documentation, comments-and-annotations and versioning/changelog defaults
   are installed as rule files and indexed from the constitution.
 - The growth path for deferred artifacts is written down, each with its trigger
@@ -295,16 +299,17 @@ Append-only registry, authored one file per entry (A.9); fixed fields:
 Shortcut.** Protocol: search before investigating any bug; add an entry after
 resolving any bug that took over 30 minutes to diagnose.
 
-Graph-ready conventions (the substrate for a future knowledge-graph layer):
-entry IDs are stable and never reused; an optional `**Related:**` line carries
-typed links — `ISSUE-NNN`, `ADR-NNN`, or `RULE|SKILL|SCRIPT|DOC:<slug>`,
-comma-separated. Shape and link syntax are lint-checkable; the kit ships
-`scripts/check-kb-shape.sh` ready to run.
+Graph conventions (A.10): entry IDs are stable and never reused; an optional
+`Related:` line carries typed links — `ISSUE-NNN`, `ADR-NNN`, or
+`RULE|SKILL|AGENT|COMMAND|SCRIPT|DOC:<slug>`, comma-separated — naming the
+rule or check that now prevents the bug. Shape and link syntax are
+lint-checkable; the kit ships `scripts/check-kb-shape.sh` ready to run.
 
 ### A.5 Enforcement-script contract
 
 One script per convention. It must: exit non-zero with a `file:line` trail AND a
-pointer to the rule it enforces; be chained into the umbrella lint target CI
+pointer to the rule it enforces; name that rule in its header as a typed link
+(`# Enforces: RULE:<name> § <section>`, A.10); be chained into the umbrella lint target CI
 runs on every PR; support a greppable commit-message escape marker (e.g.
 `[sanctioned-exception]`) for rare legitimate violations — logged forever, never
 silent. Non-trivial scripts get their own tests.
@@ -468,3 +473,43 @@ the only driver worth putting in a file you expect other people to clone.
 zero conflicts and zero duplicate identifiers. Write it before the mechanism,
 and keep a control case that reproduces the defect on the shape you replaced —
 a test that cannot fail proves nothing.
+
+### A.10 Typed links — the workspace graph
+
+Artifacts depend on each other, and a dependency written only as prose breaks
+silently when the other file is renamed. Write it as a line that names the
+other artifact by a stable token:
+
+| Line | Says | May name |
+|---|---|---|
+| `Related:` | this artifact cites that one | any artifact |
+| `Enforces:` | this script or reviewer holds that rule | a rule, a decision record, a document |
+| `Hands off to:` | who or what runs next | a skill, an agent, a command, a script, or `HUMAN` |
+
+In Markdown the label is bold at the start of a line; in a script it is a
+comment in the header block. Tokens: `RULE:<name>`, `SKILL:<name>`,
+`AGENT:<name>`, `COMMAND:<name>`, `SCRIPT:<file name>`, `DOC:<name>`, and
+registry identifiers (`ISSUE-…`, `ADR-…`). The name is the file's name without
+its extension, never its path, so a link holds in every tool layout. `HUMAN`
+is an approval gate: a workflow that may edit files or delete knowledge
+declares one.
+
+The two families of edge are the two things "graph engineering" names.
+`Related` and `Enforces` are a knowledge graph over the artifacts: why does
+this exist, and what breaks if it changes. `Hands off to` is the orchestration
+topology: who runs next, and where a human decides. Declare the topology; do
+not build an executor — running a hand-off is the agent tool's job.
+
+**Minimum implementation, when the kit is not present:** a check in the lint
+target that reads those lines outside fenced code, resolves each token to a
+file or a registry entry, and fails with the citing `file:line` and the names
+that do exist. Compute it from the files on every run — a committed index is
+one more shared file every pull request rewrites (A.9). Write the acceptance
+test first: a link to a rule that does not exist must fail, and the checks you
+already had must pass on it, or the test proves nothing.
+
+**Before renaming, deleting or rewriting** an artifact, list what cites it and
+change every citer in the same pull request (`make graph-impact NODE=<token>`
+with the kit). Deferred until a signal appears: loading graph neighbourhoods
+into context, checks on the topology itself, and resolving citations inside
+prose.

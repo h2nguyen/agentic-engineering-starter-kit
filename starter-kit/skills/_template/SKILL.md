@@ -30,3 +30,9 @@ as done.>
 
 - <known failure> → <recovery>
 - If <ambiguous condition>, STOP and ask the user before proceeding.
+
+## Links
+
+**Related:** RULE:<rule this workflow implements>, SCRIPT:<helper it runs>
+
+**Hands off to:** AGENT:<reviewer it delegates to>, HUMAN — <the approval it waits for; delete what does not apply>

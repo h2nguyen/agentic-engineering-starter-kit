@@ -46,6 +46,7 @@ appears (~10+ workspace files, or the first real drift incident):
 | Artifact | What it gives you |
 |---|---|
 | `skills/ai-engineering-workspace-audit/` + `commands/ai-engineering-workspace-audit.md` | The guide § 5.2 audit cadences: quick read-only drift report (weekly) and full six-phase, approval-gated consolidation with knowledge ledger + lossless-first remediation ladder |
+| `skills/workspace-graph/` | Reads the typed links between workspace artifacts (guide § 3.12): what cites a rule before it is renamed, which checks exist because of an incident, which rules have no script or reviewer, where the human approval gates are. The link gate and `graph_tool.py` it drives are day-1 defaults; the skill joins them here because its consumers — the audit and the coach — do |
 | `agents/agent-coach.md` | The guide § 5.3 meta-agent: OBSERVE → DIAGNOSE → PROPOSE → [HUMAN APPROVES] → APPLY → MEASURE over the other agents; propose-only by mandate |
 | `WORKSPACE_CHANGELOG.md.template` | The per-run audit record, including the "deliberately NOT changed (with reasons)" list |
 

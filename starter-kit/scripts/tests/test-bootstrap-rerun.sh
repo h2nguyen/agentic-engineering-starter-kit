@@ -8,7 +8,8 @@
 #      present exactly once (test-brownfield-adoption.sh covers the case where
 #      the block was appended to a file that already existed);
 #   2. every tool layout gets the constitution and every shipped rule, at that
-#      tool's rule location, with the constitution's rule links retargeted;
+#      tool's rule location, with the constitution's rule links retargeted — and
+#      the typed links the installed files carry resolve in that layout;
 #   3. the installed SessionStart hook runs from a project path with a space
 #      and appends its environment once, however often the session starts.
 #
@@ -83,7 +84,29 @@ for tool in claude agents cursor copilot; do
   else
     ! grep -q '\.claude/rules/' "$c" && ok "$tool: constitution links retargeted to docs/agent-rules/" || bad "$tool: constitution still links .claude/rules/"
   fi
+  # The gates cite the rules they enforce by token, not by path, so the same
+  # header has to resolve whether the rules landed in .claude/rules/ or in
+  # docs/agent-rules/. A link that only works for one tool is not tool-agnostic.
+  if ( cd "$R" && ./scripts/check-graph-links.sh > "$WORK/links-$tool.log" 2>&1 ); then
+    ok "$tool: every typed link the kit installs resolves in this layout"
+  else
+    bad "$tool: an installed typed link does not resolve:"; grep -E '^FAIL' "$WORK/links-$tool.log" | head -5 | sed 's/^/         /'
+  fi
 done
+
+echo "=== the Level-4 artifacts' links resolve once installed ==="
+R="$WORK/meta"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --with-meta --target "$R" >/dev/null 2>&1 || bad "bootstrap --with-meta exited non-zero"
+if ( cd "$R" && ./scripts/check-graph-links.sh > "$WORK/links-meta.log" 2>&1 ); then
+  ok "agent-coach, the audit skill and command, and the workspace-graph skill cite only what was installed"
+else
+  bad "a Level-4 artifact cites something that was not installed:"; grep -E '^FAIL' "$WORK/links-meta.log" | head -5 | sed 's/^/         /'
+fi
+handoffs="$( cd "$R" && python3 scripts/graph_tool.py impact HUMAN 2>/dev/null | head -1 )"
+case "$handoffs" in
+  *"(0)"*|"") bad "the installed meta loop declares no human approval gate" ;;
+  *) ok "the installed meta loop declares its human approval gates as hand-offs" ;;
+esac
 
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repos kept in $WORK"

@@ -17,11 +17,11 @@
 #             changelog.d/, CHANGELOG.md, registries.json (INFERRED from what the
 #             repo already has), .gitattributes (appended to if present),
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
-#             scripts/ (registry_tool.py, check-kb-shape.sh, check-registry-*.sh,
-#             check-ci-lint-coverage.sh)
+#             scripts/ (registry_tool.py, graph_tool.py, check-kb-shape.sh,
+#             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
-#             subagent + workspace-audit skill/command + workspace-changelog
-#             skeleton (Claude Code; other tools get the changelog only)
+#             subagent + workspace-audit skill/command + workspace-graph skill
+#             + workspace-changelog skeleton (Claude Code; others: changelog only)
 #
 # Placeholder templates (_rule-template, skills/_template, agent, command, and
 # the check-convention template) are NOT installed — they stay in the kit.
@@ -208,6 +208,12 @@ install_file scripts/check-kb-shape.sh scripts/check-kb-shape.sh x || true
 install_file scripts/check-registry-drift.sh scripts/check-registry-drift.sh x || true
 install_file scripts/check-registry-ids.sh scripts/check-registry-ids.sh x || true
 install_file scripts/check-ci-lint-coverage.sh scripts/check-ci-lint-coverage.sh x || true
+# The link gate and its tool. Tool-independent like the registry gates: a typed
+# link is a line of text, and resolving it needs only the files on disk. It
+# ships on day one for the reason the registries do — every link written while
+# nothing resolves it is a citation nobody will know has gone stale.
+install_file scripts/graph_tool.py scripts/graph_tool.py x || true
+install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
 install_tree scripts/tests scripts/tests || true
 
 # The changelog rule is only correct once the registry layer is present, so it
@@ -228,6 +234,7 @@ if [ "$WITH_META" -eq 1 ]; then
     claude)
       install_file agents/agent-coach.md .claude/agents/agent-coach.md || true
       install_dir skills/ai-engineering-workspace-audit .claude/skills/ai-engineering-workspace-audit || true
+      install_file skills/workspace-graph/SKILL.md .claude/skills/workspace-graph/SKILL.md || true
       install_file commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md || true
       install_file WORKSPACE_CHANGELOG.md.template .claude/WORKSPACE_CHANGELOG.md || true
       ;;
@@ -252,15 +259,15 @@ echo "     Then the project rows of the comments-and-annotations rule: the secon
 echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
 echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
 echo "  2. Enable common generic skills — see $(basename "$KIT_DIR")/skills/common-catalog.md."
-echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check and"
-echo "     the CI-coverage check are already chained into it, and the installed"
-echo "     workflow invokes that same target so nothing can fall out of CI."
+echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
+echo "     typed-link gate and the CI-coverage check are already chained into it, and"
+echo "     the installed workflow invokes that same target so nothing can fall out of CI."
 echo "     Merge the targets into your existing Makefile if you had one."
 if [ "$MAKEFILE_KEPT" -eq 1 ]; then
   echo "     Your existing Makefile was left untouched. Chain the registry gates in"
   echo "     with two lines (registry.mk was installed next to it):"
   echo "         include registry.mk"
-  echo "         lint: registry-drift registry-ids kb-shape ci-lint-coverage <your existing prerequisites>"
+  echo "         lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
   # Capture before matching: `grep -q` exits at its first hit, and under
   # `pipefail` the SIGPIPE that kills `make` becomes the pipeline's status, so
   # a correctly chained lint target would be reported to the user as unchained.
@@ -299,7 +306,7 @@ if [ "$WITH_META" -eq 1 ] && [ "$TOOL" != "claude" ]; then
   echo "  playbook docs per guide § 3.10; only the workspace-changelog skeleton was installed."
 fi
 if [ "$WITH_META" -eq 0 ]; then
-  echo "  Level-4 meta artifacts (agent-coach, workspace-audit, workspace changelog) ship"
+  echo "  Level-4 meta artifacts (agent-coach, workspace-audit, workspace-graph, workspace changelog) ship"
   echo "  in the kit but are NOT day-1 defaults — install them later with --with-meta"
   echo "  once the workspace has real mass (guide § 4.1 / § 5.2 / § 5.3)."
 fi

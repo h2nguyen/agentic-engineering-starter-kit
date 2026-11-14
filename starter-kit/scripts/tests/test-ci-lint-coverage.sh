@@ -123,6 +123,20 @@ printf "${HEADER}      - run: make lint\n" > "$dir/.github/workflows/lint.yml"
 if ( cd "$dir" && "$GATE" >/dev/null 2>&1 ); then ok "a registry gate reached by a long lint recipe is found (no SIGPIPE)"
 else bad "a registry gate reached by a long lint recipe was reported as never run"; fi
 
+# The link gate is held to the same standard — but only where it is installed.
+# The case above has no check-graph-links.sh and passed: a repository that
+# adopted the kit before the gate existed owes it nothing.
+dir="$(mktemp -d "$WORK/case.XXXXXX")"; mkdir -p "$dir/.github/workflows" "$dir/scripts"; git -C "$dir" init -q -b main
+printf '{"registries": []}\n' > "$dir/registries.json"
+touch "$dir/scripts/check-registry-drift.sh" "$dir/scripts/check-registry-ids.sh" "$dir/scripts/check-graph-links.sh"
+printf 'lint:\n\t@./scripts/check-registry-drift.sh\n\t@./scripts/check-registry-ids.sh\n' > "$dir/Makefile"
+printf "${HEADER}      - run: make lint\n" > "$dir/.github/workflows/lint.yml"
+if ( cd "$dir" && "$GATE" >/dev/null 2>&1 ); then bad "an installed link gate that lint never runs passed the coverage gate"
+else ok "an installed link gate that lint never runs is reported (green-but-empty is detected)"; fi
+printf 'lint:\n\t@./scripts/check-registry-drift.sh\n\t@./scripts/check-registry-ids.sh\n\t@./scripts/check-graph-links.sh\n' > "$dir/Makefile"
+if ( cd "$dir" && "$GATE" >/dev/null 2>&1 ); then ok "once lint reaches the link gate the coverage gate is green"
+else bad "a link gate that lint reaches was reported as never run"; fi
+
 echo ""
 echo "=== $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ] || exit 1

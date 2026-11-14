@@ -103,3 +103,7 @@ without its fragment fails it the other way.
 - **A registry entry as the whole pull request.** The entry belongs in the same
   pull request as the change it describes — the author is the only person who
   knows what to write, and the knowledge decays within days.
+
+## Links
+
+**Related:** RULE:shared-registries, SCRIPT:registry_tool.py
