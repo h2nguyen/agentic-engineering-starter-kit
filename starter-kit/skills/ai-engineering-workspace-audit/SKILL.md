@@ -63,6 +63,11 @@ audit/consolidation.
 5. Protect the audit's own context: if the inventory means reading many or
    large files, delegate the bulk reading to a subagent and pull back only the
    structured inventory and ledger.
+6. Where the repo ships the graph tool, take the dependency inventory from it
+   rather than rebuilding it by reading: `make graph-coverage` lists which
+   rules a script enforces and an agent reviews, and
+   `make graph-impact NODE=<token>` what cites any one artifact. It sees typed
+   links only — prose mentions still need the reading in step 1.
 
 ## Phase 1 — Assessment
 
@@ -147,6 +152,11 @@ Produce a prioritized change plan — merges, moves, splits, clarity rewrites,
 deletions, additions — one line per change:
 `- [priority] <relocate|split|compress|delete|merge|add> <target> — <reason> — ledger items: <IDs or none>`
 
+A relocate, split, merge or delete changes an artifact's name, and everything
+that cites it changes with it. Where the repo ships the graph tool, run
+`make graph-impact NODE=<token>` on each such target and name its citers in
+the plan line — they are part of the change, not a follow-up.
+
 **Remediation ladder** for oversized or multi-topic files. Apply in order and
 stop at the first rung that resolves the finding — rungs 1–3 are lossless,
 which is why deletion sits last:
@@ -183,7 +193,9 @@ every future session, so edits proceed only on a human decision.
 
 Implement the approved plan in small, reviewable git commits — one concern per
 commit, so any single change can be reverted without unwinding the rest.
-Update all cross-references between files. Append to
+Update all cross-references between files, then run `make graph-links` where
+the repo ships it: a relocated or split file has a new name, and every typed
+link to the old one fails by `file:line` until it is changed. Append to
 `.claude/WORKSPACE_CHANGELOG.md` (create it if missing): date, mode, summary,
 ladder rungs used, ledger items affected.
 
@@ -212,3 +224,9 @@ milestone or when `quick` reports a blocker, with the strongest reasoning tier
 on Phases 1–3 (e.g. a plan-with-strong-model setup); Phase 4 execution can
 drop a tier. The first `full` run on a project is the expensive one; later
 runs should shrink — if they do not, that is itself a finding.
+
+## Links
+
+**Related:** SCRIPT:graph_tool.py
+
+**Hands off to:** HUMAN — the Phase 3 approval gate; nothing is written before it

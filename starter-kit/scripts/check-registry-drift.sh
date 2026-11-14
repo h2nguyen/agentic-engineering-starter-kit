@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Enforces: every generated registry artifact matches its fragments —
-# see the shared-registries rule file.
+# Enforces: RULE:shared-registries — every generated registry artifact matches
+# its fragments.
 #
 # The gate that makes `merge=union` safe. Union merge resolves a conflicting
 # hunk by keeping both sides silently; if that mangles a generated file, the

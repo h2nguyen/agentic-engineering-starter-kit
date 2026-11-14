@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Enforces: every template the guide embeds is byte-identical to the kit file it
-# names — see AGENTIC-ENGINEERING-GUIDE.md § 3 ("Templates are inline … and also
-# shipped as files in starter-kit/") and § 5.4 (duplicated content drifts).
+# Enforces: DOC:AGENTIC-ENGINEERING-GUIDE § 3 — every template the guide embeds
+# is byte-identical to the kit file it names ("Templates are inline … and also
+# shipped as files in starter-kit/"; § 5.4, duplicated content drifts).
 #
 # Repository-only: it checks this repository's own guide, so bootstrap.sh does
 # not install it and it is not part of the kit. That is also why it lives in

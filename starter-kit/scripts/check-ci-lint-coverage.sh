@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Enforces: every check chained into the umbrella lint target actually runs in
-# CI — see the shared-registries rule file § "A Makefile target is not a CI step".
+# Enforces: RULE:shared-registries § A Makefile target is not a CI step —
+# every check chained into the umbrella lint target actually runs in CI.
 #
 # The failure this prevents is not hypothetical and not loud. A repository
 # gains checks by adding them to `make lint`, while its workflow enumerates
@@ -40,10 +40,16 @@ fi
 # scripts land in scripts/ while `make lint` keeps running only what it ran
 # before — green, and checking nothing of the registry layer. `make -n lint`
 # prints every command the target would run, transitively, which is the exact
-# question: would the drift and identifier gates execute?
+# question: would the drift, identifier and link gates execute?
 if [ -f registries.json ] && [ -f scripts/check-registry-drift.sh ]; then
   dry="$(make -n "$TARGET" -f "$MAKEFILE" 2>/dev/null || true)"
-  for gate in check-registry-drift.sh check-registry-ids.sh; do
+  for gate in check-registry-drift.sh check-registry-ids.sh check-graph-links.sh; do
+    # The link gate arrived after the registry gates. A repository that
+    # installed the kit before it has no such file and owes it nothing; one
+    # that has the file is held to the same standard as the other two.
+    if [ "$gate" = check-graph-links.sh ] && [ ! -f "scripts/$gate" ]; then
+      continue
+    fi
     # A pattern match, not `printf | grep -q`: grep -q exits at the first match,
     # the writer gets SIGPIPE on a large dry run, and pipefail turned a gate that
     # IS reached into "never runs it".
@@ -51,7 +57,7 @@ if [ -f registries.json ] && [ -f scripts/check-registry-drift.sh ]; then
       echo "FAIL: scripts/$gate is installed but '$TARGET' never runs it."
       echo "  The gate exists and gates nothing. Chain it into the umbrella target:"
       echo "      include registry.mk"
-      echo "      lint: registry-drift registry-ids kb-shape ci-lint-coverage <your existing prerequisites>"
+      echo "      lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
       echo "  See the shared-registries rule § 'A Makefile target is not a CI step'."
       fail=1
     fi

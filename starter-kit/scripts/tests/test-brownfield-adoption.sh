@@ -154,7 +154,13 @@ grep -q '^## ISSUE-001: Cache warms before config' "$R/docs/DEBUGGING-KNOWLEDGE-
   && grep -q '^## ISSUE-002: Retry swallows timeout' "$R/docs/DEBUGGING-KNOWLEDGE-BASE.md" \
   && ok "regenerated KB carries ISSUE-001 and ISSUE-002 with their original identifiers" \
   || bad "KB identifiers changed or entries missing after adoption"
-grep -q 'ADR-0002' "$R/docs/DEBUGGING-KNOWLEDGE-BASE.md" && ok "the KB's citation of ADR-0002 still resolves to the adr-tools record" || bad "cross-registry citation broken"
+grep -q 'ADR-0002' "$R/docs/DEBUGGING-KNOWLEDGE-BASE.md" && ok "the KB's citation of ADR-0002 survives adoption" || bad "cross-registry citation broken"
+# "Survives" is a string match. Whether the citation still NAMES something is
+# the link gate's question: ADR-0002 must be the adr-tools record 0002-…, and
+# RULE:testing the rule file that was here before the kit arrived.
+( cd "$R" && ./scripts/check-graph-links.sh >/dev/null 2>&1 ) \
+  && ok "and the link gate resolves it — ADR-0002 to the adr-tools record, RULE:testing to the existing rule" \
+  || { bad "the link gate rejected citations that existed before adoption:"; ( cd "$R" && ./scripts/check-graph-links.sh 2>&1 | grep -E '^FAIL' | head -5 | sed 's/^/         /' ); }
 grep -q 'Search here before debugging.' "$R/docs/DEBUGGING-KNOWLEDGE-BASE.md" && ok "KB header prose preserved above the generated region" || bad "KB header lost"
 
 # 4. A green lint that checks nothing is detected; the documented edit fixes it.
@@ -163,7 +169,7 @@ if ( cd "$R" && ./scripts/check-ci-lint-coverage.sh >/dev/null 2>&1 ); then
 else
   ok "coverage gate FAILS while the registry gates are installed but unchained (green-but-empty lint is detected)"
 fi
-printf 'include registry.mk\n.PHONY: lint fmt test\nlint: registry-drift registry-ids kb-shape ci-lint-coverage fmt test\nfmt:\n\t@echo fmt ok\ntest:\n\t@echo tests ok\n' > "$R/Makefile"
+printf 'include registry.mk\n.PHONY: lint fmt test\nlint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage fmt test\nfmt:\n\t@echo fmt ok\ntest:\n\t@echo tests ok\n' > "$R/Makefile"
 git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "adopt the registry layer" 2>/dev/null
 if ( cd "$R" && make lint >/dev/null 2>&1 ); then
   ok "after the two documented Makefile lines, 'make lint' is green"

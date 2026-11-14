@@ -37,7 +37,8 @@ detected, installs the constitution + the universal rule files (working
 principles, documentation, comments & annotations, versioning & changelog,
 shared registries) + the
 knowledge-base and changelog skeletons in their fragment layout + the
-`.gitattributes`, `Makefile` and CI workflow that make the registry gates run
+`.gitattributes`, `Makefile` and CI workflow that make the registry gates and
+the typed-link gate run
 (+ the prompt-enhancer, semver, registry-entry and registry-conflict-triage
 skills on Claude Code) to that tool's locations, and never overwrites existing
 files. Then: fill in the constitution's `<placeholders>` and the project rows of
@@ -59,7 +60,7 @@ confirm the gates pass, enable further common skills from
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
 | `registries.json.template` | `registries.json` | Reference only — bootstrap runs `registry_tool.py init`, which writes the file from the conventions your repo already has |
-| `registry.mk` | `registry.mk` | The registry targets; `include registry.mk` from an existing Makefile and add the gates to your `lint` prerequisites |
+| `registry.mk` | `registry.mk` | The registry and graph targets; `include registry.mk` from an existing Makefile and add the gates to your `lint` prerequisites |
 | `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config`. An existing file gets the block appended under a marker, idempotently |
 | `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — run `registry_tool.py adopt --registry changelog` on it instead |
 | `changelog.d/` | `changelog.d/` | One fragment per change; categories are `## ` headings inside it |
@@ -72,7 +73,9 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge acceptance test, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
+| `scripts/graph_tool.py` | `scripts/graph_tool.py` | Ready to run — `check` (the gate), `impact <KIND:name>` (what cites an artifact, and what it cites), `coverage` (which rules a script enforces and an agent reviews). Rebuilt from the files on every run, so there is nothing to regenerate |
+| `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge and typed-link acceptance tests, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | — (keep as template) | Copy per new domain rule file |
@@ -84,6 +87,7 @@ confirm the gates pass, enable further common skills from
 | `agents/agent-coach.md` | `.claude/agents/agent-coach.md` | Level-4 meta-agent — installed via `bootstrap.sh --with-meta` |
 | `skills/ai-engineering-workspace-audit/` | `.claude/skills/ai-engineering-workspace-audit/` | Level-4 audit skill — installed via `--with-meta` |
 | `commands/ai-engineering-workspace-audit.md` | `.claude/commands/ai-engineering-workspace-audit.md` | Thin `/command` entry for the audit skill — via `--with-meta` |
+| `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
 | `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
 | `commands/_command-template.md` | — (keep as template) | Copy to `.claude/commands/<name>.md` per new command |
 | `settings.json.template` | `.claude/settings.json` | Remove the hook entry if you don't need one yet |
@@ -99,7 +103,7 @@ confirm the gates pass, enable further common skills from
    auth, and messaging/integration rows), commands, and the 3–5 rules you already
    know are non-negotiable. Then the project rows of the comments-and-annotations
    rule — next section.
-3. Run `make lint`. All four gates should pass on a fresh install with no
+3. Run `make lint`. All five gates should pass on a fresh install with no
    `git config` and no other setup — that is the check that the registry layer
    actually landed rather than merely being present.
 4. Enable the generic skills worth having from day one — see
@@ -175,6 +179,13 @@ into `make lint`.
   kit ships the fragment layout, its generator and its gates as day-1 defaults
   because retrofitting is cheap while the registries are empty and expensive
   once their identifiers are cited.
+- **Artifacts cite each other with typed links, and the links are resolved.**
+  A check script names the rule it enforces (`# Enforces: RULE:<name>`), a
+  knowledge-base entry the rule that now prevents its bug (a `Related:` line),
+  a skill what it hands work to (a `Hands off to:` line). A token names a
+  file, not a path, so it holds in every tool layout. `make lint` fails on a
+  link that names nothing, and `make graph-impact NODE=<KIND:name>` lists what
+  cites an artifact before you rename, delete or rewrite it (guide § 3.12).
 - PR-only trunk: agents never commit to the default branch.
 - Placeholders are written `<like-this>`; grep for `<` after filling in a template
   to catch leftovers.

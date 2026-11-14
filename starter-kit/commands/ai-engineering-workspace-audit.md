@@ -15,3 +15,5 @@ This command is deliberately a thin, slash-only entry point (`disable-model-invo
 - `full` — Phases 0–5 with the ⛔ approval gate before Phase 4 writes (per milestone, or when `quick` finds a blocker)
 
 Do not re-derive the phases, remediation ladder, or deletion policy here — on any conflict the skill file is canonical. Audit history: `.claude/WORKSPACE_CHANGELOG.md`.
+
+**Hands off to:** SKILL:ai-engineering-workspace-audit

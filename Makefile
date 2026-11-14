@@ -16,16 +16,18 @@
 KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
-        ci-lint-coverage guide-templates kit-smoke
+        graph-links graph-impact graph-coverage ci-lint-coverage guide-templates \
+        kit-smoke
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids ci-lint-coverage guide-templates test
+lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
 	python3 -m unittest discover -s $(KIT)/scripts/tests -p 'test_*.py'
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
+	$(KIT)/scripts/tests/test-graph-links.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 
@@ -44,6 +46,20 @@ registry-drift:
 ## registry-ids — identifiers are well-shaped and unique.
 registry-ids:
 	$(KIT)/scripts/check-registry-ids.sh
+
+## graph-links — every typed link in the kit's own files resolves. The node
+## map in registries.json points the kinds at starter-kit/, so the shipped
+## rules, skills, agents and scripts are checked as they will be once installed.
+graph-links:
+	$(KIT)/scripts/check-graph-links.sh
+
+## graph-impact — what cites NODE, e.g. make graph-impact NODE=RULE:documentation
+graph-impact:
+	@python3 $(KIT)/scripts/graph_tool.py impact $(NODE)
+
+## graph-coverage — which shipped rules a script enforces and an agent reviews.
+graph-coverage:
+	@python3 $(KIT)/scripts/graph_tool.py coverage
 
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:

@@ -36,14 +36,14 @@ for every artifact type, the adoption playbook, and the maintenance flywheel.
 
 | Path | What it is |
 |---|---|
-| [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The full guide: § 1 concepts → § 2 reference anatomy → § 3 blueprint → § 4 adoption → § 5 maintenance (+ § 5.6 agentic-graph-engineering outlook) |
+| [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The full guide: § 1 concepts → § 2 reference anatomy → § 3 blueprint → § 4 adoption → § 5 maintenance (+ § 3.12 the workspace graph, and § 5.6 for what graph engineering still defers) |
 | [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md) | Self-contained prompt that makes an agent drive the whole setup — with fallback specs, so it works even without the rest of this kit |
 | [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop |
 | [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, comments & annotations, versioning & changelog, shared registries — plus a rule-file template |
-| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage), the common-skills catalog, the workspace-audit skill (Level 4), and a skill template |
+| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage), the common-skills catalog, the workspace-audit and workspace-graph skills (Level 4), and a skill template |
 | [`starter-kit/agents/`](starter-kit/agents/) | Agent template + the agent-coach meta-agent (Level 4, propose-never-silently-change) |
 | [`starter-kit/commands/`](starter-kit/commands/) | Slash-command template + the audit command entry point |
-| [`starter-kit/scripts/`](starter-kit/scripts/) | `registry_tool.py` (fragment generator + identifier gate), `check-kb-shape.sh`, the registry drift/identifier gates, the CI-coverage gate, tests + the parallel-merge acceptance test, and an enforcement-script template |
+| [`starter-kit/scripts/`](starter-kit/scripts/) | `registry_tool.py` (fragment generator + identifier gate), `graph_tool.py` (typed-link gate + impact and coverage queries) behind `check-graph-links.sh`, `check-kb-shape.sh`, the registry drift/identifier gates, the CI-coverage gate, tests + the parallel-merge and typed-link acceptance tests, and an enforcement-script template |
 | [`starter-kit/docs/`](starter-kit/docs/), `changelog.d/`, `registries.json.template`, `gitattributes.template`, `Makefile.template`, `ci/` | The shared-append-only-registry layer: fragment directories, declaration, merge behaviour, lint target and CI workflow (guide § 3.11) |
 | [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, `WORKSPACE_CHANGELOG.md.template` | Session-bootstrap hook skeleton, tool settings, audit-history skeleton |
 | [`docs/adr/`](docs/adr/) | Decision records for this project — starting with why the repo is canonical and a plugin is a future distribution channel |
@@ -55,17 +55,24 @@ knowledge base on day 1 (Level 1); enforcement scripts and domain rules as
 violations appear (Level 2); skills and specialist reviewer agents as workflows
 and review comments recur (Level 3); the self-improvement loop — workspace
 audits + agent coach — once the workspace has real mass (Level 4,
-`--with-meta`); knowledge-graph tooling only when a consumer exists (§ 5.6).
+`--with-meta`); graph-driven retrieval only when a consumer exists (§ 5.6).
 Every artifact ships de-branded and directly usable.
 
-One thing is a day-1 default rather than a grown-by-signal artifact, and
-deliberately so: files that many pull requests append to — changelogs,
+Two things are day-1 defaults rather than grown-by-signal artifacts, and
+deliberately so. The first: files that many pull requests append to — changelogs,
 knowledge bases, decision records — conflict on every concurrent pair and hand
 two branches the same identifier without either noticing. The conflict is
 loud and cheap; the duplicate identifier is silent and permanent, because
 other files cite it. Retrofitting the fix costs nothing while those files are
 empty and a great deal once their identifiers are in use, so the kit installs
 it at commit one (guide § 3.11).
+
+The second follows from the same argument. Artifacts cite each other — a check
+script names the rule it enforces, a knowledge-base entry the rule that now
+prevents its bug, a skill the reviewer it hands off to — and a citation to
+something renamed or deleted reads exactly like one that works. A gate resolves
+every such typed link from commit one, and the same index answers *what cites
+this?* before an agent edits a rule (guide § 3.12).
 
 ## Related
 

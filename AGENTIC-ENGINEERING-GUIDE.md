@@ -128,6 +128,7 @@ Autonomy is bounded by review gates that keep humans in control of anything hard
 | **Knowledge base** | Append-only log of diagnosed bugs in a fixed format | Searched on demand | `docs/…/DEBUGGING-KNOWLEDGE-BASE.*` |
 | **Workspace changelog** | Audit history of the AI configuration itself | On demand | `.claude/WORKSPACE_CHANGELOG.md` |
 | **Registry fragment** | One entry of a shared append-only registry, as its own file — the authored source a generator assembles (§3.11) | Authored per entry | `changelog.d/`, `<artifact>.d/` |
+| **Typed link** | A line in one artifact that names another by a stable token (`Related:`, `Enforces:`, `Hands off to:`) — the edges of the workspace graph (§3.12) | Resolved on every PR | any artifact |
 
 Locations are shown in Claude Code's conventions; §3.10 maps each artifact to other agentic tools, and every artifact's *content* is tool-neutral.
 
@@ -233,6 +234,7 @@ your-repo/
 │   └── DEBUGGING-KNOWLEDGE-BASE.d/  # one file per entry — the authored source
 └── scripts/
     ├── registry_tool.py             # fragment generator + identifier gate
+    ├── graph_tool.py                # typed-link gate + impact and coverage queries (§3.12)
     └── check-<convention>.sh        # CI-wired enforcement checks
 ```
 
@@ -283,6 +285,7 @@ make dev          # start local stack
 make test         # full test suite
 make lint         # lint + enforcement checks (must pass before any PR)
 make registry-generate   # rebuild CHANGELOG.md and the knowledge base from fragments
+make graph-impact NODE=RULE:testing   # what cites an artifact — run before renaming, deleting or rewriting it
 ```
 
 ## Non-Negotiable Rules
@@ -302,7 +305,7 @@ make registry-generate   # rebuild CHANGELOG.md and the knowledge base from frag
 ## Detailed Rules
 
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
-- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives
+- [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives, typed links between artifacts
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
@@ -322,7 +325,7 @@ make registry-generate
 ```
 
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
-Shortcut.
+Shortcut, and a `Related:` line naming the rule or check that now prevents it.
 ````
 
 ### 3.3 Rule files
@@ -343,6 +346,8 @@ Shortcut.
 # <Domain> Rules
 
 <One or two sentences: what this file governs and when an agent should load it.>
+
+**Related:** <ISSUE-… or ADR-… this rule came from — delete the line if there is none>
 
 ## The Rule
 
@@ -423,6 +428,12 @@ as done.>
 
 - <known failure> → <recovery>
 - If <ambiguous condition>, STOP and ask the user before proceeding.
+
+## Links
+
+**Related:** RULE:<rule this workflow implements>, SCRIPT:<helper it runs>
+
+**Hands off to:** AGENT:<reviewer it delegates to>, HUMAN — <the approval it waits for; delete what does not apply>
 ```
 
 ### 3.5 Subagents
@@ -433,7 +444,7 @@ as done.>
 2. **Minimal tools.** Reviewers get read-only tools. Grant `Edit`/`Write` only to agents whose mandate is to change files — and pair it with an approval mechanism.
 3. Pin the **model tier** to the task: strong models for judgment-heavy domains (security), cheap ones for mechanical checks a CI gate backstops anyway.
 4. The body enumerates **concrete violations to detect** — greppable patterns, not vibes — and defines an output format (severity, file:line, rationale).
-5. Keep agents aligned with the rule files they enforce; when a rule changes, its agent is part of the diff.
+5. Keep agents aligned with the rule files they enforce; when a rule changes, its agent is part of the diff. An `Enforces:` line naming the rule (§3.12) is what makes that findable: `make graph-impact NODE=RULE:<name>` lists every agent and script that holds it.
 
 **Template** (starter kit: `agents/_agent-template.md`)
 
@@ -497,6 +508,12 @@ are the reviewer half of the comments-and-annotations rule:
 For each finding: **severity** (BLOCKER / IMPROVEMENT / NIT), `file:line`,
 what rule is violated, and the minimal fix. If nothing is found, say so
 explicitly — do not invent findings.
+
+## Links
+
+**Enforces:** RULE:<the rule file this agent reviews against>
+
+**Hands off to:** HUMAN — <only for an agent that edits files: the approval it waits for; otherwise delete the line>
 ```
 
 ### 3.6 Slash commands
@@ -516,8 +533,11 @@ argument-hint: "[optional args]"
 with runnable commands.>
 
 <For a workflow command backed by a skill, keep it a thin pointer — one line:
-"Invoke the <skill-name> skill with arguments: $ARGUMENTS".
+"Invoke the <skill-name> skill with arguments: $ARGUMENTS", plus the typed
+hand-off below, so the link gate fails if the skill is ever renamed.
 Duplicated procedure text between a command and a skill WILL drift.>
+
+**Hands off to:** SKILL:<skill-name>
 ```
 
 ### 3.7 Hooks & settings
@@ -576,7 +596,7 @@ fi
 
 **Design rules**
 
-1. One script per convention; exit non-zero with a **`file:line` trail and a pointer to the rule** it enforces ("see `.claude/rules/database.md § Baseline Cutover`").
+1. One script per convention; exit non-zero with a **`file:line` trail and a pointer to the rule** it enforces ("see `.claude/rules/database.md § Baseline Cutover`"). Its header names the same rule as a typed link — `# Enforces: RULE:database § Baseline Cutover` — which the link gate resolves (§3.12), so a renamed rule cannot leave its script pointing at nothing.
 2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR.
 3. Design the escape hatch: a greppable commit-message marker (`[sanctioned-exception]`) for the rare legitimate violation — logged in history forever, never silent.
 4. Non-trivial check scripts get their own unit tests.
@@ -585,10 +605,13 @@ fi
 
 ```bash
 #!/bin/bash
-# Enforces: <rule name> — see .claude/rules/<domain>.md § <section>
+# Enforces: RULE:<domain> § <section> — <rule name>
 # Escape: commit-message marker [<marker>] anywhere on the branch.
 #
 # Design rules (guide § 3.8):
+#   - Name the rule in the header as a typed link — RULE:<its file name without
+#     .md>. The link gate fails if that rule is ever renamed or deleted, and
+#     `make graph-impact NODE=RULE:<domain>` finds this script from the rule.
 #   - Fail with a file:line trail AND a pointer to the rule being enforced.
 #   - Wire into the umbrella lint target that CI runs on every PR.
 #   - Escape hatches are greppable commit-message markers, never silent.
@@ -614,8 +637,8 @@ echo "OK: <rule name>"
 
 A fixed entry format with stable identifiers, read as one file and *written* as one file per entry (§3.11 — one shared file that every branch appends to conflicts on every concurrent pair, and hands two branches the same number without either noticing). The format matters more than the storage medium (Markdown, AsciiDoc, wiki — anything greppable). Two design rules upgrade it from a log into a **substrate**:
 
-- **Stable IDs + typed links.** Entry IDs are never reused, and entries cross-reference other artifacts with typed tokens (`ISSUE-NNN`, `ADR-NNN`, `RULE:<slug>`, `SKILL:<slug>`, `SCRIPT:<slug>`, `DOC:<slug>`) on an optional `Related:` line. This is what makes the KB graph-ready (§5.6) at near-zero extra writing cost.
-- **Shape is enforced.** The starter kit ships `scripts/check-kb-shape.sh` — runnable as-is, no adaptation — validating heading shape, identifier uniqueness, the six required fields, and link syntax. It is already chained into the installed lint target, and doubles as the project's first working enforcement check on day one. Note what it asserts *first*: that identifiers match an exact shape. `ISSUE-7`, `ISSUE-07` and `ISSUE-007` are one identifier to a reader and three to a check that only compares numbers, so a width variant walks straight past a uniqueness test — the shape assertion has to precede the uniqueness assertion or the uniqueness assertion buys nothing.
+- **Stable IDs + typed links.** Entry IDs are never reused, and entries cross-reference other artifacts with typed tokens (`ISSUE-NNN`, `ADR-NNN`, `RULE:<slug>`, `SKILL:<slug>`, `AGENT:<slug>`, `COMMAND:<slug>`, `SCRIPT:<slug>`, `DOC:<slug>`) on an optional `Related:` line. This is what makes every entry a node of the workspace graph (§3.12) at near-zero extra writing cost: name the rule or check that now prevents the bug, and the incident is reachable from its guard and the guard from its incident.
+- **Shape is enforced.** The starter kit ships `scripts/check-kb-shape.sh` — runnable as-is, no adaptation — validating heading shape, identifier uniqueness, the six required fields, and link syntax. It is already chained into the installed lint target, and doubles as the project's first working enforcement check on day one. Note what it asserts *first*: that identifiers match an exact shape. `ISSUE-7`, `ISSUE-07` and `ISSUE-007` are one identifier to a reader and three to a check that only compares numbers, so a width variant walks straight past a uniqueness test — the shape assertion has to precede the uniqueness assertion or the uniqueness assertion buys nothing. Shape is not existence, though: whether a well-formed token names something that is still there is a separate question with its own gate (§3.12).
 
 **Template** — one fragment per entry (starter kit: `docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md`). The filename carries the identifier and nothing else does, so two branches cannot claim the same one; `make registry-generate` assembles the fragments into the readable file, and `registry_tool.py new` creates them so the name always matches the grammar the check enforces.
 
@@ -661,6 +684,7 @@ Concrete file locations for widely-used tools (conventions move fast — treat y
 | Skills / playbooks | `.claude/skills/` | playbook docs linked from `AGENTS.md` | rule files with scoped triggers | prompt files |
 | Knowledge base | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | same — plain doc, tool-independent | same | same |
 | Enforcement scripts | `scripts/check-*` + lint target | same — plain CI, tool-independent | same | same |
+| Typed links + link gate | `Related:` / `Enforces:` / `Hands off to:` lines, `scripts/graph_tool.py` | same — plain text and plain CI; a token names a file, not a path, so it resolves in every layout | same | same |
 
 The starter kit's **`bootstrap.sh`** encodes this mapping: it detects which tool your repo uses (or asks when ambiguous / told via `--tool`), then installs the constitution, the universal working-principles rule, and the knowledge-base skeleton to the right locations. Artifacts with no equivalent in the target tool (native skills, subagents, hooks) are skipped with a note naming the nearest substitute from the table above.
 
@@ -692,7 +716,7 @@ Rank proposals against that sentence, not against how irritating the conflict is
 | **Automate** | `merge=union` + a gate that can still see the damage | the conflict resolves unattended; corruption is caught downstream | correct stopgap |
 | **Delegate** | an agent resolves conflicts mid-merge | non-deterministic, unauditable, fires at the worst moment | escalation only |
 
-The third tier deserves its demotion for a specific reason. An agent resolving two colliding entries **cannot safely renumber either of them**: the citations that would break live in files the conflict resolution never opens, and nothing checks that a cited identifier still resolves. Deterministic allocation beats intelligent repair — which is the general lesson, not a claim about any particular agent's competence. Anything that must come out the same way every time belongs in a tool.
+The third tier deserves its demotion for a specific reason. An agent resolving two colliding entries **cannot safely renumber either of them**: the citations that would break live in files the conflict resolution never opens, and only the ones written as typed links are ever resolved (§3.12) — a source comment or a test name that cites the number is not. Deterministic allocation beats intelligent repair — which is the general lesson, not a claim about any particular agent's competence. Anything that must come out the same way every time belongs in a tool.
 
 **What the starter kit ships**, working on a fresh clone with no `git config` in it:
 
@@ -731,6 +755,45 @@ document and its identifier is cited elsewhere.
 
 **The acceptance test to write first.** Two branches each add a registry entry; both merge with zero conflicts and zero duplicate identifiers. Write it before the mechanism and watch it fail — and keep a control case in it that reproduces the defect on the shape you are replacing, because a test that cannot fail proves nothing. The kit ships this as `scripts/tests/test-parallel-merge.sh`.
 
+### 3.12 The workspace graph
+
+The artifacts of §3.2–§3.11 depend on each other: a rule exists because of an incident, a script enforces a rule, an agent reviews against it, a command hands a workflow to a skill, a skill stops for a human. Written as prose, each of those dependencies is invisible to tooling and breaks silently when the other file is renamed. Written as **typed links**, they form a graph — with two families of edge, which is why "graph engineering" names two different things:
+
+| Edge family | Line label | Answers | Usually called |
+|---|---|---|---|
+| **Knowledge** | `Related:`, `Enforces:` | why does this exist, and what breaks if it changes? | a knowledge graph over artifacts |
+| **Orchestration** | `Hands off to:` | who or what runs next, and where does a human decide? | orchestration topology — agents and loops as nodes, hand-offs as edges |
+
+Both live in the same files, use the same tokens and are checked by the same gate. The kit *declares* the orchestration topology; it does not execute it. Running a hand-off is the agent tool's job (a subagent call, a skill invocation, a reviewer bot), and a workflow that is agentic by nature should not be forced down a fixed path. The edges worth declaring are the ones that must not be skipped: the reviewer a skill always delegates to, the check that ends a loop, the approval nothing proceeds without.
+
+**Design rules**
+
+1. **One token grammar.** `RULE:<name>`, `SKILL:<name>`, `AGENT:<name>`, `COMMAND:<name>`, `SCRIPT:<file name>`, `DOC:<name>`, registry identifiers exactly as `registries.json` declares them, and `HUMAN` for an approval gate. The name is the file's name, not its path, so a link survives a move between tool layouts and breaks only on a rename.
+2. **The label is the edge type.** `Related` cites. `Enforces` says a script or a reviewer holds a rule — layers 2 and 3 of P3, made findable from the rule. `Hands off to` names what runs next, and may carry its condition after a dash.
+3. **Resolution is gated from commit one.** A dangling link is silent, which is the argument that made the registry layer a day-1 default (§3.11): waiting for the signal means waiting for a signal that never comes. A syntax check without resolution validates the shape of a citation nobody follows.
+4. **Nothing is stored.** The graph is rebuilt from the files on every run. A committed index would be one more shared file that every pull request rewrites — the §3.11 defect, reintroduced by its own cure.
+5. **Examples are not edges.** Fenced blocks and underscore-prefixed files are not read, so templates and this guide can show the syntax.
+6. **Ask before you edit.** `make graph-impact NODE=<token>` before renaming, deleting or rewriting an artifact; its "Cited by" list is the change set.
+
+**What the starter kit ships**
+
+| Component | What it does | Installed |
+|---|---|---|
+| `graph_tool.py check` behind `check-graph-links.sh` | resolves every typed link; fails with `file:line`, the names that do exist, and the fix | day 1, every tool; chained into `make lint` |
+| `graph_tool.py impact <token>` | what cites an artifact and what it cites — the reverse index the gate already builds | day 1 (`make graph-impact`) |
+| `graph_tool.py coverage` | which rules a script enforces and an agent reviews; which gates no agent cites | day 1 (`make graph-coverage`); its regular readers, the audit and the coach, arrive at Level 4 |
+| typed links in the shipped gates, skills, agent and command | the kit's own artifacts are the first nodes, so a fresh install has a graph to resolve | with each artifact |
+| `workspace-graph` skill | impact-before-edit and coverage as a procedure | `--with-meta` |
+| `.graph-link-allowlist` | the one sanctioned exception — an immutable decision record citing a retired rule — keyed on the (file, token) pair, reason mandatory, reported on every run | created on first need |
+
+**Where the kinds live.** The tool's defaults are the locations `bootstrap.sh` installs to, for every supported tool, so a bootstrapped repository needs no configuration. One that keeps a kind somewhere else — playbook docs standing in for skills, say — declares it once in `registries.json`:
+
+```json
+"graph": { "nodes": { "SKILL": ["docs/agent-playbooks/*.md"] } }
+```
+
+**The acceptance test to write first**, as in §3.11: a link to a rule that does not exist fails the lint target and names the citing line; renaming a cited rule names every citer. Its control case runs the three older gates over the same dangling link and requires them to *pass* — the defect, reproduced. The kit ships it as `scripts/tests/test-graph-links.sh`.
+
 
 ---
 
@@ -752,7 +815,7 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 
 **Day 1 — Level 1 (≈ 1–2 hours):**
 
-1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, comments & annotations, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
+1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, comments & annotations, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, the gate that resolves typed links between artifacts (§3.12), and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
 2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling). Then the project rows of the comments-and-annotations rule — the second half of its protected-shapes table and its pointer placeholders; the starter-kit README's adoption note says how.
 3. Enable the common generic skills worth having from day one — `starter-kit/skills/common-catalog.md` lists them with adoption notes; the prompt-enhancer and semver skills already ship in the kit, and architecture review / architecture docs are one copy away.
 4. Commit. The setup is live: every agent session now starts from the contract.
@@ -760,13 +823,13 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 **Week 1 — Level 2:**
 
 5. Each time you correct the agent twice about the same thing → add the rule (constitution table row if short; new rule file if it needs examples).
-6. Wire an umbrella `make lint` target into CI — the kit installs one, already chained to the knowledge-base shape check, the registry drift and identifier gates, and the coverage check that proves all of them actually run in CI. Add your first mined `check-*.sh` when a documented rule gets violated anyway.
+6. Wire an umbrella `make lint` target into CI — the kit installs one, already chained to the knowledge-base shape check, the registry drift and identifier gates, the typed-link gate, and the coverage check that proves all of them actually run in CI. Add your first mined `check-*.sh` when a documented rule gets violated anyway — its header names the rule (`# Enforces: RULE:<name>`), so the rule and its script can find each other.
 7. First >30-min bug → the first knowledge-base entry (`registry_tool.py new --registry debugging-kb`). Enforce the discipline from the start; the KB's value is compounding.
 
 **Month 1 — Level 3:**
 
 8. The first workflow you've walked an agent through twice (release process, scaffolding a module) → a skill.
-9. The first review dimension where you keep making the same comments → a specialist agent with a violations list.
+9. The first review dimension where you keep making the same comments → a specialist agent with a violations list. Give it an `Enforces:` line for the rule it reviews against, and a `Hands off to: HUMAN` line if it may edit files.
 10. If sessions keep fighting the environment (missing toolchain, dead daemon) → a `SessionStart` hook.
 
 **Later — Level 4:** once the workspace has real mass (≥ ~10 rule/skill/agent files), install the meta layer — the kit ships it: `bootstrap.sh --with-meta` adds the workspace-audit skill + command, the agent-coach meta-agent, and the workspace-changelog skeleton (§5.2–§5.3). Deliberately not part of the day-1 install.
@@ -779,7 +842,7 @@ The difference: the knowledge already exists — in heads, PR threads, and incid
 2. **Mine the last ~50 PR review threads.** Every comment a reviewer made more than once is a rule file entry — with the real WRONG example straight from the PR.
 3. **Mine incident memory.** Ask the team for the five bugs that cost the most time; write them as ISSUE-001…005. This seeds the KB *and* usually yields your first enforcement scripts.
 4. **Promote existing checks.** Linter configs, custom CI greps, pre-commit hooks — you likely have Level-2 enforcement already. Chain everything into one `make lint` and reference it from the constitution.
-   The registry layer (§3.11) adopts rather than imposes here: `registry_tool.py init` writes its config from the conventions already on disk — an `adr-tools` directory of `0001-title.md` files, a knowledge base of `ISSUE-042` entries — so the identifier gate passes on existing records without renaming any of them; `adopt` then moves existing entries into fragments losslessly. The one thing to verify by hand is that your existing `make lint` actually *reaches* the new gates (`make -n lint | grep check-registry`): the installer never edits an existing Makefile, and a gate nothing runs is green and checks nothing — which the coverage check now reports rather than tolerates.
+   The registry layer (§3.11) adopts rather than imposes here: `registry_tool.py init` writes its config from the conventions already on disk — an `adr-tools` directory of `0001-title.md` files, a knowledge base of `ISSUE-042` entries — so the identifier gate passes on existing records without renaming any of them; `adopt` then moves existing entries into fragments losslessly. The one thing to verify by hand is that your existing `make lint` actually *reaches* the new gates (`make -n lint | grep check-registry`): the installer never edits an existing Makefile, and a gate nothing runs is green and checks nothing — which the coverage check now reports rather than tolerates. The link gate adopts the same way: it reads typed link lines only, so existing prose citations are left alone, and the links a repository already has are resolved against its own layout and identifier conventions.
 5. **Start agents read-only.** Run specialist reviewers on a few PRs and tune their violation lists against real diffs before trusting their findings in workflow gates.
 6. **Retrofit incrementally.** Never big-bang refactor the codebase to match new rules. Encode the target state as rules with a files-you-touch migration policy; the codebase converges over months.
 
@@ -801,6 +864,7 @@ The third starting state: the repo **already has** an agentic workspace — a co
 - **MCP servers** — until an external tool is genuinely called repeatedly. Wiring tools nobody invokes is pure maintenance load.
 - **Meta layer** — audits of a five-file workspace are overhead; adopt at real mass.
 - **Model tiering** — a default model everywhere is fine until cost or review depth becomes measurable.
+- **Graph retrieval and execution** — the link gate and its two queries ship on day 1 because a dangling link is silent (§3.12); loading graph neighbourhoods into context, a stored index, and anything that *executes* a hand-off wait for the signals in §5.6.
 - **Speculative anything** — every artifact must trace to a signal that actually recurred (P6). A skills directory full of guessed workflows is context bloat, not capability.
 
 ---
@@ -817,10 +881,11 @@ The single habit that separates a living setup from a decorative one — run the
 | You typed the same instruction a second time | Constitution row or rule-file section |
 | You walked the agent through the same workflow a second time | Skill |
 | Same review comment on a second PR | Rule + agent violations-list entry |
-| Documented rule violated anyway | Enforcement script wired into lint |
+| Documented rule violated anyway | Enforcement script wired into lint, its header naming the rule (`# Enforces: RULE:<name>`) |
 | Rule file contradicted by current code reality | Fix the rule file — a stale rule is worse than no rule |
 | Two pull requests conflicted in the same shared file, or two branches claimed one identifier | Move that file to the fragment layout (§3.11) — the second occurrence is the signal, and the cost of moving rises with every entry already cited |
-| Agents mis-retrieve from a grown KB/rules corpus, or an impact-analysis need appears | The knowledge-graph layer over the workspace (§5.6) — the conventions already make every artifact a well-formed node |
+| About to rename, delete or rewrite a rule, skill, agent, command or script | `make graph-impact NODE=<token>` first — its "Cited by" list is the change set, edited in the same PR (§3.12) |
+| Agents mis-retrieve from a grown KB/rules corpus | Graph-driven retrieval (§5.6) — load a node's neighbourhood instead of whole files; the links are already typed, resolved and queryable |
 
 The "same PR" clause matters: the author of the fix is the only one who knows what to write, and the knowledge decays within days.
 
@@ -860,6 +925,7 @@ Guardrails: propose-never-silently-change, and prefer sharpening an existing age
 | **Silent knowledge deletion** | "Cleanup" that loses learned gotchas re-pays for old bugs | Knowledge ledger + lossless-first + written justification (§5.2) |
 | **Copying another project's domain rules as universal** | Their constraints are not your constraints | Copy *structures* (this guide); write your own *content* |
 | **Speculative artifacts** | Guessed skills/agents nobody triggers = maintenance load | Everything traces to a recurred signal (§4.5) |
+| **Prose-only dependencies** | "See the testing rule" breaks silently when the rule is renamed, and nothing leads from a rule back to the script that enforces it | Typed links + a gate that resolves them (§3.12) |
 | **Shared append-only registries** | Every concurrent pull request conflicts, and two branches taking "the next free number" collide *cleanly* — permanently, because the identifier is cited elsewhere | One file per entry + generator + drift check (§3.11) |
 | **Gates that live only in a Makefile** | A check CI never invokes stops running silently, while the rule file still calls it enforced | CI invokes the aggregate target; a coverage check proves it (§3.11) |
 
@@ -868,27 +934,34 @@ Guardrails: propose-never-silently-change, and prefer sharpening an existing age
 Run quarterly (or as the quick-audit report):
 
 - [ ] Constitution ≤ ~200 lines, and every claim in it is currently true?
-- [ ] Every non-negotiable rule has all three enforcement layers (stated / reviewed / enforced)?
+- [ ] Every non-negotiable rule has all three enforcement layers (stated / reviewed / enforced)? `make graph-coverage` lists the rules with no script and no reviewer.
 - [ ] Every enforcement script's failure message points to its rule?
 - [ ] KB entry count growing (bugs are being converted, not just fixed)?
 - [ ] No rule file contradicts current code reality (spot-check the three oldest)?
 - [ ] No command duplicates a skill's body?
 - [ ] Every gate in the lint target actually runs in CI (not just present in the Makefile)?
 - [ ] No shared file that many PRs append to has escaped the fragment layout?
-- [ ] Agents' violation lists match the current rule files they enforce?
+- [ ] Agents' violation lists match the current rule files they enforce? `make graph-impact NODE=RULE:<name>` names the agents holding each rule.
+- [ ] `.graph-link-allowlist` absent or empty — or every entry still an immutable decision record citing something retired?
 - [ ] `WORKSPACE_CHANGELOG.md` has an entry newer than the last milestone?
 
 ### 5.6 The next level: agentic graph engineering
 
-Everything in this guide produces *documents*; the next maturity level treats them as a **knowledge graph**. Every artifact — rule, KB entry, ADR, skill, enforcement script — is a node; every typed cross-reference (`ISSUE-NNN`, `ADR-NNN`, `RULE:<slug>`, …) is an edge. An agent that can traverse that graph gains capabilities flat files cannot give: *"which rules and checks exist because of this incident?"*, *"what does this rule invalidate if it changes?"*, targeted retrieval of exactly the relevant nodes instead of loading whole files, and impact analysis before edits.
+Everything in this guide produces *documents*; graph engineering treats them as a **graph**. The term names two things. In most current writing it means **orchestration topology**: agents, loops, tools and human checkpoints as nodes, hand-offs and shared state as edges. This guide has used it from its first version for a **knowledge graph** over workspace artifacts: every rule, KB entry, ADR, skill and enforcement script a node, every typed cross-reference an edge. The kit means both, over one substrate (§3.12) — the same tokens and the same gate, two families of edge.
 
-The framework prepares for this **by convention, not by tooling**:
+**What ships** (§3.12): stable, never-reused identifiers; the three typed link lines; a gate that resolves every link on every pull request; and two queries over the resolved graph — *what cites this?* and *which rules have a script and a reviewer?* That is enough for an agent to answer *"which rules and checks exist because of this incident?"* and *"what does this rule invalidate if it changes?"* before it edits, and for a reviewer to see where each workflow stops for a human.
 
-- **Stable, never-reused IDs** on every referenced artifact (`ISSUE-NNN`, `ADR-NNN`, rule/skill/script slugs)
-- **Typed link syntax** wherever artifacts reference each other — the KB's `Related:` line is the anchor instance; rules citing `ISSUE-NNN` / `ADR-NNN` inline already conform
-- **Shape enforcement** (`check-kb-shape.sh`) so the substrate cannot rot before it is ever consumed
+**What is still deferred**, per the anti-speculation rule (§4.5) — each with the signal that should bring it in:
 
-The graph *tooling* — an index, a query layer, retrieval integration — is deliberately deferred per the anti-speculation rule (§4.5): build it when a consumer exists. Its trigger lives in the flywheel (§5.1): when the corpus reaches a mass where agents mis-retrieve, or an impact-analysis need actually appears, that is the signal. Until then the conventions cost near-zero — and every entry written today becomes a well-formed node on the day the graph layer lands.
+| Deferred | Signal |
+|---|---|
+| **Graph-driven retrieval** — loading a node's neighbourhood instead of whole files, by a hook or a tool server | agents mis-retrieve from a grown KB/rules corpus (§5.1) |
+| **Topology checks** — every agent that can write has a `HUMAN` hand-off; no hand-off cycle without a stop | a workspace with several agents, or the first unapproved write |
+| **Resolving citations inside prose** (`see ISSUE-019`) | the first stale prose citation found in review |
+| **A stored index, or a diagram export** | the gate becomes slow, or the same diagram is drawn by hand twice |
+| **An orchestration executor** | never in the kit — running a hand-off is the agent tool's job, and declaring it is enough to review and gate it |
+
+The gate is a day-1 default and the rest is not, for the reason the registry layer is one (§3.11): a dangling link is silent, so the signal that would justify the gate never arrives — while a missing query is only a capability nobody has asked for yet.
 
 ---
 

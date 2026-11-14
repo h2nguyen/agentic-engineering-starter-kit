@@ -24,18 +24,22 @@ python3 scripts/registry_tool.py new --registry debugging-kb \
 make registry-generate
 ```
 
-Conventions — this file doubles as the substrate for a future knowledge-graph
-layer:
+Conventions — every entry is a node in the workspace graph, and its links are
+checked:
 
 - Entry identifiers are **stable and never reused**, even when an entry is
   superseded. They come from the fragment's filename and from nowhere else, so
   there is exactly one place they can drift from.
 - Cross-reference other workspace artifacts with **typed links** on the
   optional `**Related:**` line: an entry identifier, `ADR-…`, `RULE:<slug>`,
-  `SKILL:<slug>`, `SCRIPT:<slug>`, `DOC:<slug>` — comma-separated.
+  `SKILL:<slug>`, `AGENT:<slug>`, `COMMAND:<slug>`, `SCRIPT:<slug>`,
+  `DOC:<slug>` — comma-separated. Name the rule or check script that now
+  prevents the bug: that link is how the next reader gets from the incident to
+  its guard, and from the guard back to why it exists.
 - `scripts/check-kb-shape.sh` validates the assembled file; `registry_tool.py
-  check` validates the fragments. Both are wired into the lint target so the
-  substrate cannot silently rot.
+  check` validates the fragments; `scripts/check-graph-links.sh` checks that
+  every link names something that still exists. All three are wired into the
+  lint target, so neither the shape nor the citations can silently rot.
 
 <!-- BEGIN GENERATED: debugging-kb — do not edit inside this region. Add a file under docs/DEBUGGING-KNOWLEDGE-BASE.d/ and run `make registry-generate`. -->
 

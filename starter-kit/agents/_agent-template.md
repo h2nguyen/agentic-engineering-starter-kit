@@ -57,3 +57,9 @@ are the reviewer half of the comments-and-annotations rule:
 For each finding: **severity** (BLOCKER / IMPROVEMENT / NIT), `file:line`,
 what rule is violated, and the minimal fix. If nothing is found, say so
 explicitly — do not invent findings.
+
+## Links
+
+**Enforces:** RULE:<the rule file this agent reviews against>
+
+**Hands off to:** HUMAN — <only for an agent that edits files: the approval it waits for; otherwise delete the line>

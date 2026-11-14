@@ -1,8 +1,11 @@
 #!/bin/bash
-# Enforces: <rule name> — see .claude/rules/<domain>.md § <section>
+# Enforces: RULE:<domain> § <section> — <rule name>
 # Escape: commit-message marker [<marker>] anywhere on the branch.
 #
 # Design rules (guide § 3.8):
+#   - Name the rule in the header as a typed link — RULE:<its file name without
+#     .md>. The link gate fails if that rule is ever renamed or deleted, and
+#     `make graph-impact NODE=RULE:<domain>` finds this script from the rule.
 #   - Fail with a file:line trail AND a pointer to the rule being enforced.
 #   - Wire into the umbrella lint target that CI runs on every PR.
 #   - Escape hatches are greppable commit-message markers, never silent.

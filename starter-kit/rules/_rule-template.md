@@ -2,6 +2,8 @@
 
 <One or two sentences: what this file governs and when an agent should load it.>
 
+**Related:** <ISSUE-… or ADR-… this rule came from — delete the line if there is none>
+
 ## The Rule
 
 <The core imperative(s), stated first, unhedged.>
