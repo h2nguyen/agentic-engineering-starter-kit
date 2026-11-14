@@ -14,8 +14,17 @@ tool, and `bootstrap.sh` installs them to the file locations your tool expects
 
 ## Requirements
 
-`git`, `make`, `bash` 3.2 or newer, `python3` 3.9 or newer (standard library
+`git`, `make`, `bash` 3.2 or newer, Python 3.9 or newer (standard library
 only). No packages, no network access, no per-clone `git config`.
+
+Python may be called `python3`, `python` or `py` on your machine. Everything
+the kit runs itself — the make targets, the gates, the tests, the Claude Code
+hook — starts it through `scripts/python.sh`, which tries those names in that
+order and uses the first that really is Python 3.9 or newer. Where this page
+or a rule writes `python3 scripts/…` for you to type, `./scripts/python.sh
+scripts/…` is the same command on any machine. `make lint PYTHON=/path/to/python`
+names the interpreter yourself. On Windows, run the kit from Git Bash (with
+`make` installed) or WSL.
 
 ## Quick start (recommended)
 
@@ -81,6 +90,7 @@ confirm the gates pass, enable further common skills from
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
+| `scripts/python.sh` | `scripts/python.sh` | Starts Python under whatever name the machine gives it (`python3`, `python`, `py -3`); every make target, gate, test and hook of the kit goes through it |
 | `scripts/registry_tool.py` | `scripts/registry_tool.py` | Ready to run — `new` / `generate` / `check` / `release` / `adopt` (brownfield: moves an existing artifact into fragments) |
 | `scripts/check-registry-drift.sh` | `scripts/check-registry-drift.sh` | Chained into `make lint`; the gate that makes `merge=union` safe |
 | `scripts/check-registry-ids.sh` | `scripts/check-registry-ids.sh` | Chained into `make lint` |
@@ -155,7 +165,7 @@ whichever version you started from. For why a file changed, search the kit's
    merged by hand instead of copied.
    ```bash
    git log --oneline -- scripts registry.mk
-   cp "$KIT"/starter-kit/scripts/*.py "$KIT"/starter-kit/scripts/check-*.sh scripts/
+   cp "$KIT"/starter-kit/scripts/*.py "$KIT"/starter-kit/scripts/check-*.sh "$KIT"/starter-kit/scripts/python.sh scripts/
    cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
    cp "$KIT"/starter-kit/registry.mk registry.mk
    cp "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md docs/DEBUGGING-KNOWLEDGE-BASE.d/
@@ -235,6 +245,7 @@ workspace — and, where you keep one, a line in the workspace changelog.
 | `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
 | `duplicate identifier … claimed by 2 fragments` | Two branches took the same number | Rename the fragment that has not been merged yet. Never renumber one that has |
+| `python3: command not found`, `Python was not found`, or `no Python 3.9 or newer found` | Python has another name on this machine, or is older than 3.9 | Nothing the kit runs names `python3` — if a command you typed did, run it as `./scripts/python.sh scripts/…`. `./scripts/python.sh --which` prints the interpreter it found; `PYTHON=/path/to/python` names one |
 | `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step | Have the workflow run `make lint`, the aggregate target |
 
 ## The workspace-graph hook (Claude Code)
@@ -258,6 +269,7 @@ when it cannot do its job it ends silent.
 | Switch it off for one run | `WORKSPACE_GRAPH_HOOK=off` in the environment |
 | Remove it | Delete the `PostToolUse` and `Stop` entries that name `workspace-graph.py` from `.claude/settings.json` |
 | See why it said nothing | `WORKSPACE_GRAPH_HOOK_DEBUG=1`; the reason goes to the hook's stderr |
+| Run it on a machine where Python is not `python3` | Nothing: both entries start it through `scripts/python.sh` |
 | Add it to a repository installed before it existed | Re-run `bootstrap.sh`: it adds the hook file and prints the two entries to put in your `settings.json`, which it never edits |
 
 Claude Code asks you to approve an edit to a file under `.claude/` — a rule,

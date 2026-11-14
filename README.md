@@ -12,8 +12,13 @@ de-branded: its material is illustration, never prescription.
 
 ## Requirements
 
-`git`, `make`, `bash` 3.2 or newer and `python3` 3.9 or newer — standard
+`git`, `make`, `bash` 3.2 or newer and Python 3.9 or newer — standard
 library only. Nothing to install, no network access, no per-clone `git config`.
+Python may be called `python3`, `python` or `py`: everything the kit runs
+starts it through `scripts/python.sh`, which finds the one your machine has.
+On Windows, run the kit from Git Bash (with `make` installed) or WSL; that
+path is covered by a simulated machine in the test suites and has not been
+run on Windows itself.
 The kit's own checks, and a fresh install for each of the four tools, pass in
 a clean clone on macOS (system bash 3.2, GNU Make 3.81, Python 3.9) and on
 Linux (Debian 12, bash 5.2, GNU Make 4.3, Python 3.9, as a non-root user with
