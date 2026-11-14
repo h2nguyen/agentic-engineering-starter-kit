@@ -123,6 +123,10 @@ make graph-impact NODE=RULE:<name>   # what cites this, with file:line
 make graph-links                     # every typed link resolves (part of make lint)
 ```
 
+Where the agent tool runs the kit's hook (Claude Code), you are handed that
+list after an edit to a cited file. It is a reminder, not a substitute: ask
+before a rename, and act on the list when it arrives.
+
 **Litmus test:** does `make graph-links` pass, and does every check script and
 reviewer agent added in this PR carry an `Enforces` line naming its rule?
 
