@@ -112,11 +112,19 @@ echo "=== the kit's own tools leave no bytecode behind in the repository ==="
 R="$WORK/claude"
 unit="$(grep -m1 'unittest discover' "$R/registry.mk" | sed 's/^[[:space:]]*//')"
 ( cd "$R" && env -u PYTHONDONTWRITEBYTECODE make graph-links registry-ids >/dev/null 2>&1
-  env -u PYTHONDONTWRITEBYTECODE sh -c "$unit" >/dev/null 2>&1
+  env -u PYTHONDONTWRITEBYTECODE sh -c "$unit" > "$WORK/unit.log" 2>&1
   env -u PYTHONDONTWRITEBYTECODE python3 scripts/graph_tool.py impact RULE:documentation >/dev/null 2>&1 )
 left="$(find "$R" -name '__pycache__' -o -name '*.pyc' | grep -v '/.git/' | wc -l | tr -d ' ')"
 [ "$left" -eq 0 ] && ok "the gates, the unit tests and a direct query leave no __pycache__ in the repository" \
   || bad "the kit's tools left $left bytecode path(s) in the repository"
+
+# A green run must read as green. The unit tests exercise the gates' failure
+# paths, and those used to print their FAIL lines straight into `make lint` —
+# dozens of them on a passing run, which an agent scanning the output for
+# "FAIL" reads as a broken build.
+grep -q '^Ran [0-9]* tests' "$WORK/unit.log" && ! grep -q '^FAIL' "$WORK/unit.log" \
+  && ok "a passing unit-test run prints no FAIL line" \
+  || bad "a passing unit-test run prints $(grep -c '^FAIL' "$WORK/unit.log") FAIL line(s)"
 
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"

@@ -58,8 +58,10 @@ ci-lint-coverage:
 
 ## registry-test — the registry layer's own suites. -B: the kit installs no
 ## .gitignore, so its tools must not leave a __pycache__ in your repository.
+## -b: the suites exercise the gates' failure paths, and a passing run must
+## not print their FAIL lines into a green `make lint`.
 registry-test:
-	python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
+	python3 -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
 	./scripts/tests/test-ci-lint-coverage.sh
 	./scripts/tests/test-parallel-merge.sh
 	./scripts/tests/test-graph-links.sh
