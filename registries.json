@@ -39,7 +39,7 @@
       "AGENT": ["starter-kit/agents/*.md"],
       "COMMAND": ["starter-kit/commands/*.md"],
       "SCRIPT": ["starter-kit/scripts/*", "scripts/*"],
-      "DOC": ["docs/**/*.md", "*.md", "starter-kit/docs/**/*.md", "starter-kit/*.md"]
+      "DOC": ["docs/**/*.md", "*.md", "starter-kit/docs/**/*.md", "starter-kit/*.md", "starter-kit/rules/reference/*.md"]
     }
   },
 

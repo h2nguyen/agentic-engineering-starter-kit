@@ -102,6 +102,16 @@ for tool in claude agents cursor copilot; do
   else
     ! grep -q '\.claude/rules/' "$c" && ok "$tool: constitution links retargeted to docs/agent-rules/" || bad "$tool: constitution still links .claude/rules/"
   fi
+  # Two shipped rules keep only their imperative always-loaded and point at an
+  # on-demand reference for the worked examples and the gotcha write-ups. A
+  # pointer to a file that was not installed would send every reader nowhere.
+  missing=""
+  for ref in $(grep -rhoE 'docs/rule-reference/[a-z-]+\.md' "$rules_dir" | sort -u); do
+    [ -f "$R/$ref" ] || missing="$missing $ref"
+  done
+  [ -n "$(ls "$R/docs/rule-reference" 2>/dev/null)" ] && [ -z "$missing" ] \
+    && ok "$tool: every on-demand reference a rule points at is installed" \
+    || bad "$tool: a rule points at a reference that is not installed:$missing"
   # Two of the kit's suites test the INSTALLER — this one and the brownfield
   # one. A repository the kit was installed into has no installer, so there
   # they could only print SKIP into every lint run, and four adopting agents

@@ -62,6 +62,7 @@ confirm the gates pass, enable further common skills from
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
 | `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR format (Michael Nygard), where rationale lives) |
 | `rules/comments-and-annotations.md` | `.claude/rules/comments-and-annotations.md` | Fill in the project half of its protected-shapes table and its four `<placeholders>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule) |
+| `rules/reference/` | `docs/rule-reference/` | The worked examples of the comments rule and the gotchas of the registries rule — read on demand, never loaded. Same location for every tool |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
 | `registries.json.template` | `registries.json` | Reference only — bootstrap runs `registry_tool.py init`, which writes the file from the conventions your repo already has |
@@ -141,7 +142,8 @@ can fill. Two things to do once, right after bootstrap:
    the list, not the command. Every shape that turns up is configuration, not
    commentary, and goes into the table with the gate that reads it in the last
    column.
-2. **Resolve the pointers.** Four placeholders stay in the file on purpose,
+2. **Resolve the pointers.** Four placeholders stay in the rule — and in its
+   on-demand examples, `docs/rule-reference/comments-and-annotations.md` — on purpose,
    because their value belongs to the adopting project:
 
    | Placeholder | Fill with |
@@ -151,7 +153,7 @@ can fill. Two things to do once, right after bootstrap:
    | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
    | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence |
 
-   `<EVAL-RECORD-ID>` appears in the prompt-file example and the survivors
+   `<EVAL-RECORD-ID>` appears in the reference file's prompt-file example and survivors
    table: fill it with wherever your project records evaluation evidence for
    prompts, or leave it if you keep none. `<product>`, `<vendor>`,
    `<regulation>` and `<TIER>`, like the other angle-bracket tokens inside the
