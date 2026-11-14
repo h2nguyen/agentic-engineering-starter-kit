@@ -68,7 +68,18 @@ echo "=== every tool layout receives the constitution and every shipped rule ===
 expected_rules="$(cd "$KIT_DIR/rules" && ls *.md | grep -v '^_' | sort)"
 for tool in claude agents cursor copilot; do
   R="$WORK/$tool"; fresh_repo "$R"
-  "$BOOTSTRAP" --tool "$tool" --target "$R" >/dev/null 2>&1 || bad "$tool: bootstrap exited non-zero"
+  "$BOOTSTRAP" --tool "$tool" --target "$R" > "$WORK/boot-$tool.out" 2> "$WORK/boot-$tool.err" || bad "$tool: bootstrap exited non-zero"
+  # A fresh install skips nothing, and under `set -u` bash 3.2 (macOS) treats
+  # the expansion of an EMPTY array as an unbound variable: the installer
+  # printed that error twice and still exited 0.
+  [ ! -s "$WORK/boot-$tool.err" ] && ok "$tool: a fresh install writes nothing to stderr" \
+    || { bad "$tool: a fresh install wrote to stderr:"; head -3 "$WORK/boot-$tool.err" | cut -c1-160 | sed 's/^/         /'; }
+  ! grep -q 'adopt --registry' "$WORK/boot-$tool.out" \
+    && ok "$tool: a repository that had nothing is not told to adopt what it was just given" \
+    || bad "$tool: a fresh install is told to run adopt on the template it just received"
+  pointer="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rule_pointer"])' "$R/registries.json")"
+  [ -f "$R/$pointer" ] && ok "$tool: gate failures point at a rule file that exists ($pointer)" \
+    || bad "$tool: registries.json points gate failures at $pointer, which is not there"
   case "$tool" in
     claude)  c="$R/CLAUDE.md";                        rules_dir="$R/.claude/rules" ;;
     copilot) c="$R/.github/copilot-instructions.md";  rules_dir="$R/docs/agent-rules" ;;

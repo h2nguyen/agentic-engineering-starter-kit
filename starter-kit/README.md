@@ -141,7 +141,7 @@ can fill. Two things to do once, right after bootstrap:
 
    | Placeholder | Fill with |
    |---|---|
-   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records (MADR numbering, or the date-slug form) |
+   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `python3 scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
    | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
    | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key) |
    | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence |

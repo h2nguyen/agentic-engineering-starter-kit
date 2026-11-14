@@ -258,6 +258,7 @@ echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' <co
 echo "     Then the project rows of the comments-and-annotations rule: the second half of"
 echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
 echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
+echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
 echo "  2. Enable common generic skills — see $(basename "$KIT_DIR")/skills/common-catalog.md."
 echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
 echo "     typed-link gate and the CI-coverage check are already chained into it, and"
@@ -280,7 +281,9 @@ if [ "$MAKEFILE_KEPT" -eq 1 ]; then
   fi
 fi
 for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
-  if printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept "; then
+  # Guard on the count: under `set -u`, bash 3.2 (macOS) treats the expansion
+  # of an EMPTY array as an unbound variable, and a fresh install skips nothing.
+  if [ ${#SKIPPED[@]} -gt 0 ] && printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept "; then
     _reg=changelog; [ "$_kept" = docs/DEBUGGING-KNOWLEDGE-BASE.md ] && _reg=debugging-kb
     echo "     Your existing $_kept was left untouched. Bring it into the layout with"
     echo "         python3 scripts/registry_tool.py adopt --registry $_reg"
