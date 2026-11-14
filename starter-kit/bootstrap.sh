@@ -303,7 +303,11 @@ fi
 for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
   # Guard on the count: under `set -u`, bash 3.2 (macOS) treats the expansion
   # of an EMPTY array as an unbound variable, and a fresh install skips nothing.
-  if [ ${#SKIPPED[@]} -gt 0 ] && printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept "; then
+  # Only a file that was kept AND is still hand-maintained needs adopting. A
+  # re-run keeps the files an earlier run generated, and those already carry
+  # the generated region.
+  if [ ${#SKIPPED[@]} -gt 0 ] && printf '%s\n' "${SKIPPED[@]}" | grep -q "^$_kept " \
+     && ! grep -q 'BEGIN GENERATED:' "$TARGET/$_kept" 2>/dev/null; then
     _reg=changelog; [ "$_kept" = docs/DEBUGGING-KNOWLEDGE-BASE.md ] && _reg=debugging-kb
     echo "     Your existing $_kept was left untouched. Bring it into the layout with"
     echo "         python3 scripts/registry_tool.py adopt --registry $_reg"

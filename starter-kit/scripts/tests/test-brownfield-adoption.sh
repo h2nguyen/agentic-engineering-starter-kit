@@ -118,6 +118,13 @@ before_sha="$(git -C "$R" rev-parse HEAD)"
 echo "=== brownfield: existing workspace + populated registries ==="
 "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/bootstrap.log" 2>&1 || { bad "bootstrap exited non-zero"; cat "$WORK/bootstrap.log"; }
 
+# The hint that matters here: these two files are hand-maintained, were kept,
+# and are exactly what `adopt` is for. (A re-run on generated files must NOT
+# print it — test-bootstrap-rerun.sh holds that side.)
+grep -q 'adopt --registry changelog' "$WORK/bootstrap.log" && grep -q 'adopt --registry debugging-kb' "$WORK/bootstrap.log" \
+  && ok "bootstrap points the hand-maintained changelog and knowledge base at adopt" \
+  || bad "bootstrap kept a hand-maintained registry and did not say how to adopt it"
+
 # 1. Nothing pre-existing was modified (only additions; .gitattributes appended).
 modified="$(git -C "$R" status --short | grep -E '^ M|^M ' | grep -v '.gitattributes' || true)"
 [ -z "$modified" ] && ok "bootstrap modified no existing file" || bad "bootstrap modified: $modified"

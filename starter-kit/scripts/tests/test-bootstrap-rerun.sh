@@ -48,6 +48,13 @@ attrs="$(grep -c '^CHANGELOG.md .*merge=union' "$R/.gitattributes")"
 [ "$attrs" -eq 1 ] && ok "and the CHANGELOG.md merge attribute exactly once" || bad "CHANGELOG.md attribute present $attrs times"
 grep -q 'registry block already present' "$WORK/run2.log" \
   && ok "second run reports the block as already present" || bad "second run did not recognise its own block"
+# A re-run is how the Level-4 layer and newer kit files arrive, so its output
+# is read by someone whose repository is ALREADY in the fragment layout. The
+# kept-file hint used to fire for any changelog or knowledge base it skipped,
+# and told that reader to adopt files the kit itself had generated.
+! grep -q 'adopt --registry' "$WORK/run2.log" \
+  && ok "second run does not tell a repository already in the fragment layout to adopt" \
+  || bad "second run tells an already-migrated repository to run adopt"
 
 echo "=== the installed SessionStart hook runs, also from a path with a space ==="
 # Hook commands run through `sh -c`. Unquoted, $CLAUDE_PROJECT_DIR splits at a
