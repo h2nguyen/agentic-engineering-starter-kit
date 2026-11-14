@@ -56,6 +56,24 @@ grep -q 'registry block already present' "$WORK/run2.log" \
   && ok "second run does not tell a repository already in the fragment layout to adopt" \
   || bad "second run tells an already-migrated repository to run adopt"
 
+echo "=== run without --target: a project is installed into, the kit's own repository is not ==="
+# The kit's repository carries agent instructions of its own now, so tool
+# detection succeeds there. Run from its root with no --target, the installer
+# would install the kit into the kit. A project that merely holds a copy of
+# starter-kit/ is the legitimate no-argument case and must keep working.
+K="$WORK/kit-root"; mkdir -p "$K"; cp -R "$KIT_DIR" "$K/starter-kit"; : > "$K/AGENTIC-ENGINEERING-GUIDE.md"
+( cd "$K" && ./starter-kit/bootstrap.sh --tool claude > "$WORK/self.log" 2>&1 ); rc=$?
+[ "$rc" -ne 0 ] && [ ! -e "$K/CLAUDE.md" ] && [ ! -e "$K/registries.json" ] \
+  && ok "run from the kit's own repository with no --target, the installer refuses and writes nothing" \
+  || bad "the installer installed the kit into its own repository (exit $rc)"
+grep -q -- '--target' "$WORK/self.log" && ok "and it says to name the repository to install into" \
+  || bad "the refusal does not mention --target"
+P="$WORK/copied-in"; fresh_repo "$P"; cp -R "$KIT_DIR" "$P/starter-kit"
+( cd "$P" && ./starter-kit/bootstrap.sh --tool agents >/dev/null 2>&1 ); rc=$?
+[ "$rc" -eq 0 ] && [ -f "$P/AGENTS.md" ] \
+  && ok "a project holding a copy of starter-kit/ still installs with no --target" \
+  || bad "the no-argument install into a project stopped working (exit $rc)"
+
 echo "=== the installed SessionStart hook runs, also from a path with a space ==="
 # Hook commands run through `sh -c`. Unquoted, $CLAUDE_PROJECT_DIR splits at a
 # space and the hook exits 127 — a non-blocking error, so it is silently gone.

@@ -31,16 +31,30 @@ KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$(pwd)"
 TOOL=""
 WITH_META=0
+TARGET_GIVEN=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
-    --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; shift 2 ;;
+    --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
     -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
+
+# With no --target the installer installs into the current directory, which
+# is right when a project holds a copy of starter-kit/. It is wrong in the
+# kit's own repository: that one carries the guide beside starter-kit/, and
+# agent instructions of its own, so detection would succeed and the kit would
+# be installed into itself.
+if [ "$TARGET_GIVEN" -eq 0 ] && [ -f "$TARGET/AGENTIC-ENGINEERING-GUIDE.md" ] \
+   && [ "$(cd "$TARGET" && pwd -P)" = "$(cd "$KIT_DIR/.." && pwd -P)" ]; then
+  echo "ERROR: this is the starter kit's own repository, not a project to install into." >&2
+  echo "Name the repository the kit should be installed into:" >&2
+  echo "    $0 --target /path/to/your-repo" >&2
+  exit 1
+fi
 
 detect_tool() {
   if [ -d "$TARGET/.claude" ] || [ -f "$TARGET/CLAUDE.md" ]; then echo claude; return; fi
