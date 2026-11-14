@@ -65,5 +65,3 @@ registry-test:
 	./scripts/tests/test-ci-lint-coverage.sh
 	./scripts/tests/test-parallel-merge.sh
 	./scripts/tests/test-graph-links.sh
-	./scripts/tests/test-brownfield-adoption.sh
-	./scripts/tests/test-bootstrap-rerun.sh

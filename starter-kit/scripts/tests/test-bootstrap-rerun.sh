@@ -102,6 +102,14 @@ for tool in claude agents cursor copilot; do
   else
     ! grep -q '\.claude/rules/' "$c" && ok "$tool: constitution links retargeted to docs/agent-rules/" || bad "$tool: constitution still links .claude/rules/"
   fi
+  # Two of the kit's suites test the INSTALLER — this one and the brownfield
+  # one. A repository the kit was installed into has no installer, so there
+  # they could only print SKIP into every lint run, and four adopting agents
+  # stopped to work out what that meant.
+  [ ! -e "$R/scripts/tests/test-bootstrap-rerun.sh" ] && [ ! -e "$R/scripts/tests/test-brownfield-adoption.sh" ] \
+    && ! grep -q 'test-bootstrap-rerun\|test-brownfield-adoption' "$R/registry.mk" \
+    && ok "$tool: the installer's own suites stay in the kit, and lint does not try to run them" \
+    || bad "$tool: a suite that can only SKIP outside the kit was installed"
   # A later session never sees the kit. If the templates stay behind in it,
   # the first rule, check script, skill or reviewer that session writes is
   # rebuilt from memory — and each adopting agent dropped a different required

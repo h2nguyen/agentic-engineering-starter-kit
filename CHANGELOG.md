@@ -54,6 +54,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - A link line follows a rename even inside an accepted decision record — it is a pointer, not part of the decision. `.graph-link-allowlist` is for a record citing something that was retired. The documentation rule, the gate's failure message and the workspace-graph skill all say so.
 - The setup prompt says who edits an existing Makefile (the adopter, not the installer), what to do with the SessionStart hook skeleton on Claude Code, and to leave the kit directory out of the commit; the README says what `<TICKET-ID>` is where there is no tracker.
 - The kit's unit tests run with `python3 -B` and unittest's `-b`.
+- The two suites that test the installer itself (`test-bootstrap-rerun.sh`, `test-brownfield-adoption.sh`) are no longer installed into your repository, where they could only print `SKIP` on every lint run. A repository that already has them can delete both and drop their two lines from `registry.mk`.
 
 <!-- category: Deprecated -->
 

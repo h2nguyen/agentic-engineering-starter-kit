@@ -121,7 +121,10 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
       INSTALLED+=("$2/$rel")
       any=0
     fi
-  done < <(find "$src" -type f ! -name '*.pyc' ! -path '*/__pycache__/*')
+  # The two suites that test this installer stay in the kit: a repository it
+  # installs into has no bootstrap.sh for them to run.
+  done < <(find "$src" -type f ! -name '*.pyc' ! -path '*/__pycache__/*' \
+             ! -name 'test-bootstrap-rerun.sh' ! -name 'test-brownfield-adoption.sh')
   return $any
 }
 
