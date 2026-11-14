@@ -94,6 +94,19 @@ for tool in claude agents cursor copilot; do
   fi
 done
 
+echo "=== the kit's own tools leave no bytecode behind in the repository ==="
+# The installer ships no .gitignore, so a __pycache__ the tools create shows
+# up as untracked files and rides into the next `git add -A`. A machine with
+# PYTHONDONTWRITEBYTECODE set hides this, so it is unset here on purpose.
+R="$WORK/claude"
+unit="$(grep -m1 'unittest discover' "$R/registry.mk" | sed 's/^[[:space:]]*//')"
+( cd "$R" && env -u PYTHONDONTWRITEBYTECODE make graph-links registry-ids >/dev/null 2>&1
+  env -u PYTHONDONTWRITEBYTECODE sh -c "$unit" >/dev/null 2>&1
+  env -u PYTHONDONTWRITEBYTECODE python3 scripts/graph_tool.py impact RULE:documentation >/dev/null 2>&1 )
+left="$(find "$R" -name '__pycache__' -o -name '*.pyc' | grep -v '/.git/' | wc -l | tr -d ' ')"
+[ "$left" -eq 0 ] && ok "the gates, the unit tests and a direct query leave no __pycache__ in the repository" \
+  || bad "the kit's tools left $left bytecode path(s) in the repository"
+
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --with-meta --target "$R" >/dev/null 2>&1 || bad "bootstrap --with-meta exited non-zero"

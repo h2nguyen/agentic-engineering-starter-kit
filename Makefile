@@ -24,7 +24,7 @@ lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates t
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
-	python3 -m unittest discover -s $(KIT)/scripts/tests -p 'test_*.py'
+	python3 -B -m unittest discover -s $(KIT)/scripts/tests -p 'test_*.py'
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
 	$(KIT)/scripts/tests/test-graph-links.sh
