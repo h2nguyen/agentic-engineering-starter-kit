@@ -12,6 +12,11 @@ tool, and `bootstrap.sh` installs them to the file locations your tool expects
 > becomes active once installed to the canonical paths in a target repo
 > (via `bootstrap.sh` or manual copy).
 
+## Requirements
+
+`git`, `make`, `bash` 3.2 or newer, `python3` 3.9 or newer (standard library
+only). No packages, no network access, no per-clone `git config`.
+
 ## Quick start (recommended)
 
 ```bash
@@ -120,6 +125,56 @@ confirm the gates pass, enable further common skills from
    when you repeat a workflow, agents when you repeat a review comment,
    enforcement scripts when a documented rule gets violated anyway. See the
    guide § 4–§ 5.
+
+## Upgrading an existing install
+
+`bootstrap.sh` never overwrites a file. Re-running it from a newer kit
+therefore **adds** what is new and leaves every file you already have exactly
+as it is — including the kit's own scripts. Moving to a newer kit is these
+steps, in order, from the root of your repository (`KIT` is a checkout of the
+newer kit):
+
+1. **Add what is new.**
+   ```bash
+   "$KIT"/starter-kit/bootstrap.sh --target .
+   ```
+2. **Replace the files the kit owns.** They hold nothing of your project, so
+   copying is safe:
+   ```bash
+   cp "$KIT"/starter-kit/scripts/*.py "$KIT"/starter-kit/scripts/check-*.sh scripts/
+   cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
+   cp "$KIT"/starter-kit/registry.mk registry.mk
+   rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh
+   ```
+   The last line removes the two suites that test the installer; they stay in
+   the kit and are not run from your repository.
+3. **Merge the rule files; do not copy them.** Yours may carry your project's
+   fill-ins. Compare each with the kit's and take the changes:
+   ```bash
+   diff -u .claude/rules/documentation.md "$KIT"/starter-kit/rules/documentation.md
+   ```
+   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.) The
+   release notes in the kit's `CHANGELOG.md` say which rules changed.
+4. **Chain any new gate into your lint target.** If you keep your own
+   Makefile, its `lint:` line must name every gate `registry.mk` defines —
+   `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`.
+5. **Run `make lint` and fix what it reports.** Each failure names the file,
+   the line and the fix. Coming from a kit older than 1.2.0, expect one kind:
+   a check script whose header still reads `# Enforces: <rule> — see <file>`
+   must name its rule as a token, `# Enforces: RULE:<name> — <what it checks>`.
+
+Commit the upgrade on a branch of its own, like any other change.
+
+## Troubleshooting
+
+| `make lint` says | What it means | Do this |
+|---|---|---|
+| `<file>:<line> — … link 'RULE:x' resolves to nothing` | A typed link names an artifact that was renamed, deleted or never written | Fix the citing line; the message lists the names that exist. `make graph-impact NODE=RULE:x` shows what cites an artifact *before* you rename it |
+| `check-graph-links.sh is installed but 'lint' never runs it` | Your own Makefile does not chain the gate | Add `graph-links` to the `lint:` prerequisites |
+| `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
+| `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
+| `duplicate identifier … claimed by 2 fragments` | Two branches took the same number | Rename the fragment that has not been merged yet. Never renumber one that has |
+| `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step | Have the workflow run `make lint`, the aggregate target |
 
 ## Adopting the comments-and-annotations rule
 
