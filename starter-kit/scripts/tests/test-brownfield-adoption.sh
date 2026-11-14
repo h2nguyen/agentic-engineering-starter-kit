@@ -117,6 +117,12 @@ before_sha="$(git -C "$R" rev-parse HEAD)"
 
 echo "=== brownfield: existing workspace + populated registries ==="
 "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/bootstrap.log" 2>&1 || { bad "bootstrap exited non-zero"; cat "$WORK/bootstrap.log"; }
+# This repository had a constitution and no kit. It is a first install, and
+# its reader needs the first-install steps — not to be told that the kit was
+# already here and that the way forward is the upgrade procedure.
+! grep -q 'Upgrading an existing install' "$WORK/bootstrap.log" && grep -q "Fill in the constitution" "$WORK/bootstrap.log" \
+  && ok "a first install into a repository with its own constitution gets the first-install steps" \
+  || bad "a first install into a repository with its own constitution is treated as a re-run of the kit"
 
 # The hint that matters here: these two files are hand-maintained, were kept,
 # and are exactly what `adopt` is for. (A re-run on generated files must NOT
@@ -192,6 +198,21 @@ case "$_dry" in
   *check-registry-drift.sh*) ok "and it really reaches the registry gates" ;;
   *) bad "lint still does not run the gates" ;;
 esac
+
+# An upgrade is a re-run into a repository whose own Makefile predates a gate.
+# The installer used to look for the drift gate alone and call the lint target
+# verified, so the reader of a re-run was told all was chained when one gate
+# was not. It names the gates lint does not reach.
+printf 'include registry.mk\n.PHONY: lint fmt test\nlint: registry-drift registry-ids kb-shape ci-lint-coverage fmt test\nfmt:\n\t@echo fmt ok\ntest:\n\t@echo tests ok\n' > "$R/Makefile"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/rerun-unchained.log" 2>&1
+grep -q "does not reach: graph-links$" "$WORK/rerun-unchained.log" \
+  && ok "a re-run names the one gate the repository's own lint target does not reach" \
+  || bad "a re-run does not say that lint misses graph-links"
+git -C "$R" checkout -q -- Makefile
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/rerun-chained.log" 2>&1
+grep -q "already reaches every gate" "$WORK/rerun-chained.log" && ! grep -q 'include registry.mk' "$WORK/rerun-chained.log" \
+  && ok "and says nothing is left to chain once lint reaches them all" \
+  || bad "a re-run on a fully chained Makefile still prints the lines to add"
 
 # 5. Parallel work is clean and green on the adopted repository.
 git -C "$R" checkout -q -b feat-a
