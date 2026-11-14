@@ -81,9 +81,12 @@ For a rename, a move, a delete, a split or a rewrite:
 - **The gate says a link "resolves to nothing".** Fix the citing line, not
   the gate: point it at the artifact's current name (the message lists the
   real ones), or delete it if the artifact is gone.
-- **The citing file is an accepted decision record.** It is immutable. Add
-  the pair to `.graph-link-allowlist` as `<citing file> <token>  # reason`.
-  No other kind of file qualifies, and an entry without a reason is rejected.
+- **The citing file is an accepted decision record.** Its decision is
+  immutable; its link lines are pointers. If the artifact was renamed, update
+  the token in the record like in any other citer. Only if the artifact was
+  retired does the pair go in `.graph-link-allowlist`, as
+  `<citing file> <token>  # reason`. No other kind of file qualifies, and an
+  entry without a reason is rejected.
 - **"This repository has no SKILL artifacts"** (or AGENT, COMMAND), on a tool
   without native skills. Declare where the playbooks live in
   `registries.json` — `"graph": {"nodes": {"SKILL": ["<glob>"]}}` — instead

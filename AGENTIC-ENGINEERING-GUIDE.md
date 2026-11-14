@@ -775,7 +775,7 @@ Both live in the same files, use the same tokens and are checked by the same gat
 3. **Resolution is gated from commit one.** A dangling link is silent, which is the argument that made the registry layer a day-1 default (§3.11): waiting for the signal means waiting for a signal that never comes. A syntax check without resolution validates the shape of a citation nobody follows.
 4. **Nothing is stored.** The graph is rebuilt from the files on every run. A committed index would be one more shared file that every pull request rewrites — the §3.11 defect, reintroduced by its own cure.
 5. **Examples are not edges.** Fenced blocks and underscore-prefixed files are not read, so templates and this guide can show the syntax.
-6. **Ask before you edit.** `make graph-impact NODE=<token>` before renaming, deleting or rewriting an artifact; its "Cited by" list is the change set.
+6. **Ask before you edit.** `make graph-impact NODE=<token>` before renaming, deleting or rewriting an artifact; its "Cited by" list is the change set. A link line is a pointer, so it follows a rename even inside an accepted decision record; only a *retired* artifact leaves such a record with a link it cannot repair.
 
 **What the starter kit ships**
 
