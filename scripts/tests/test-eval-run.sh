@@ -61,6 +61,13 @@ grep -q -- '--cwd' "$WORK/out" && ok "and the refusal names --cwd" || bad "the r
 "$RUN" --cwd "$TARGET" -- true > /dev/null 2>&1; rc=$?
 [ "$rc" -eq 64 ] && ok "a run with no --log is refused: an unrecorded run is not evidence" \
   || bad "a run with no --log was accepted (exit $rc)"
+# Options glued into one word by a shell that does not split them (zsh, with
+# an unquoted variable) arrive as the first word of the "command". Running
+# that produced six records of a command that never started.
+"$RUN" --cwd "$TARGET" --log "$LOG" "--guard $SOURCE --quiet" -- true > "$WORK/out" 2>&1; rc=$?
+[ "$rc" -eq 64 ] && grep -q 'not a command' "$WORK/out" \
+  && ok "a word that looks like an option where the command should start is refused, not run" \
+  || bad "an option-shaped word was taken for the command (exit $rc)"
 [ ! -e "$LOG/commands.jsonl" ] && ok "a refused run records nothing" || bad "a refused run left a record"
 
 echo "=== every run leaves a complete record ==="

@@ -120,6 +120,9 @@ def main(argv):
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         refuse("no command given after --")
+    if command[0].startswith("-"):
+        refuse("'%s' is not a command — an option the runner does not know, or several options "
+               "passed as one word (an unquoted variable in zsh is not split)" % command[0])
     if not args.cwd:
         refuse("--cwd is required: a command with no named directory runs wherever the caller happens to be")
     if not os.path.isabs(args.cwd):
