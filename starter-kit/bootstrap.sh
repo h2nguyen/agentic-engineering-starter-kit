@@ -147,6 +147,11 @@ fi
 for rule in "${DEFAULT_RULES[@]}"; do
   install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
 done
+# A rule file is loaded into every session, so the two long ones keep only
+# their imperative there and point at these for the worked examples and the
+# gotcha write-ups. One location for every tool, outside the rules directory:
+# read when the pointer is followed, never loaded by default.
+install_tree rules/reference docs/rule-reference || true
 if [ "$TOOL" = claude ]; then
   install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
   install_dir skills/semver .claude/skills/semver || true
@@ -281,6 +286,7 @@ echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' <co
 echo "     Then the project rows of the comments-and-annotations rule: the second half of"
 echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
 echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
+echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
 echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
 echo "  2. Enable common generic skills — see $(basename "$KIT_DIR")/skills/common-catalog.md."
 echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"

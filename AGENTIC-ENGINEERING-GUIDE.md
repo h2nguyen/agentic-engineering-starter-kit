@@ -231,6 +231,7 @@ your-repo/
 │   └── <date>-<slug>.md             #   categories are `## ` headings inside
 ├── docs/
 │   ├── agent-templates/             # rule, check-script, skill and reviewer templates — copied, never loaded
+│   ├── rule-reference/              # worked examples and gotchas the long rules point at — read on demand
 │   ├── DEBUGGING-KNOWLEDGE-BASE.md  # generated from the fragment directory
 │   └── DEBUGGING-KNOWLEDGE-BASE.d/  # one file per entry — the authored source
 └── scripts/
@@ -341,6 +342,7 @@ Shortcut, and a `Related:` line naming the rule or check that now prevents it
 5. Cross-reference sibling rule files rather than duplicating (duplicated rules drift).
 6. Document reality, not aspiration. A rule the codebase itself violates everywhere trains agents to ignore rules; either fix the code or scope the rule ("new code follows X; migrate legacy files only when touched").
 7. **Cross-cutting concerns earn a rule file early.** Security (AuthN/AuthZ defaults, secret handling, data classification), infrastructure & deployment, and messaging/integration contracts span modules — no single file teaches them by example, which is exactly where agents most need written rules. Testing and per-language conventions are the other early candidates.
+8. **Keep what is always loaded lean.** A rule file is paid for in every session. Once one passes ~200 lines, keep the imperative, the litmus tests and the tables a reader fills in, and *move* the worked examples, anti-pattern galleries and gotcha write-ups to an on-demand reference, leaving a pointer — move, never summarise, so nothing is lost. The starter kit's two longest rules ship this way (`rules/reference/`, installed to `docs/rule-reference/`), and a gate holds every shipped rule under a ceiling.
 
 **Template** (starter kit: `rules/_rule-template.md`)
 

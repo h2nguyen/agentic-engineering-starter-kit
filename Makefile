@@ -11,16 +11,18 @@
 #
 # The top-level scripts/ directory holds gates that check this repository's
 # own documents and are not part of the kit: check-guide-templates.sh keeps
-# the guide's embedded templates identical to the kit files they name.
+# the guide's embedded templates identical to the kit files they name, and
+# check-rule-budget.sh keeps the rule files the kit ships short enough to be
+# loaded into every session.
 
 KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
         graph-links graph-impact graph-coverage ci-lint-coverage guide-templates \
-        kit-smoke
+        rule-budget kit-smoke
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates test
+lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates rule-budget test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
@@ -68,6 +70,11 @@ ci-lint-coverage:
 ## guide-templates — every template the guide embeds matches its kit file.
 guide-templates:
 	scripts/check-guide-templates.sh
+
+## rule-budget — every rule file the kit ships stays under the line ceiling
+## for an always-loaded file; worked examples live in rules/reference/.
+rule-budget:
+	scripts/check-rule-budget.sh
 
 ## kit-smoke — bootstrap into a throwaway repo and run its gates there.
 kit-smoke:
