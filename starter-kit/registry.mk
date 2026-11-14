@@ -9,16 +9,17 @@
 # behind the kit's Makefile.template, so there is exactly one copy of these
 # targets to maintain.
 #
-# If the umbrella lint target does not reach registry-drift, registry-ids and
-# graph-links, check-ci-lint-coverage.sh fails and says so — an installed gate that nothing
-# runs is indistinguishable from no gate at all.
+# If the umbrella lint target does not reach every one of those five gates,
+# check-ci-lint-coverage.sh fails and names the one it misses — an installed
+# gate that nothing runs is indistinguishable from no gate at all.
 
 # Python is started through scripts/python.sh, which finds it under whatever
 # name this machine gives it (python3, python, py -3). To choose one yourself:
 #     make lint PYTHON=/path/to/python
 
 .PHONY: registry-generate registry-list registry-drift registry-ids kb-shape \
-        graph-links graph-impact graph-coverage ci-lint-coverage registry-test
+        graph-links graph-impact graph-coverage ci-lint-coverage constitution \
+        registry-test
 
 ## registry-generate — assemble every registry artifact from its fragments.
 registry-generate:
@@ -64,6 +65,13 @@ graph-coverage:
 ci-lint-coverage:
 	./scripts/check-ci-lint-coverage.sh
 
+## constitution — the constitution links only to files that exist and has no
+## template placeholder left. Run it after filling the constitution in, and
+## after editing it. Not a prerequisite of lint as shipped; to hold it on every
+## pull request, add `constitution` to your lint line.
+constitution:
+	./scripts/check-constitution.sh
+
 ## registry-test — the registry layer's own suites. -B: the kit installs no
 ## .gitignore, so its tools must not leave a __pycache__ in your repository.
 ## -b: the suites exercise the gates' failure paths, and a passing run must
@@ -71,6 +79,7 @@ ci-lint-coverage:
 registry-test:
 	./scripts/python.sh -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
 	./scripts/tests/test-ci-lint-coverage.sh
+	./scripts/tests/test-constitution.sh
 	./scripts/tests/test-parallel-merge.sh
 	./scripts/tests/test-graph-links.sh
 	./scripts/tests/test-python-launcher.sh

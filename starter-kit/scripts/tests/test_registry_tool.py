@@ -181,6 +181,19 @@ class TestNumericIdentifiers(RegistryTestCase):
         self.entry("014-fourteenth.md")
         self.assertEqual(rt.next_number(self.registry()), "015")
 
+    def test_a_date_named_file_is_rejected_as_a_date_not_as_a_width(self):
+        # At width 3 the name never matched. The message used to ask for a
+        # "3-digit number", which does not tell the author what they did.
+        path = self.entry("2026-11-14-cache-warms.md")
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.registry().id_for(path)
+        self.assertIn("named by date", str(caught.exception))
+
+    def test_allocation_does_not_count_a_year_as_a_number(self):
+        self.entry("001-first.md")
+        self.entry("2026-11-14-cache-warms.md")
+        self.assertEqual(rt.next_number(self.registry()), "002")
+
 
 class TestGeneration(RegistryTestCase):
     def test_entries_are_ordered_deterministically(self):
@@ -607,6 +620,48 @@ class TestFilenamePrefix(RegistryTestCase):
         self.adr("adr-0001-also-one.md")
         self.assertEqual(self.run_tool("check", "--registry", "adr"), 1)
 
+    # A registry that numbers its records at width 4 — the MADR convention,
+    # and adr-tools' — matched a date-named file: `adr-2026-11-14-x.md` read
+    # as number 2026 with the slug `11-14-x`. One such file passed every gate
+    # as ADR-2026; the next `new` allocated 2027; two in a year collided.
+    def test_a_date_named_file_is_not_read_as_the_year(self):
+        path = self.adr("adr-2026-11-14-a-decision.md")
+        with self.assertRaises(rt.RegistryError) as caught:
+            self.registry().id_for(path)
+        message = str(caught.exception)
+        self.assertIn("named by date", message)
+        self.assertIn("ADR-2026", message)          # what it would have been read as
+        self.assertIn("adr-<4-digit number>-", message)  # what to rename it to
+
+    def test_check_fails_on_a_single_date_named_file(self):
+        # The quiet case: one file, so no duplicate to give it away.
+        self.adr("adr-0001-first.md")
+        self.adr("adr-2026-11-14-a-decision.md")
+        self.assertEqual(self.run_tool("check", "--registry", "adr"), 1)
+
+    def test_a_record_numbered_like_a_year_is_still_a_number(self):
+        # Control. 2026 is a legitimate number at width 4, and a title may
+        # open with digits; only a real calendar date after it is a date.
+        for name, why in (
+            ("adr-2026-a-decision.md", "the 2026th record"),
+            ("adr-2026-10-principles.md", "a title that opens with a number"),
+            ("adr-2026-13-45-odd-title.md", "two numbers that are no month and day"),
+            ("adr-0012-10-11-migration.md", "a low number is not a year"),
+        ):
+            with self.subTest(why):
+                path = self.adr(name)
+                self.assertEqual(self.registry().id_for(path), "ADR-" + name[4:8])
+                os.remove(path)
+
+    def test_allocation_ignores_a_date_named_file(self):
+        self.adr("adr-0003-third.md")
+        self.adr("adr-2026-11-14-a-decision.md")
+        self.assertEqual(rt.next_number(self.registry()), "0004")
+
+    def test_allocation_still_follows_a_record_numbered_like_a_year(self):
+        self.adr("adr-2026-a-decision.md")
+        self.assertEqual(rt.next_number(self.registry()), "2027")
+
     def test_prefix_works_with_the_slug_scheme_too(self):
         config = json.loads(self.read("registries.json"))
         for registry in config["registries"]:
@@ -876,6 +931,45 @@ class TestInit(unittest.TestCase):
         self.write("docs/adr/adr-0007-thing.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
         adr = self.registry(self.init(), "adr")
         self.assertEqual((adr["filename_prefix"], adr["id_width"]), ("adr-", 4))
+
+    # Date-named decision records are the kit's own default and a common
+    # convention besides. `init` read the year as a 4-digit number, declared
+    # the directory numeric, and said "existing names and identifiers
+    # preserved" about records that then all collided on ADR-<year>.
+    def test_date_named_records_are_declared_date_slug_not_numeric(self):
+        self.write("docs/adr/adr-2026-11-14-first.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/adr-2026-11-15-second.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual(adr["id_scheme"], "slug")
+        self.assertEqual(adr["filename_prefix"], "adr-")
+        self.assertEqual(rt.main(["check", "--registry", "adr"]), 0)
+
+    def test_date_named_records_without_a_prefix_keep_their_names(self):
+        self.write("docs/adr/2026-11-14-first.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/2026-12-01-second.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual((adr["id_scheme"], adr["filename_prefix"]), ("slug", ""))
+        self.assertEqual(rt.main(["check", "--registry", "adr"]), 0)
+
+    def test_the_note_for_date_named_records_says_what_was_declared(self):
+        self.write("docs/adr/adr-2026-11-14-first.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        _, out = self.init_output()
+        self.assertIn("YYYY-MM-DD", out)
+        self.assertNotIn("numeric", out.split("decision records:")[1].splitlines()[0])
+
+    def test_records_numbered_like_years_are_still_numeric(self):
+        # Control: 1999-…, 2000-… with no month and day are numbers.
+        self.write("docs/adr/1999-first.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/2000-second.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual((adr["id_scheme"], adr["id_width"], adr["filename_prefix"]), ("numeric", 4, ""))
+        self.assertEqual(rt.main(["check", "--registry", "adr"]), 0)
+
+    def test_a_directory_mixing_dates_and_numbers_is_not_called_numeric(self):
+        self.write("docs/adr/0001-first.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        self.write("docs/adr/2026-11-14-second.md", "# t\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        adr = self.registry(self.init(), "adr")
+        self.assertEqual(adr["id_scheme"], "slug")  # the default; the gate names what does not fit
 
     def test_docs_decisions_directory_is_found(self):
         self.write("docs/decisions/0001-x.md", "# x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")

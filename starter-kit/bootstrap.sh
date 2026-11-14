@@ -5,6 +5,10 @@
 # installs the kit's ready-to-use files to that tool's expected locations.
 # Never overwrites an existing file; safe to re-run.
 #
+# Which tool: --tool if given; else the one tool whose files the target has;
+# else it asks. A target with the files of several tools is asked about too —
+# and with no terminal to ask at, the run fails before it writes anything.
+#
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
@@ -18,7 +22,8 @@
 #             repo already has), .gitattributes (appended to if present),
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
 #             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
-#             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh)
+#             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh,
+#             check-constitution.sh)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
@@ -38,7 +43,7 @@ while [ $# -gt 0 ]; do
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -56,27 +61,66 @@ if [ "$TARGET_GIVEN" -eq 0 ] && [ -f "$TARGET/AGENTIC-ENGINEERING-GUIDE.md" ] \
   exit 1
 fi
 
-detect_tool() {
-  if [ -d "$TARGET/.claude" ] || [ -f "$TARGET/CLAUDE.md" ]; then echo claude; return; fi
-  if [ -d "$TARGET/.cursor" ] || [ -f "$TARGET/.cursorrules" ]; then echo cursor; return; fi
-  if [ -f "$TARGET/.github/copilot-instructions.md" ]; then echo copilot; return; fi
-  if [ -f "$TARGET/AGENTS.md" ]; then echo agents; return; fi
-  echo ""
+# Every tool whose files the target already has: one line each, the tool's
+# name and then what gave it away. Not the first match — a repository can
+# carry the files of several tools, and which one the kit installs for is the
+# adopter's decision, not the order of these lines.
+detect_tools() {
+  local found
+  found=""
+  [ -d "$TARGET/.claude" ] && found="$found .claude/"
+  [ -f "$TARGET/CLAUDE.md" ] && found="$found CLAUDE.md"
+  [ -n "$found" ] && echo "claude $found"
+  found=""
+  [ -d "$TARGET/.cursor" ] && found="$found .cursor/"
+  [ -f "$TARGET/.cursorrules" ] && found="$found .cursorrules"
+  [ -n "$found" ] && echo "cursor $found"
+  # Cursor's layout keeps its constitution in AGENTS.md, so beside Cursor's
+  # own files that file is Cursor's, not a second tool. This is also what
+  # lets a re-run on a Cursor install detect Cursor again.
+  if [ -z "$found" ] && [ -f "$TARGET/AGENTS.md" ]; then echo "agents  AGENTS.md"; fi
+  [ -f "$TARGET/.github/copilot-instructions.md" ] && echo "copilot  .github/copilot-instructions.md"
+  return 0
 }
 
+# Decided before anything is written: --tool, else the one tool detected, else
+# a question. Several detected tools are a question too, and with nobody at a
+# terminal to answer it the run ends here, with the repository as it was.
 if [ -z "$TOOL" ]; then
-  TOOL="$(detect_tool)"
-  [ -n "$TOOL" ] && echo "Detected agentic tool: $TOOL"
-fi
-if [ -z "$TOOL" ]; then
-  if [ -t 0 ]; then
-    printf "No agentic tool detected in %s.\nWhich tool will this repo use? [claude/agents/cursor/copilot]: " "$TARGET"
-    read -r TOOL
-  else
-    echo "ERROR: no agentic tool detected and no --tool given." >&2
-    echo "Re-run with: ./bootstrap.sh --tool claude|agents|cursor|copilot" >&2
-    exit 1
-  fi
+  DETECTED="$(detect_tools)"
+  CANDIDATES="$(printf '%s\n' "$DETECTED" | sed '/^$/d' | sed 's/ .*//' | tr '\n' '|' | sed 's/|$//')"
+  case "$CANDIDATES" in
+    "")
+      if [ -t 0 ]; then
+        printf "No agentic tool detected in %s.\nWhich tool will this repo use? [claude/agents/cursor/copilot]: " "$TARGET"
+        read -r TOOL
+      else
+        echo "ERROR: no agentic tool detected and no --tool given." >&2
+        echo "Re-run with: ./bootstrap.sh --tool claude|agents|cursor|copilot" >&2
+        exit 1
+      fi
+      ;;
+    *"|"*)
+      if [ -t 0 ]; then
+        printf "More than one agentic tool is set up in %s:\n" "$TARGET"
+        printf '%s\n' "$DETECTED" | sed 's/^\([a-z]*\) *\(.*\)$/  \1 (\2)/'
+        printf "Which one is primary — the one to install for? [%s]: " "$(printf '%s' "$CANDIDATES" | tr '|' '/')"
+        read -r TOOL
+      else
+        {
+          echo "ERROR: more than one agentic tool is set up in $TARGET, and no --tool was given:"
+          printf '%s\n' "$DETECTED" | sed 's/^\([a-z]*\) *\(.*\)$/  \1 (\2)/'
+          echo "The installer does not pick one for you. Name the primary tool; nothing was written:"
+          echo "    $0 --tool $CANDIDATES --target $TARGET"
+        } >&2
+        exit 1
+      fi
+      ;;
+    *)
+      TOOL="$CANDIDATES"
+      echo "Detected agentic tool: $TOOL"
+      ;;
+  esac
 fi
 case "$TOOL" in
   claude|agents|cursor|copilot) ;;
@@ -135,11 +179,11 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
       INSTALLED+=("$2/$rel")
       any=0
     fi
-  # The two suites that test this installer stay in the kit: a repository it
+  # The suites that test this installer stay in the kit: a repository it
   # installs into has no bootstrap.sh for them to run.
   done < <(find "$src" -type f ! -name '*.pyc' ! -path '*/__pycache__/*' \
              ! -name 'test-bootstrap-rerun.sh' ! -name 'test-brownfield-adoption.sh' \
-             ! -name 'test-graph-hooks.sh')
+             ! -name 'test-upgrade.sh' ! -name 'test-graph-hooks.sh')
   return $any
 }
 
@@ -251,6 +295,11 @@ install_file scripts/check-ci-lint-coverage.sh scripts/check-ci-lint-coverage.sh
 # nothing resolves it is a citation nobody will know has gone stale.
 install_file scripts/graph_tool.py scripts/graph_tool.py x || true
 install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
+# The constitution's own check: its links name files that exist, and no
+# template placeholder is left in it. A command the next steps name
+# (`make constitution`), not a prerequisite of `lint`: it would fail a
+# constitution that passed before, and that is the adopter's call to make.
+install_file scripts/check-constitution.sh scripts/check-constitution.sh x || true
 install_tree scripts/tests scripts/tests || true
 
 # The templates a workspace grows from. They used to stay in the kit, and a
@@ -345,7 +394,10 @@ else
     echo "     On $TOOL nothing loads a skill by itself: one you want becomes a playbook"
     echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."
   fi
-  echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
+  echo "  3. Run 'make constitution'. It fails, naming the line, for as long as $CONSTITUTION"
+  echo "     links to a file that does not exist or still carries a template <placeholder> —"
+  echo "     'make lint' does not check either, so a green lint does not mean step 1 is done."
+  echo "     Then run 'make lint' — the registry gates, the knowledge-base shape check, the"
   echo "     typed-link gate and the CI-coverage check are already chained into it, and"
   echo "     the installed workflow invokes that same target so nothing can fall out of CI."
 fi

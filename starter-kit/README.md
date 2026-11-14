@@ -30,7 +30,7 @@ names the interpreter yourself. On Windows, run the kit from Git Bash (with
 
 ```bash
 # from a checkout of this kit — nothing but the installed files lands in your repo
-./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool, or asks
+./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool; asks if it finds none, or several
 ./starter-kit/bootstrap.sh --target /path/to/your-repo --tool claude   # or name it explicitly
 ./starter-kit/bootstrap.sh --target /path/to/your-repo --with-meta     # later, at Level 4: + self-improvement loop
 ```
@@ -51,8 +51,10 @@ lossless-first remediation, approval-gated changes — existing working
 conventions beat the blueprint's defaults (guide § 4.4).
 
 `bootstrap.sh` detects which agentic tool the repo uses (`.claude`/`CLAUDE.md`,
-`.cursor`, `.github/copilot-instructions.md`, `AGENTS.md`), asks when nothing is
-detected, installs the constitution + the universal rule files (working
+`.cursor`, `.github/copilot-instructions.md`, `AGENTS.md`). When it finds none,
+or the files of more than one, it asks which — and where there is no terminal
+to ask at (an agent, CI) it stops before writing anything and says to pass
+`--tool`. It never picks one of several for you. It then installs the constitution + the universal rule files (working
 principles, documentation, comments & annotations, versioning & changelog,
 shared registries) + the
 knowledge-base and changelog skeletons in their fragment layout + the
@@ -63,8 +65,9 @@ skills on Claude Code, and the hook that hands the typed links to the agent —
 [below](#the-workspace-graph-hook-claude-code)) to that tool's locations, and
 never overwrites existing files. Then: fill in the constitution's `<placeholders>` and the project rows of
 the comments-and-annotations rule
-([how](#adopting-the-comments-and-annotations-rule)), run `make lint` to
-confirm the gates pass, enable further common skills from
+([how](#adopting-the-comments-and-annotations-rule)), run `make constitution`
+until it stops naming placeholders and links to files that do not exist, run
+`make lint` to confirm the gates pass, enable further common skills from
 `skills/common-catalog.md`, and commit.
 
 ## Contents → target locations (manual path)
@@ -97,7 +100,8 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
 | `scripts/graph_tool.py` | `scripts/graph_tool.py` | Ready to run — `check` (the gate), `impact <KIND:name>` (what cites an artifact, and what it cites), `coverage` (which rules a script enforces and an agent reviews). Rebuilt from the files on every run, so there is nothing to regenerate |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption and bootstrap re-run suites test the installer itself, so they stay in the kit |
+| `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist or still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade and hook suites test the installer and the Claude Code hook, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | `docs/agent-templates/_rule-template.md` | Template — copy per new domain rule file (installed by bootstrap; never loaded) |
@@ -126,14 +130,19 @@ confirm the gates pass, enable further common skills from
    auth, and messaging/integration rows), commands, and the 3–5 rules you already
    know are non-negotiable. Then the project rows of the comments-and-annotations
    rule — next section.
-3. Run `make lint`. All five gates should pass on a fresh install with no
+3. Run `make constitution`. It lists, by line, every template placeholder
+   still in the constitution and every link to a file that does not exist —
+   the template links two example rules, `testing.md` and `security.md`, that
+   no install has. It passes when step 2 is really done; `make lint` does not
+   look at either.
+4. Run `make lint`. All five gates should pass on a fresh install with no
    `git config` and no other setup — that is the check that the registry layer
    actually landed rather than merely being present.
-4. Enable the generic skills worth having from day one — see
+5. Enable the generic skills worth having from day one — see
    [`skills/common-catalog.md`](skills/common-catalog.md) (semver decisions,
    architecture review, architecture docs).
-5. Commit. The setup is live.
-6. Grow by signal, not speculation: rules when you repeat an instruction, skills
+6. Commit. The setup is live.
+7. Grow by signal, not speculation: rules when you repeat an instruction, skills
    when you repeat a workflow, agents when you repeat a review comment,
    enforcement scripts when a documented rule gets violated anyway. See the
    guide § 4–§ 5.
@@ -159,6 +168,12 @@ whichever version you started from. For why a file changed, search the kit's
    Its "Installed" list is what the newer kit added. Everything under
    "Skipped" was left as it was. If you keep your own Makefile, it also names
    any gate your `lint` target does not reach yet (step 5).
+
+   If your repository carries the files of more than one agent tool — a
+   `CLAUDE.md` beside an `AGENTS.md`, `.claude/` beside `.cursor/` — the
+   installer stops before writing and lists them: add `--tool <the one this
+   kit was installed for>` to the command. Earlier versions picked one
+   silently.
 2. **Replace the files the kit owns.** They hold nothing of your project, so
    copying is safe — unless you changed one yourself. The first command lists
    the commits that touched them; a file one of your own commits changed is
@@ -169,11 +184,12 @@ whichever version you started from. For why a file changed, search the kit's
    cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
    cp "$KIT"/starter-kit/registry.mk registry.mk
    cp "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md docs/DEBUGGING-KNOWLEDGE-BASE.d/
-   rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh
+   rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh scripts/tests/test-upgrade.sh scripts/tests/test-graph-hooks.sh
    ```
-   The last line removes the two suites that test the installer; they stay in
-   the kit and are not run from your repository. Your own `check-*.sh` scripts
-   and tests are not touched: only files the kit has are copied.
+   The last line removes the four suites that test the installer and the
+   Claude Code hook; they stay in the kit and are not run from your
+   repository. Your own `check-*.sh` scripts and tests are not touched: only
+   files the kit has are copied.
 
    The templates in `docs/agent-templates/` are the kit's too. To refresh
    them, delete the directory and run step 1 again — the installer puts them
@@ -224,13 +240,22 @@ whichever version you started from. For why a file changed, search the kit's
    (Claude Code only.) The constitution template is the third; a change to it
    is named in the kit's changelog.
 5. **Chain any new gate into your lint target.** If you keep your own
-   Makefile, its `lint:` line must name every gate `registry.mk` defines —
-   `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`.
+   Makefile, its `lint:` line must name every gate the kit installed —
+   `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`. The
+   coverage gate holds you to all five now; it used to check three, so a
+   `lint:` line without `kb-shape` or `ci-lint-coverage` passed and no longer
+   does. `constitution` is the one target `registry.mk` defines that is yours
+   to add or leave ([The constitution check](#the-constitution-check)).
 6. **Run `make lint` and fix what it reports.** Each failure names the file,
    the line and the fix. If your repository had no `scripts/graph_tool.py`
    before step 1, expect one kind: a check script whose header still reads
    `# Enforces: <rule> — see <file>` must name its rule as a token,
    `# Enforces: RULE:<name> — <what it checks>`.
+
+`scripts/tests/test-upgrade.sh` in the kit runs these steps as written
+here — against an install shaped like 1.x and, where the kit's history has the
+tag, against a real 1.1.0 install — and checks that what is yours comes out
+byte for byte as it went in.
 
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
@@ -241,12 +266,50 @@ workspace — and, where you keep one, a line in the workspace changelog.
 | `make lint` says | What it means | Do this |
 |---|---|---|
 | `<file>:<line> — … link 'RULE:x' resolves to nothing` | A typed link names an artifact that was renamed, deleted or never written | Fix the citing line; the message lists the names that exist. `make graph-impact NODE=RULE:x` shows what cites an artifact *before* you rename it |
-| `check-graph-links.sh is installed but 'lint' never runs it` | Your own Makefile does not chain the gate | Add `graph-links` to the `lint:` prerequisites |
+| `check-<gate>.sh is installed but 'lint' never runs it` | Your own Makefile does not chain a gate the kit installed. All five are held: `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` | Add the target the message names to the `lint:` prerequisites |
+| `more than one agentic tool is set up … no --tool was given` | The installer found the files of several agent tools and nobody to ask | Re-run with `--tool` naming the one to install for. Nothing was written |
+| `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
 | `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
+| `… is named by date, and this registry numbers its records` | A fragment was named `YYYY-MM-DD-<slug>.md` where `registries.json` declares `"id_scheme": "numeric"`. At width 4 it would be read as record number `<year>` | Rename it to the numbered form the message shows; `registry_tool.py new --registry <name> --title "…"` allocates the number. If the records really are date-named and the declaration is wrong — an install made before this was fixed — set `"id_scheme": "slug"` for that registry |
 | `duplicate identifier … claimed by 2 fragments` | Two branches took the same number | Rename the fragment that has not been merged yet. Never renumber one that has |
 | `python3: command not found`, `Python was not found`, or `no Python 3.9 or newer found` | Python has another name on this machine, or is older than 3.9 | Nothing the kit runs names `python3` — if a command you typed did, run it as `./scripts/python.sh scripts/…`. `./scripts/python.sh --which` prints the interpreter it found; `PYTHON=/path/to/python` names one |
-| `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step | Have the workflow run `make lint`, the aggregate target |
+| `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step the gate can read: only a `run:` step of a workflow that a push, pull request or merge queue triggers — or of a reusable workflow one of those calls by a local path — counts, in the repository root | Have that workflow run `make lint`, the aggregate target. The lines under "Read and not counted" say what was seen and why it did not count |
+
+## The constitution check
+
+`make constitution` reads the constitution — `CLAUDE.md`, `AGENTS.md` or
+`.github/copilot-instructions.md`, whichever the repository has — and fails,
+with the file and line, on two things:
+
+| It reports | For instance |
+|---|---|
+| A relative Markdown link to a file or directory that does not exist | The template's `testing.md` and `security.md` lines, left in a project that never wrote those rules; a rule that was renamed without its index line |
+| A template placeholder nobody filled in: `<…>` that opens with a letter and contains a space, outside code | `<Project Name>`, `<language, framework, versions>`, `<add one line per rule file …>` |
+
+`make lint` checks neither. The typed-link gate resolves `Related:`,
+`Enforces:` and `Hands off to:` lines, not ordinary links, so a constitution
+can be committed half filled in with every gate green — which is what this
+check was written after.
+
+What it leaves alone, on purpose: anything inside a fenced block or
+`backticks` (`--title "<symptom>"`, `RULE:<name>`), HTML tags and comments,
+autolinks, a single word in angle brackets (`Option<T>`), web links — and
+every file that is not the constitution. Rule files and `docs/rule-reference/`
+are full of `<IDENTIFIER>` shapes that are the point of those documents.
+
+It ships **unchained**: `lint` does not run it. A check that is on by default
+and can fail a constitution that passed yesterday is a breaking change for
+every repository that upgrades, and whether to hold your constitution on
+every pull request is your decision. To do so, add the target to your own
+line — nothing else is needed:
+
+```make
+lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage constitution <your existing prerequisites>
+```
+
+Other files can be checked the same way by naming them:
+`./scripts/check-constitution.sh docs/PLAYBOOK.md`.
 
 ## The workspace-graph hook (Claude Code)
 

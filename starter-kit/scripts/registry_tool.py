@@ -179,6 +179,21 @@ class Registry:
         reintroduce exactly the drift this design removes.
         """
         stem = os.path.splitext(os.path.basename(path))[0]
+        if self.id_scheme == "numeric" and stem.startswith(self.filename_prefix) \
+                and starts_with_date(stem[len(self.filename_prefix):]):
+            # At width 4 the numeric pattern matches this name — the year as
+            # the number, the month and day as the start of the slug — so it
+            # has to be refused before the pattern is asked.
+            year = stem[len(self.filename_prefix):][:4]
+            raise RegistryError(
+                f"{self.rel(path)}:1 — {stem!r} is named by date, and this registry "
+                f"numbers its records.\n"
+                f"  Read as a number it would be {self.id_prefix + '-' if self.id_prefix else ''}{year}"
+                f" — the year — and the next `new` would count on from there.\n"
+                f"  Rename it to {self._stem_hint()}; `registry_tool.py new "
+                f"--registry {self.name} --title \"…\"` allocates the number.\n"
+                f"  See {self.rule_pointer}."
+            )
         match = self.stem_regex().match(stem)
         if not match:
             raise RegistryError(
@@ -204,6 +219,28 @@ class Registry:
         if self.id_scheme == "slug":
             return f"{head}YYYY-MM-DD-<lowercase-slug>.md"
         return f"{head}<{self.id_width}-digit number>-<lowercase-slug>.md"
+
+
+def starts_with_date(text: str) -> bool:
+    """True when text opens with `YYYY-MM-DD-`, a day that exists.
+
+    This is what tells a date-named file from a numbered one. `2026-11-14-x`
+    is a date; `2026-a-decision` is record 2026, `2026-10-principles` is
+    record 2026 with a title that opens with a number, and `2026-13-45-x` is
+    no day at all. Years outside 1900–2199 are numbers too: record 12 may be
+    titled "10 11 migration".
+    """
+    match = re.match(r"(\d{4})-(\d{2})-(\d{2})-", text)
+    if not match:
+        return False
+    year, month, day = (int(part) for part in match.groups())
+    if not 1900 <= year <= 2199:
+        return False
+    try:
+        _dt.date(year, month, day)
+    except ValueError:
+        return False
+    return True
 
 
 def load_registries(args) -> tuple[list[Registry], str, dict]:
@@ -682,7 +719,12 @@ def next_number(reg: Registry) -> str:
     highest = 0
     head = re.escape(reg.filename_prefix)
     for path in fragment_paths(reg):
-        match = re.match(head + r"(\d+)-", os.path.splitext(os.path.basename(path))[0])
+        stem = os.path.splitext(os.path.basename(path))[0]
+        # A date-named file is not record number <year>. `check` reports it;
+        # the allocator must not count on from it in the meantime.
+        if stem.startswith(reg.filename_prefix) and starts_with_date(stem[len(reg.filename_prefix):]):
+            continue
+        match = re.match(head + r"(\d+)-", stem)
         if match:
             highest = max(highest, int(match.group(1)))
     return str(highest + 1).zfill(reg.id_width)
@@ -1065,7 +1107,28 @@ def _infer_numbered_convention(paths: list[str]) -> tuple[str, int] | None:
         match = re.match(r"^([A-Za-z]+[-_])?(\d+)-", stem)
         if not match:
             return None
+        # A date is not a 4-digit number. Read as one, every record of a year
+        # is the same identifier.
+        if starts_with_date(stem[len(match.group(1) or ""):]):
+            return None
         seen.add((match.group(1) or "", len(match.group(2))))
+    return next(iter(seen)) if len(seen) == 1 else None
+
+
+def _infer_dated_convention(paths: list[str]) -> str | None:
+    """The filename_prefix shared by files that are ALL named by date.
+
+    `adr-2026-11-14-title.md` gives "adr-", `2026-11-14-title.md` gives "".
+    None when a file is not date-named or the prefixes differ.
+    """
+    seen: set[str] = set()
+    for path in paths:
+        stem = os.path.splitext(os.path.basename(path))[0]
+        match = re.match(r"^([A-Za-z]+[-_])?", stem)
+        prefix = match.group(1) or ""
+        if not starts_with_date(stem[len(prefix):]):
+            return None
+        seen.add(prefix)
     return next(iter(seen)) if len(seen) == 1 else None
 
 
@@ -1170,7 +1233,15 @@ def cmd_init(args) -> int:
     ]
     if existing:
         inferred = _infer_numbered_convention(existing)
-        if inferred:
+        dated = _infer_dated_convention(existing)
+        if dated is not None:
+            adr["filename_prefix"] = dated
+            notes.append(
+                f"decision records: {len(existing)} existing files in {adr_dir}/ named "
+                f"{dated}YYYY-MM-DD-<slug>.md -> date-slug scheme, filename_prefix "
+                f"{dated!r}, cited as ADR-YYYY-MM-DD-<slug> (existing names preserved)"
+            )
+        elif inferred:
             adr["filename_prefix"], adr["id_width"] = inferred
             adr["id_scheme"] = "numeric"
             shown = f"{inferred[0]}{'N' * inferred[1]}-<slug>.md"

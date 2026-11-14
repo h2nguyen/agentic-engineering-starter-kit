@@ -43,22 +43,28 @@ fi
 # scripts land in scripts/ while `make lint` keeps running only what it ran
 # before — green, and checking nothing of the registry layer. `make -n lint`
 # prints every command the target would run, transitively, which is the exact
-# question: would the drift, identifier and link gates execute?
+# question: would every gate the kit installed here execute?
+#
+# All five, this one included. The list used to stop at three, and a lint
+# line that dropped `kb-shape` left the knowledge-base check installed,
+# described as enforced, and never run — with this gate green.
 if [ -f registries.json ] && [ -f scripts/check-registry-drift.sh ]; then
   dry="$(make -n "$TARGET" -f "$MAKEFILE" 2>/dev/null || true)"
-  for gate in check-registry-drift.sh check-registry-ids.sh check-graph-links.sh; do
-    # The link gate arrived after the registry gates. A repository that
-    # installed the kit before it has no such file and owes it nothing; one
-    # that has the file is held to the same standard as the other two.
-    if [ "$gate" = check-graph-links.sh ] && [ ! -f "scripts/$gate" ]; then
-      continue
-    fi
+  for gate in check-registry-drift.sh check-registry-ids.sh check-kb-shape.sh check-graph-links.sh check-ci-lint-coverage.sh; do
+    # The gates arrived over several releases, and a repository is held to the
+    # ones it has: an install from before the link gate has no such file and
+    # owes it nothing. The two registry gates came together and are always owed.
+    case "$gate" in
+      check-registry-drift.sh|check-registry-ids.sh) ;;
+      *) [ -f "scripts/$gate" ] || continue ;;
+    esac
     # A pattern match, not `printf | grep -q`: grep -q exits at the first match,
     # the writer gets SIGPIPE on a large dry run, and pipefail turned a gate that
     # IS reached into "never runs it".
     if [[ "$dry" != *"$gate"* ]]; then
       echo "FAIL: scripts/$gate is installed but '$TARGET' never runs it."
-      echo "  The gate exists and gates nothing. Chain it into the umbrella target:"
+      _target="${gate#check-}"; _target="${_target%.sh}"
+      echo "  The gate exists and gates nothing. Add '$_target' to the umbrella target:"
       echo "      include registry.mk"
       echo "      lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
       echo "  See the shared-registries rule § 'A Makefile target is not a CI step'."
@@ -84,11 +90,27 @@ fi
 # count — a check that passes on a comment is exactly the kind of gate that
 # silently stops gating — and neither must a run that cannot reach this
 # Makefile. So only the `run:` value of a step counts, read as shell, and only:
-#   - in a workflow a push, pull request or merge queue triggers (or one that
-#     such a workflow calls), never one that only runs by hand or on a schedule;
+#   - in a workflow a push, pull request or merge queue triggers, never one
+#     that only runs by hand or on a schedule;
+#   - or in a reusable workflow (`on: workflow_call`) that such a workflow
+#     reaches through `uses: ./.github/workflows/<file>`, directly or through
+#     other reusable workflows. Being callable is not being called: a reusable
+#     workflow that nothing reaches covers nothing;
 #   - in a job and step that are not switched off with `if: false`;
-#   - in this directory — no `working-directory:`, `cd elsewhere`, `make -C dir`
-#     or `make -f other` — and for real, not `make -n` / `-q` / `-t`.
+#   - in this directory — the step's `working-directory`, else the job's
+#     default, else the workflow's, else the root; no `cd elsewhere`,
+#     `make -C dir` or `make -f other` — and for real, not `make -n`/`-q`/`-t`.
+#
+# What this can and cannot establish. It reads text and runs nothing. It
+# cannot know that a job's `if:` turns out false at run time, that a matrix is
+# empty, that a branch or path filter excludes every change, or what a script
+# a step calls goes on to do. So it errs one way on purpose: a form it cannot
+# read is never counted as coverage — a workflow in another repository
+# (`owner/repo/…@ref`), a `uses:` built from an expression, a workflow that is
+# not block-style YAML, a `make` reached through a wrapper script, a variable
+# or `eval`. "Covered" means a step that is not visibly switched off names the
+# target: evidence that CI runs it, not proof.
+#
 # A deliberately small YAML reader (block style, which is how workflows are
 # written): the kit stays stdlib-only, and an unreadable workflow covers nothing.
 # A function, not a here-document inside $(…), which bash 3.2 misparses.
@@ -97,7 +119,9 @@ list_ci_targets() {
 import os, re, shlex, sys
 
 makefile, files = sys.argv[1], sys.argv[2:]
-TRIGGERS = {"push", "pull_request", "pull_request_target", "merge_group", "workflow_call"}
+AUTOMATIC = {"push", "pull_request", "pull_request_target", "merge_group"}
+# The one form of call that names a file on disk. A local call takes no @ref.
+LOCAL_CALL = re.compile(r"\./(\.github/workflows/[^/@\s${}]+\.ya?ml)")
 
 
 def plain(text):
@@ -252,35 +276,84 @@ def run_targets(script):
     return found
 
 
-covered = set()
+def triggers(workflow):
+    on = workflow.get("on", workflow.get("true"))
+    return {on} if isinstance(on, str) else set(on or [])
+
+
+def working_directory(scope):
+    """The `defaults.run.working-directory` a workflow or a job sets, if any."""
+    defaults = scope.get("defaults") if isinstance(scope.get("defaults"), dict) else {}
+    run = defaults.get("run") if isinstance(defaults.get("run"), dict) else {}
+    return run.get("working-directory")
+
+
+def active_jobs(workflow):
+    jobs = workflow.get("jobs")
+    for name, job in (jobs.items() if isinstance(jobs, dict) else []):
+        if isinstance(job, dict) and not off(job.get("if", "")):
+            yield name, job
+
+
+workflows = {}
 for path in files:
     try:
         workflow = Reader(open(path, encoding="utf-8").read()).node(-1)
     except (OSError, UnicodeDecodeError):
         continue
-    if not isinstance(workflow, dict):
-        continue
-    on = workflow.get("on", workflow.get("true"))
-    triggers = {on} if isinstance(on, str) else set(on or [])
-    if not triggers & TRIGGERS:
-        continue
-    jobs = workflow.get("jobs")
-    for job in (jobs.values() if isinstance(jobs, dict) else []):
-        if not isinstance(job, dict) or off(job.get("if", "")):
+    if isinstance(workflow, dict):
+        workflows[os.path.normpath(path)] = workflow
+
+# Which workflows run without anyone asking: the ones an automatic trigger
+# starts, and the reusable ones those reach. `reached` is also what ends the
+# walk when two workflows call each other.
+notes = []
+reached = [path for path in sorted(workflows) if triggers(workflows[path]) & AUTOMATIC]
+for path in reached:  # grows while it is walked
+    for name, job in active_jobs(workflows[path]):
+        uses = job.get("uses")
+        if uses is None:
             continue
-        defaults = job.get("defaults") if isinstance(job.get("defaults"), dict) else {}
-        run_defaults = defaults.get("run") if isinstance(defaults.get("run"), dict) else {}
+        match = LOCAL_CALL.fullmatch(str(uses).strip())
+        callee = os.path.normpath(match.group(1)) if match else None
+        if callee is None:
+            notes.append("%s: job '%s' uses '%s', which is not a workflow file in this repository — "
+                         "what it runs cannot be read and is not counted." % (path, name, uses))
+        elif callee not in workflows:
+            notes.append("%s: job '%s' calls %s, which is missing or unreadable." % (path, name, callee))
+        elif "workflow_call" not in triggers(workflows[callee]):
+            notes.append("%s: job '%s' calls %s, which has no 'workflow_call' trigger and cannot be called."
+                         % (path, name, callee))
+        elif callee not in reached:
+            reached.append(callee)
+for path in sorted(set(workflows) - set(reached)):
+    if "workflow_call" in triggers(workflows[path]):
+        notes.append("%s is a reusable workflow that no push, pull-request or merge-queue workflow calls — "
+                     "its steps are not counted." % path)
+
+covered = set()
+for path in reached:
+    workflow = workflows[path]
+    for name, job in active_jobs(workflow):
         steps = job.get("steps")
         for step in (steps if isinstance(steps, list) else []):
             if not isinstance(step, dict) or "run" not in step or off(step.get("if", "")):
                 continue
-            if not same(str(step.get("working-directory") or run_defaults.get("working-directory") or "."), "."):
+            # The nearest setting wins: step, then job, then workflow, then the root.
+            where = next((d for d in (step.get("working-directory"), working_directory(job),
+                                      working_directory(workflow)) if d is not None), ".")
+            if not same(str(where), "."):
                 continue
             covered.update(run_targets(str(step["run"])))
-print("\n".join(sorted(covered)))
+for target in sorted(covered):
+    print("target\t" + target)
+for note in notes:
+    print("note\t" + note)
 PY
 }
-ci_targets="$(list_ci_targets)"
+ci_report="$(list_ci_targets)"
+ci_targets="$(printf '%s\n' "$ci_report" | sed -n 's/^target[[:space:]]//p')"
+ci_notes="$(printf '%s\n' "$ci_report" | sed -n 's/^note[[:space:]]//p')"
 
 runs_target() { # $1 = make target name
   case $'\n'"$ci_targets"$'\n' in *$'\n'"$1"$'\n'*) return 0 ;; esac
@@ -351,6 +424,11 @@ if [ "$fail" -ne 0 ]; then
     echo ""
     echo "or add each one as its own workflow step. Exempting it in $ALLOWLIST"
     echo "is the last resort, and needs a comment saying why."
+    if [ -n "$ci_notes" ]; then
+      echo ""
+      echo "Read and not counted — possibly why:"
+      printf '%s\n' "$ci_notes" | sed 's/^/  - /'
+    fi
   fi
   exit 1
 fi

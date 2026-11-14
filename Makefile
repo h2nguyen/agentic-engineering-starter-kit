@@ -18,22 +18,25 @@
 KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
-        graph-links graph-impact graph-coverage ci-lint-coverage guide-templates \
-        rule-budget kit-smoke
+        graph-links graph-impact graph-coverage ci-lint-coverage constitution \
+        guide-templates rule-budget kit-smoke
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates rule-budget test
+lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
 	$(KIT)/scripts/python.sh -B -m unittest discover -b -s $(KIT)/scripts/tests -p 'test_*.py'
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
+	$(KIT)/scripts/tests/test-constitution.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
 	$(KIT)/scripts/tests/test-graph-links.sh
 	$(KIT)/scripts/tests/test-python-launcher.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
+	$(KIT)/scripts/tests/test-upgrade.sh
 	$(KIT)/scripts/tests/test-graph-hooks.sh
+	scripts/tests/test-eval-run.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
@@ -72,6 +75,12 @@ graph-coverage:
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:
 	$(KIT)/scripts/check-ci-lint-coverage.sh
+
+## constitution — AGENTS.md and CLAUDE.md link only to files that exist. The
+## kit ships this check unchained and leaves the choice to the adopter; this
+## repository chains it.
+constitution:
+	$(KIT)/scripts/check-constitution.sh
 
 ## guide-templates — every template the guide embeds matches its kit file.
 guide-templates:

@@ -20,14 +20,19 @@ and change nothing.
 ## Installing the kit into a project
 
 The target is the user's project, never this repository. Every command below
-that changes a file is run against the target.
+that changes a file is run against the target — with the target's path in the
+command (`--target`, `git -C`, `make -C`), never by relying on the directory
+you happen to be in. This repository is where a session installing the kit
+usually starts, so a command that leaves the path out writes here.
 
 1. **Know the target.** You need the path of the project's git repository. If
    the user did not give one, ask.
 2. **Know the tool.** One of `claude`, `agents`, `cursor`, `copilot`. The
    installer detects it from what the target already has (`.claude/` or
    `CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, `AGENTS.md`).
-   If the target has none of these and the user did not say, ask. Do not guess.
+   If the target has none of these, or the files of more than one, and the
+   user did not say, ask. Do not guess: run from an agent, the installer has
+   nobody to ask either, and it stops before writing until `--tool` names one.
 3. **Look before you install.** If the target already has agent instructions,
    rules or skills of its own, do not run the installer on your own judgement:
    follow the Harmonize track in
@@ -57,8 +62,14 @@ that changes a file is run against the target.
    `adopt` command it printed. If, on Claude Code, it kept an existing
    `.claude/settings.json`, show the user the two hook entries it printed and
    add them only with their approval: that file is theirs.
-8. **Verify.** In the target, `make lint` must exit 0, with an `OK:` line for
-   each gate and no `FAIL`. A failure names the file, the line and the fix;
+8. **Verify.** In the target, `make constitution` and then `make lint` must
+   each exit 0. `make constitution` is the check on step 6: it names every
+   template placeholder still in the constitution and every link to a file
+   that does not exist — the template links two example rules, `testing.md`
+   and `security.md`; delete the lines unless the project has those files.
+   `make lint` does not check either, so it is not enough alone. It must show
+   an `OK:` line for each gate and no `FAIL`. A failure names the file, the
+   line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.
 9. **Commit on the branch.** Do not push or open a pull request unless asked.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
@@ -69,7 +80,7 @@ that changes a file is run against the target.
     defers until the project shows a need for it.
 
 Stop and ask the user, instead of deciding yourself, when: the tool is
-unknown; the target already has an agent workspace; a command you were going
+unknown, or the target has more than one; the target already has an agent workspace; a command you were going
 to document does not run; or a step would overwrite or delete a file that was
 there before you.
 
@@ -89,6 +100,7 @@ make lint                                   # everything CI runs; must pass befo
 make kit-smoke                              # install into a throwaway repo and run its lint
 make registry-generate                      # rebuild CHANGELOG.md from changelog.d/
 make graph-impact NODE=RULE:documentation   # what cites an artifact — before renaming or deleting it
+scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one command of an evaluation, recorded
 ```
 
 ### Non-negotiable rules
@@ -115,4 +127,4 @@ make graph-impact NODE=RULE:documentation   # what cites an artifact — before 
 | [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The reasoning: concepts, blueprint, adoption playbook, maintenance |
 | [`docs/adr/`](docs/adr/) | Why the kit is the way it is |
 | [`changelog.d/`](changelog.d/), [`CHANGELOG.md`](CHANGELOG.md) | One fragment per change; the generated changelog |
-| [`scripts/`](scripts/), [`Makefile`](Makefile), [`registries.json`](registries.json) | This repository's own gates — the kit applied to itself |
+| [`scripts/`](scripts/), [`Makefile`](Makefile), [`registries.json`](registries.json) | This repository's own gates — the kit applied to itself — and `eval-run.sh`, the recorder an evaluation runs its commands through |
