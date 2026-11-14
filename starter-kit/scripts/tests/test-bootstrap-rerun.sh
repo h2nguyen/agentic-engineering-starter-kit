@@ -280,6 +280,99 @@ named="$(grep -v 'sys.version_info' "$WORK/reached.log" 2>/dev/null | wc -l | tr
 [ "$named" -eq 0 ] && ok "and nothing in the kit called python3 by name" \
   || { bad "$named call(s) named python3 directly:"; grep -v 'sys.version_info' "$WORK/reached.log" | cut -c1-150 | sort | uniq -c | head -6 | sed 's/^/         /'; }
 
+echo "=== which tool: named, detected, or asked for — never picked ==="
+# A repository can carry the files of more than one agent tool. The installer
+# used to take the first it looked for — Claude Code ahead of Cursor ahead of
+# AGENTS.md — and install that layout without a word, where the guide says it
+# asks. Now: --tool wins; one detected tool is used; more than one is a
+# question, and where nobody can answer it the run ends before it writes.
+tree() { ( cd "$1" && find . -path ./.git -prune -o -print | sort ); }
+R="$WORK/several"; fresh_repo "$R"; mkdir -p "$R/.claude" "$R/.cursor"; echo "# ours" > "$R/AGENTS.md"
+before="$(tree "$R")"
+"$BOOTSTRAP" --target "$R" > "$WORK/several.log" 2>&1 < /dev/null; rc=$?
+[ "$rc" -ne 0 ] && ok "several tools detected, no --tool, nobody to ask: the installer fails" \
+  || bad "several tools detected and the installer picked one (exit 0): $(head -1 "$WORK/several.log")"
+[ "$(tree "$R")" = "$before" ] && ok "and it has written nothing" \
+  || bad "an ambiguous run changed the repository: $(tree "$R" | wc -l | tr -d ' ') paths, was $(echo "$before" | wc -l | tr -d ' ')"
+grep -q -- '--tool' "$WORK/several.log" && grep -q 'claude' "$WORK/several.log" && grep -q 'cursor' "$WORK/several.log" \
+  && ok "and it names the tools it found and the option that settles it" \
+  || bad "the refusal does not name the detected tools and --tool"
+! grep -q 'agents' "$WORK/several.log" \
+  && ok "AGENTS.md beside .cursor/ is Cursor's own constitution, not a third tool" \
+  || bad "AGENTS.md was counted as a separate tool beside Cursor"
+"$BOOTSTRAP" --tool cursor --target "$R" > "$WORK/several-told.log" 2>&1 < /dev/null; rc=$?
+[ "$rc" -eq 0 ] && [ -f "$R/docs/agent-rules/documentation.md" ] && [ ! -e "$R/CLAUDE.md" ] && [ ! -e "$R/.claude/rules" ] \
+  && ok "control: the same repository with --tool cursor installs that layout and no other" \
+  || bad "--tool did not settle an ambiguous repository (exit $rc)"
+[ "$(cat "$R/AGENTS.md")" = "# ours" ] && ok "and the constitution that was there is still the adopter's" \
+  || bad "the installer changed an AGENTS.md that already existed"
+
+for case in "claude:CLAUDE.md:CLAUDE.md" "claude:.claude/:CLAUDE.md" "cursor:.cursor/:AGENTS.md" "cursor:.cursorrules:AGENTS.md" \
+            "copilot:.github/copilot-instructions.md:.github/copilot-instructions.md" "agents:AGENTS.md:AGENTS.md"; do
+  tool="${case%%:*}"; marker="${case#*:}"; marker="${marker%%:*}"; constitution="${case##*:}"
+  R="$WORK/one-$tool-$(echo "$marker" | tr -c 'A-Za-z0-9\n' '_')"; fresh_repo "$R"
+  case "$marker" in */) mkdir -p "$R/$marker" ;; *) mkdir -p "$(dirname "$R/$marker")"; echo "# ours" > "$R/$marker" ;; esac
+  "$BOOTSTRAP" --target "$R" > "$WORK/one.log" 2>&1 < /dev/null; rc=$?
+  [ "$rc" -eq 0 ] && grep -q "^Detected agentic tool: $tool\$" "$WORK/one.log" && [ -f "$R/$constitution" ] \
+    && ok "one tool detected ($marker): $tool is used without asking" \
+    || bad "a single $marker did not install for $tool (exit $rc): $(head -1 "$WORK/one.log")"
+done
+# The Cursor layout is .cursor/ beside an AGENTS.md the kit itself installed.
+# A re-run with no --tool — the first step of an upgrade — must not call that two tools.
+R="$WORK/one-cursor-_cursor_"
+"$BOOTSTRAP" --target "$R" > "$WORK/one.log" 2>&1 < /dev/null; rc=$?
+[ "$rc" -eq 0 ] && grep -q '^Detected agentic tool: cursor$' "$WORK/one.log" \
+  && ok "a re-run on a Cursor install detects Cursor again" || bad "a re-run on a Cursor install was ambiguous (exit $rc)"
+
+R="$WORK/claude-and-agents"; fresh_repo "$R"; echo "@AGENTS.md" > "$R/CLAUDE.md"; echo "# ours" > "$R/AGENTS.md"
+before="$(tree "$R")"
+"$BOOTSTRAP" --target "$R" > "$WORK/two.log" 2>&1 < /dev/null; rc=$?
+[ "$rc" -ne 0 ] && [ "$(tree "$R")" = "$before" ] \
+  && ok "CLAUDE.md beside AGENTS.md is two tools: the installer fails and writes nothing" \
+  || bad "CLAUDE.md beside AGENTS.md was settled silently (exit $rc)"
+
+R="$WORK/no-tool"; fresh_repo "$R"; before="$(tree "$R")"
+"$BOOTSTRAP" --target "$R" > /dev/null 2>&1 < /dev/null; rc=$?
+[ "$rc" -ne 0 ] && [ "$(tree "$R")" = "$before" ] \
+  && ok "no tool detected, no --tool, nobody to ask: the installer fails and writes nothing" \
+  || bad "a repository with no agent tool was installed into without a tool being named (exit $rc)"
+
+# With a terminal there is someone to ask. A pseudo-terminal stands in for
+# one; where the platform has none (Windows) the case is skipped, and says so.
+R="$WORK/asked"; fresh_repo "$R"; mkdir -p "$R/.claude" "$R/.cursor"
+"$PY" -B - "$BOOTSTRAP" "$R" cursor > "$WORK/asked.log" 2>&1 <<'PTY'
+import os, sys
+try:
+    import pty
+except ImportError:
+    print("NO-PTY"); sys.exit(0)
+bootstrap, target, answer = sys.argv[1:4]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execv(bootstrap, [bootstrap, "--target", target])
+seen, answered = b"", False
+while True:
+    try:
+        chunk = os.read(fd, 4096)
+    except OSError:
+        break
+    if not chunk:
+        break
+    seen += chunk
+    if not answered and b"]: " in seen:
+        os.write(fd, answer.encode() + b"\n"); answered = True
+status = os.waitpid(pid, 0)[1]
+sys.stdout.write(seen.decode("utf-8", "replace"))
+print("\nASKED=%s EXIT=%s" % (answered, os.WEXITSTATUS(status) if os.WIFEXITED(status) else "signal"))
+PTY
+if grep -q 'NO-PTY' "$WORK/asked.log"; then
+  echo "  skip — no pseudo-terminal on this platform: the interactive question is not exercised here"
+else
+  grep -q 'ASKED=True EXIT=0' "$WORK/asked.log" && [ -f "$R/AGENTS.md" ] && [ ! -e "$R/CLAUDE.md" ] \
+    && ok "at a terminal, several detected tools are a question, and the answer is the layout installed" \
+    || { bad "at a terminal the installer did not ask, or did not install what was answered:"; tail -3 "$WORK/asked.log" | cut -c1-160 | sed 's/^/         /'; }
+fi
+
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --with-meta --target "$R" >/dev/null 2>&1 || bad "bootstrap --with-meta exited non-zero"

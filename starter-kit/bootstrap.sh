@@ -5,6 +5,10 @@
 # installs the kit's ready-to-use files to that tool's expected locations.
 # Never overwrites an existing file; safe to re-run.
 #
+# Which tool: --tool if given; else the one tool whose files the target has;
+# else it asks. A target with the files of several tools is asked about too —
+# and with no terminal to ask at, the run fails before it writes anything.
+#
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
@@ -38,7 +42,7 @@ while [ $# -gt 0 ]; do
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -56,27 +60,66 @@ if [ "$TARGET_GIVEN" -eq 0 ] && [ -f "$TARGET/AGENTIC-ENGINEERING-GUIDE.md" ] \
   exit 1
 fi
 
-detect_tool() {
-  if [ -d "$TARGET/.claude" ] || [ -f "$TARGET/CLAUDE.md" ]; then echo claude; return; fi
-  if [ -d "$TARGET/.cursor" ] || [ -f "$TARGET/.cursorrules" ]; then echo cursor; return; fi
-  if [ -f "$TARGET/.github/copilot-instructions.md" ]; then echo copilot; return; fi
-  if [ -f "$TARGET/AGENTS.md" ]; then echo agents; return; fi
-  echo ""
+# Every tool whose files the target already has: one line each, the tool's
+# name and then what gave it away. Not the first match — a repository can
+# carry the files of several tools, and which one the kit installs for is the
+# adopter's decision, not the order of these lines.
+detect_tools() {
+  local found
+  found=""
+  [ -d "$TARGET/.claude" ] && found="$found .claude/"
+  [ -f "$TARGET/CLAUDE.md" ] && found="$found CLAUDE.md"
+  [ -n "$found" ] && echo "claude $found"
+  found=""
+  [ -d "$TARGET/.cursor" ] && found="$found .cursor/"
+  [ -f "$TARGET/.cursorrules" ] && found="$found .cursorrules"
+  [ -n "$found" ] && echo "cursor $found"
+  # Cursor's layout keeps its constitution in AGENTS.md, so beside Cursor's
+  # own files that file is Cursor's, not a second tool. This is also what
+  # lets a re-run on a Cursor install detect Cursor again.
+  if [ -z "$found" ] && [ -f "$TARGET/AGENTS.md" ]; then echo "agents  AGENTS.md"; fi
+  [ -f "$TARGET/.github/copilot-instructions.md" ] && echo "copilot  .github/copilot-instructions.md"
+  return 0
 }
 
+# Decided before anything is written: --tool, else the one tool detected, else
+# a question. Several detected tools are a question too, and with nobody at a
+# terminal to answer it the run ends here, with the repository as it was.
 if [ -z "$TOOL" ]; then
-  TOOL="$(detect_tool)"
-  [ -n "$TOOL" ] && echo "Detected agentic tool: $TOOL"
-fi
-if [ -z "$TOOL" ]; then
-  if [ -t 0 ]; then
-    printf "No agentic tool detected in %s.\nWhich tool will this repo use? [claude/agents/cursor/copilot]: " "$TARGET"
-    read -r TOOL
-  else
-    echo "ERROR: no agentic tool detected and no --tool given." >&2
-    echo "Re-run with: ./bootstrap.sh --tool claude|agents|cursor|copilot" >&2
-    exit 1
-  fi
+  DETECTED="$(detect_tools)"
+  CANDIDATES="$(printf '%s\n' "$DETECTED" | sed '/^$/d' | sed 's/ .*//' | tr '\n' '|' | sed 's/|$//')"
+  case "$CANDIDATES" in
+    "")
+      if [ -t 0 ]; then
+        printf "No agentic tool detected in %s.\nWhich tool will this repo use? [claude/agents/cursor/copilot]: " "$TARGET"
+        read -r TOOL
+      else
+        echo "ERROR: no agentic tool detected and no --tool given." >&2
+        echo "Re-run with: ./bootstrap.sh --tool claude|agents|cursor|copilot" >&2
+        exit 1
+      fi
+      ;;
+    *"|"*)
+      if [ -t 0 ]; then
+        printf "More than one agentic tool is set up in %s:\n" "$TARGET"
+        printf '%s\n' "$DETECTED" | sed 's/^\([a-z]*\) *\(.*\)$/  \1 (\2)/'
+        printf "Which one is primary — the one to install for? [%s]: " "$(printf '%s' "$CANDIDATES" | tr '|' '/')"
+        read -r TOOL
+      else
+        {
+          echo "ERROR: more than one agentic tool is set up in $TARGET, and no --tool was given:"
+          printf '%s\n' "$DETECTED" | sed 's/^\([a-z]*\) *\(.*\)$/  \1 (\2)/'
+          echo "The installer does not pick one for you. Name the primary tool; nothing was written:"
+          echo "    $0 --tool $CANDIDATES --target $TARGET"
+        } >&2
+        exit 1
+      fi
+      ;;
+    *)
+      TOOL="$CANDIDATES"
+      echo "Detected agentic tool: $TOOL"
+      ;;
+  esac
 fi
 case "$TOOL" in
   claude|agents|cursor|copilot) ;;
