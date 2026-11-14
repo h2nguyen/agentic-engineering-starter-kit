@@ -9,7 +9,7 @@
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
-#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/, .claude/skills/ (prompt-enhancer, semver)
+#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (session-start, workspace-graph), .claude/skills/ (prompt-enhancer, semver)
 #   agents  → AGENTS.md, docs/agent-rules/          (AGENTS.md-convention tools)
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
@@ -138,7 +138,8 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
   # The two suites that test this installer stay in the kit: a repository it
   # installs into has no bootstrap.sh for them to run.
   done < <(find "$src" -type f ! -name '*.pyc' ! -path '*/__pycache__/*' \
-             ! -name 'test-bootstrap-rerun.sh' ! -name 'test-brownfield-adoption.sh')
+             ! -name 'test-bootstrap-rerun.sh' ! -name 'test-brownfield-adoption.sh' \
+             ! -name 'test-graph-hooks.sh')
   return $any
 }
 
@@ -171,6 +172,12 @@ if [ "$TOOL" = claude ]; then
   install_dir skills/semver .claude/skills/semver || true
   install_file settings.json.template .claude/settings.json || true
   install_file hooks/session-start.sh.template .claude/hooks/session-start.sh x || true
+  # The typed links, handed to the agent instead of looked up by it: who cites
+  # the file it just edited, and — once — a link that broke before the turn
+  # ends. Claude Code only; it is that tool's hook protocol. settings.json
+  # registers it, and a settings.json that was already here is never edited,
+  # so the closing message says which entries to add.
+  install_file hooks/workspace-graph.py .claude/hooks/workspace-graph.py x || true
 fi
 # --- shared append-only registries -----------------------------------------
 # Tool-independent: this layer is git configuration, a generator and CI checks.
@@ -363,6 +370,14 @@ if [ "$MAKEFILE_KEPT" -eq 1 ]; then
     echo "     Until then 'make lint' passes without running them;"
     echo "     check-ci-lint-coverage.sh reports exactly that once it is chained in."
   fi
+fi
+if [ "$TOOL" = claude ] && ! grep -q 'workspace-graph.py' "$TARGET/.claude/settings.json" 2>/dev/null; then
+  echo "     .claude/settings.json was left untouched, and it does not register the workspace-graph"
+  echo "     hook (.claude/hooks/workspace-graph.py): the agent is not told what cites a file it"
+  echo "     edits, nor held once when a typed link breaks. To switch that on, add these two entries"
+  echo "     inside its \"hooks\" object (the whole file to compare with: $KIT_DIR/settings.json.template):"
+  echo '         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit", "timeout": 20}]}],'
+  echo '         "Stop": [{"hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop", "timeout": 30}]}]'
 fi
 for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
   # Guard on the count: under `set -u`, bash 3.2 (macOS) treats the expansion

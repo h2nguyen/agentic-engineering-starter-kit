@@ -32,6 +32,7 @@ test:
 	$(KIT)/scripts/tests/test-graph-links.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
+	$(KIT)/scripts/tests/test-graph-hooks.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
