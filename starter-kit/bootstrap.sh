@@ -23,8 +23,8 @@
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
 #
-# Placeholder templates (_rule-template, skills/_template, agent, command, and
-# the check-convention template) are NOT installed — they stay in the kit.
+# Placeholder templates (rule, check script, skill, reviewer agent, command)
+# install to docs/agent-templates/ — unloaded, and where a later session finds them.
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -216,6 +216,26 @@ install_file scripts/graph_tool.py scripts/graph_tool.py x || true
 install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
 install_tree scripts/tests scripts/tests || true
 
+# The templates a workspace grows from. They used to stay in the kit, and a
+# later session never sees the kit: its first rule, check script, skill or
+# reviewer was rebuilt from memory, each time without some required part — the
+# litmus test, the incident link, the reviewer's cross-cutting checks. They go
+# to one directory every tool layout has in common. Not the rules directory:
+# on Claude Code everything in it is loaded into every session. And every name
+# begins with an underscore or ends in .template, which is what tells the link
+# gate these are scaffolding and their <placeholders> are not citations.
+install_file rules/_rule-template.md docs/agent-templates/_rule-template.md || true
+install_file scripts/check-convention.sh.template docs/agent-templates/check-convention.sh.template || true
+install_file skills/_template/SKILL.md docs/agent-templates/_skill-template.md || true
+install_file agents/_agent-template.md docs/agent-templates/_agent-template.md || true
+if [ "$TOOL" = claude ]; then
+  install_file commands/_command-template.md docs/agent-templates/_command-template.md || true
+else
+  for _tpl in _rule-template.md check-convention.sh.template _skill-template.md _agent-template.md; do
+    retarget_rule_links "docs/agent-templates/$_tpl"
+  done
+fi
+
 # The changelog rule is only correct once the registry layer is present, so it
 # ships alongside it rather than with the default rules above.
 install_file rules/shared-registries.md "$RULES_DIR/shared-registries.md" || true
@@ -291,8 +311,9 @@ for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
     echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi
 done
-echo "  4. Grow by signal: the placeholder templates (rules/_rule-template.md,"
-echo "     skills/_template/, agents/, commands/) stay in the kit for later."
+echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
+echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
+echo "     (the documentation rule's table says which, and what each must carry)."
 case "$TOOL" in
   cursor)
     echo "  Note (cursor): rules were installed to docs/agent-rules/ and linked from AGENTS.md."

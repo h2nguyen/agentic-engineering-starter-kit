@@ -78,22 +78,22 @@ confirm the gates pass, enable further common skills from
 | `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge and typed-link acceptance tests, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
-| `rules/_rule-template.md` | — (keep as template) | Copy per new domain rule file |
+| `rules/_rule-template.md` | `docs/agent-templates/_rule-template.md` | Template — copy per new domain rule file (installed by bootstrap; never loaded) |
 | `skills/common-catalog.md` | — (reference doc) | Enable the listed generic skills at setup |
 | `skills/prompt-enhancer/SKILL.md` | `.claude/skills/prompt-enhancer/SKILL.md` | Ready-to-use helper skill (installed by bootstrap on Claude Code) |
 | `skills/semver/` | `.claude/skills/semver/` | Ready-to-use SemVer decision skill incl. validator + tests (installed by bootstrap on Claude Code; upstream: h2nguyen/semver-skill) |
-| `skills/_template/SKILL.md` | — (keep as template) | Copy to `.claude/skills/<name>/SKILL.md` per new skill |
-| `agents/_agent-template.md` | — (keep as template) | Copy to `.claude/agents/<name>.md` per new agent |
+| `skills/_template/SKILL.md` | `docs/agent-templates/_skill-template.md` | Template — copy to `.claude/skills/<name>/SKILL.md` per new skill, or use as a playbook skeleton on other tools |
+| `agents/_agent-template.md` | `docs/agent-templates/_agent-template.md` | Template — copy to `.claude/agents/<name>.md` per new reviewer; it carries the cross-cutting checks every reviewer runs |
 | `agents/agent-coach.md` | `.claude/agents/agent-coach.md` | Level-4 meta-agent — installed via `bootstrap.sh --with-meta` |
 | `skills/ai-engineering-workspace-audit/` | `.claude/skills/ai-engineering-workspace-audit/` | Level-4 audit skill — installed via `--with-meta` |
 | `commands/ai-engineering-workspace-audit.md` | `.claude/commands/ai-engineering-workspace-audit.md` | Thin `/command` entry for the audit skill — via `--with-meta` |
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
 | `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
-| `commands/_command-template.md` | — (keep as template) | Copy to `.claude/commands/<name>.md` per new command |
+| `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
 | `settings.json.template` | `.claude/settings.json` | Remove the hook entry if you don't need one yet |
 | `hooks/session-start.sh.template` | `.claude/hooks/session-start.sh` | `chmod +x`; fill in toolchain steps |
 | `scripts/check-kb-shape.sh` | `scripts/check-kb-shape.sh` | Ready to run; already chained into the installed `make lint` (guards the KB's graph-ready shape) |
-| `scripts/check-convention.sh.template` | `scripts/check-<convention>.sh` | `chmod +x`; wire into your lint target |
+| `scripts/check-convention.sh.template` | `docs/agent-templates/check-convention.sh.template` | Template — copy to `scripts/check-<convention>.sh`, `chmod +x`, wire into your lint target |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | Generated — start empty; add the first entry at the first >30-min bug |
 
 ## Bootstrap order (Level 1 — guide § 4.2)

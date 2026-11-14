@@ -63,7 +63,7 @@ lines="$(wc -l < "$env_file" | tr -d ' ')"
 [ "$lines" -eq 1 ] && ok "a second SessionStart (resume, compaction) appends nothing new" || bad "the env file has $lines lines after two starts"
 
 echo "=== every tool layout receives the constitution and every shipped rule ==="
-# Templates (leading underscore) stay in the kit; everything else under rules/
+# Templates (leading underscore) are not rules; everything else under rules/
 # is a shipped rule and must land, whichever tool the repository uses.
 expected_rules="$(cd "$KIT_DIR/rules" && ls *.md | grep -v '^_' | sort)"
 for tool in claude agents cursor copilot; do
@@ -94,6 +94,21 @@ for tool in claude agents cursor copilot; do
     ! grep -q 'docs/agent-rules/' "$c" && ok "$tool: constitution links point at .claude/rules/" || bad "$tool: links retargeted by mistake"
   else
     ! grep -q '\.claude/rules/' "$c" && ok "$tool: constitution links retargeted to docs/agent-rules/" || bad "$tool: constitution still links .claude/rules/"
+  fi
+  # A later session never sees the kit. If the templates stay behind in it,
+  # the first rule, check script, skill or reviewer that session writes is
+  # rebuilt from memory — and each adopting agent dropped a different required
+  # part (the litmus test, the incident link, the reviewer's cross-cutting
+  # checks). They land where every tool layout can find them, out of the
+  # always-loaded rules directory and out of the link gate's way.
+  tdir="$R/docs/agent-templates"
+  [ -f "$tdir/_rule-template.md" ] && [ -f "$tdir/check-convention.sh.template" ] \
+    && [ -f "$tdir/_skill-template.md" ] && [ -f "$tdir/_agent-template.md" ] \
+    && ok "$tool: the rule, check-script, skill and reviewer templates are in docs/agent-templates/" \
+    || bad "$tool: templates missing from docs/agent-templates/: $(ls "$tdir" 2>/dev/null | tr '\n' ' ')"
+  if [ "$tool" != claude ]; then
+    ! grep -rq '\.claude/rules/' "$tdir" && ok "$tool: the templates point at docs/agent-rules/, where this layout keeps rules" \
+      || bad "$tool: a template still points at .claude/rules/"
   fi
   # The gates cite the rules they enforce by token, not by path, so the same
   # header has to resolve whether the rules landed in .claude/rules/ or in
