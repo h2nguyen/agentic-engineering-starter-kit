@@ -437,6 +437,90 @@ class ReportTest(GraphTestCase):
         self.assertNotIn("No agent reviews", out)
 
 
+class NoteTest(GraphTestCase):
+    """`note` is what an editor is told about the file it just changed.
+
+    It is read by an agent in the middle of a task, on every edit, so it says
+    nothing unless the file is cited or carries a link that does not resolve —
+    and it never fails: reporting is the gate's job.
+    """
+
+    def cite_testing_rule(self):
+        self.write("scripts/check-tests.sh", "#!/bin/sh\n# Enforces: RULE:testing — test files sit beside their source\n")
+        self.write("docs/kb.d/2026-03-01-flaky-clock.md", "# Flaky clock\n\n**Related:** RULE:testing\n")
+
+    def test_a_file_nothing_cites_says_nothing(self):
+        self.assertEqual(self.run_tool("note", ".claude/rules/testing.md"), (0, "", ""))
+
+    def test_a_file_that_is_not_an_artifact_says_nothing(self):
+        self.write("src/app.py", "print('hello')\n")
+        self.assertEqual(self.run_tool("note", "src/app.py"), (0, "", ""))
+        self.assertEqual(self.run_tool("note", "src/never-written.py"), (0, "", ""))
+
+    def test_the_citers_of_the_file_are_listed_with_their_lines(self):
+        self.cite_testing_rule()
+        code, out, err = self.run_tool("note", ".claude/rules/testing.md")
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("RULE:testing", out)
+        self.assertIn("cited by 2 file(s)", out)
+        self.assertIn("scripts/check-tests.sh:2", out)
+        self.assertIn("docs/kb.d/2026-03-01-flaky-clock.md:3", out)
+        self.assertIn("in the same change", out)
+
+    def test_an_absolute_path_is_the_same_file(self):
+        self.cite_testing_rule()
+        relative = self.run_tool("note", ".claude/rules/testing.md")
+        absolute = self.run_tool("note", os.path.join(self.root, ".claude/rules/testing.md"))
+        self.assertEqual(relative, absolute)
+
+    def test_a_path_through_a_symlinked_directory_is_the_same_file(self):
+        # macOS hands out /var/… paths that are /private/var/… on disk, and an
+        # editor reports the first while git and the tool see the second.
+        self.cite_testing_rule()
+        alias = self.root + "-alias"
+        os.symlink(self.root, alias)
+        self.addCleanup(os.unlink, alias)
+        through_link = os.path.join(alias, ".claude/rules/testing.md")
+        self.assertEqual(self.run_tool("note", through_link), self.run_tool("note", ".claude/rules/testing.md"))
+        code, out, _ = self.run_tool("impact", through_link)
+        self.assertEqual(code, 0)
+        self.assertIn("RULE:testing — .claude/rules/testing.md", out)
+
+    def test_a_link_in_the_file_that_resolves_to_nothing_is_reported_and_is_not_a_failure(self):
+        self.write(".claude/rules/testing.md", "# Testing Rules\n\n**Related:** RULE:gone\n")
+        code, out, err = self.run_tool("note", ".claude/rules/testing.md")
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn(".claude/rules/testing.md:3", out)
+        self.assertIn("resolves to nothing", out)
+
+    def test_a_broken_link_in_another_file_is_not_this_files_news(self):
+        self.write(".claude/rules/security.md", "# Security Rules\n\n**Related:** RULE:gone\n")
+        self.assertEqual(self.run_tool("note", ".claude/rules/testing.md"), (0, "", ""))
+
+    def test_a_sanctioned_link_is_not_repeated_on_every_edit(self):
+        self.write("docs/adr/adr-0002-retry-policy.md", "# Retry policy\n\n**Related:** RULE:retired\n")
+        self.write(".graph-link-allowlist", "docs/adr/adr-0002-retry-policy.md RULE:retired  # immutable record\n")
+        self.assertEqual(self.run_tool("note", "docs/adr/adr-0002-retry-policy.md"), (0, "", ""))
+
+    def test_a_long_list_is_cut_short_and_says_how_to_see_the_rest(self):
+        for number in range(11):
+            self.write(f"docs/kb.d/2026-03-{number + 1:02d}-case.md", "# Case\n\n**Related:** RULE:testing\n")
+        code, out, _ = self.run_tool("note", ".claude/rules/testing.md")
+        self.assertEqual(code, 0)
+        self.assertIn("cited by 11 file(s)", out)
+        self.assertEqual(out.count("docs/kb.d/"), 8)
+        self.assertIn("3 more", out)
+        self.assertIn("impact RULE:testing", out)
+
+    def test_several_files_are_each_reported(self):
+        self.cite_testing_rule()
+        self.write(".claude/rules/security.md", "# Security Rules\n\n**Related:** RULE:gone\n")
+        code, out, _ = self.run_tool("note", ".claude/rules/testing.md", ".claude/rules/security.md")
+        self.assertEqual(code, 0)
+        self.assertIn("cited by 2 file(s)", out)
+        self.assertIn(".claude/rules/security.md:3", out)
+
+
 class ConfigTest(GraphTestCase):
     def test_no_config_is_a_failure_that_says_what_is_missing(self):
         os.remove(os.path.join(self.root, "registries.json"))
