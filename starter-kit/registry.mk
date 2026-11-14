@@ -56,9 +56,10 @@ graph-coverage:
 ci-lint-coverage:
 	./scripts/check-ci-lint-coverage.sh
 
-## registry-test — the registry layer's own suites.
+## registry-test — the registry layer's own suites. -B: the kit installs no
+## .gitignore, so its tools must not leave a __pycache__ in your repository.
 registry-test:
-	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+	python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
 	./scripts/tests/test-ci-lint-coverage.sh
 	./scripts/tests/test-parallel-merge.sh
 	./scripts/tests/test-graph-links.sh

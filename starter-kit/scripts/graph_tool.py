@@ -43,6 +43,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+# Importing a sibling module would write scripts/__pycache__/ into the
+# adopting repository, which gets no .gitignore from the kit — untracked files
+# that ride into the next `git add -A`.
+sys.dont_write_bytecode = True
 try:
     # One source of truth for identifier grammar: the registry tool derives an
     # entry's identifier from its filename, and a second derivation here would
