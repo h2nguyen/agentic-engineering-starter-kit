@@ -1092,6 +1092,9 @@ def cmd_init(args) -> int:
     kb_out = "docs/DEBUGGING-KNOWLEDGE-BASE.md"
     kb: dict = {
         "name": "debugging-kb", "kind": "entries", "id_prefix": "ISSUE",
+        # Stated here rather than inherited: next to a width and a filename
+        # prefix, an unstated scheme reads as numbering.
+        "id_scheme": "slug",
         "fragments": "docs/DEBUGGING-KNOWLEDGE-BASE.d", "output": kb_out,
         "required_fields": ["Symptom", "Investigation Trail", "Root Cause",
                             "Fix", "Prevention", "Debug Shortcut"],
@@ -1156,8 +1159,8 @@ def cmd_init(args) -> int:
         "docs/adr",
     )
     adr: dict = {
-        "name": "adr", "kind": "documents", "id_prefix": "ADR", "id_width": 4,
-        "filename_prefix": "adr-", "fragments": adr_dir,
+        "name": "adr", "kind": "documents", "id_prefix": "ADR", "id_scheme": "slug",
+        "id_width": 4, "filename_prefix": "adr-", "fragments": adr_dir,
         "required_headings": ["Status", "Context", "Decision", "Consequences"],
     }
     existing = [

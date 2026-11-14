@@ -856,6 +856,14 @@ class TestInit(unittest.TestCase):
         adr = self.registry(cfg, "adr")
         self.assertEqual((adr["filename_prefix"], adr["id_width"]), ("adr-", 4))
 
+    def test_every_cited_registry_states_its_own_scheme(self):
+        # An inherited scheme has to be looked up, and next to `id_width: 4`
+        # and `filename_prefix: "adr-"` a reader took the block for MADR
+        # numbering. Written on the registry, there is nothing to infer.
+        cfg = self.init()
+        self.assertEqual(self.registry(cfg, "adr")["id_scheme"], "slug")
+        self.assertEqual(self.registry(cfg, "debugging-kb")["id_scheme"], "slug")
+
     def test_adr_tools_naming_is_inferred(self):
         self.write("docs/adr/0001-record-decisions.md", "# 1. x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
         self.write("docs/adr/0002-retry-policy.md", "# 2. y\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
