@@ -10,8 +10,9 @@ For people changing the kit itself. To install it into a project, start at the
 | `starter-kit/` | Everything the installer copies into another repository | Someone else's agent, in a repository you will never see |
 | Everything else | The guide, this repository's decision records, changelog, `Makefile` and `scripts/` — the kit applied to itself | You |
 
-A file under `starter-kit/` has to work without this repository around it.
-That is the first thing to check about any change there.
+A file the installer copies has to work without this repository around it.
+That is the first thing to check about any change there. (`starter-kit/README.md`
+and `bootstrap.sh` are read in the kit, so they may point at the guide.)
 
 ## Commands
 
@@ -92,8 +93,8 @@ Four invariants every such change keeps, each with a test behind it:
 
 The tests prove the mechanism. Whether an agent can *use* it is a different
 question, and the cheapest way to answer it is to hand the kit to a small
-model and watch where it guesses. Version 1.2.0 was hardened this way; the
-recipe:
+model and watch where it guesses. The workspace-graph release was hardened
+this way; the recipe:
 
 1. Export the committed tree (`git archive HEAD`) into a scratch directory.
    Use a fresh copy and a fresh `git init` per experiment.
