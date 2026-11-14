@@ -15,12 +15,17 @@ tool, and `bootstrap.sh` installs them to the file locations your tool expects
 ## Quick start (recommended)
 
 ```bash
-cp -r starter-kit /path/to/your-repo/          # or clone/vendor it
-cd /path/to/your-repo
-./starter-kit/bootstrap.sh                     # detects your tool, or asks
-./starter-kit/bootstrap.sh --tool claude       # or name it explicitly
-./starter-kit/bootstrap.sh --with-meta         # later, at Level 4: + self-improvement loop
+# from a checkout of this kit — nothing but the installed files lands in your repo
+./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool, or asks
+./starter-kit/bootstrap.sh --target /path/to/your-repo --tool claude   # or name it explicitly
+./starter-kit/bootstrap.sh --target /path/to/your-repo --with-meta     # later, at Level 4: + self-improvement loop
 ```
+
+The kit is an installer, not a dependency: nothing it installs refers back to
+it, and the templates a workspace grows from are installed too
+(`docs/agent-templates/`). If you copied `starter-kit/` into the repository to
+run it from there, delete the copy afterwards instead of committing it. Keep a
+checkout of the kit only for `--with-meta` and the common-skills catalog.
 
 **Zero-copy alternative:** paste [`SETUP-PROMPT.md`](SETUP-PROMPT.md) into a
 fresh session of your AI coding agent at the target repo's root — the prompt
