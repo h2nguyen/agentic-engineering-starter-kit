@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [2.0.0] — 2026-11-14
+
+<!-- category: Added -->
 ### Added
 
 - ADR-0003 records why the comments-and-annotations rule is enforced by review rather than by a check in the lint target, and what was weighed first: an annotation-density check, a marker-aware check, and deferring until the first violation. The rule already stated the conclusion inline; the record carries the rejected options and scopes the exception to judgement about annotation content, leaving marker *shape* gateable as `check-kb-shape.sh` and `check-registry-drift.sh` already gate it.
@@ -110,8 +126,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - Run from the root of the kit's own repository with no `--target`, `bootstrap.sh` would install the kit into itself. It now refuses and says to name the repository to install into. A project that holds a copy of `starter-kit/` still installs with no argument.
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [1.1.0] — 2026-09-07
 
