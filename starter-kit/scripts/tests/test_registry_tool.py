@@ -6,6 +6,8 @@ Stdlib unittest, so they run anywhere python3 does:
     python3 -m unittest discover -s starter-kit/scripts/tests -p 'test_*.py'
 """
 
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -792,6 +794,61 @@ class TestInit(unittest.TestCase):
 
     def registry(self, cfg, name):
         return next(r for r in cfg["registries"] if r["name"] == name)
+
+    def init_output(self, *extra):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            cfg = self.init(*extra)
+        return cfg, out.getvalue()
+
+    def test_numbered_decision_records_do_not_make_the_knowledge_base_numeric(self):
+        # The scheme is per registry. A repository with adr-tools records and
+        # no knowledge base yet still gets the collision-free default for the
+        # knowledge base — which is what init's own note about it says.
+        self.write("docs/adr/0001-x.md", "# x\n\n## Status\nA\n## Context\nc\n## Decision\nd\n## Consequences\ne\n")
+        cfg, out = self.init_output()
+        kb = rt.Registry(self.registry(cfg, "debugging-kb"), cfg, self.root)
+        adr = rt.Registry(self.registry(cfg, "adr"), cfg, self.root)
+        self.assertEqual((kb.id_scheme, adr.id_scheme), ("slug", "numeric"))
+        self.assertIn("knowledge base: none found", out)
+
+    def test_the_greenfield_note_names_the_identifier_shape_it_declares(self):
+        # The note used to promise MADR numbering while the config it wrote
+        # produced ADR-<date>-<slug>; two adopting agents guessed from the note.
+        cfg, out = self.init_output()
+        adr = rt.Registry(self.registry(cfg, "adr"), cfg, self.root)
+        self.assertEqual(adr.id_scheme, "slug")
+        self.assertIn(adr.id_pattern, out)
+        self.assertNotIn("MADR naming adr-NNNN", out)
+
+    def test_a_changelog_that_already_has_the_generated_region_needs_no_adoption(self):
+        # bootstrap installs the template changelog before it runs init.
+        self.write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n<!-- BEGIN GENERATED: changelog — do not edit -->\n\n<!-- END GENERATED: changelog -->\n")
+        _, out = self.init_output()
+        self.assertNotIn("adopt --registry changelog", out)
+
+    def test_a_hand_maintained_changelog_is_still_pointed_at_adopt(self):
+        self.write("CHANGELOG.md", "# Changelog\n\n## Unreleased\n\n- One.\n")
+        _, out = self.init_output()
+        self.assertIn("adopt --registry changelog", out)
+
+    def test_rule_pointer_names_the_rules_directory_this_layout_has(self):
+        os.makedirs("docs/agent-rules")
+        self.assertEqual(self.init()["rule_pointer"], "docs/agent-rules/shared-registries.md")
+
+    def test_rule_pointer_prefers_the_claude_layout_and_defaults_to_it(self):
+        self.assertEqual(self.init()["rule_pointer"], ".claude/rules/shared-registries.md")
+        os.makedirs(".claude/rules")
+        os.makedirs("docs/agent-rules")
+        self.assertEqual(self.init("--force")["rule_pointer"], ".claude/rules/shared-registries.md")
+
+    def test_list_does_not_print_an_identifier_shape_for_a_changelog(self):
+        self.init()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rt.main(["list"])
+        self.assertNotIn("→  -", out.getvalue())
+        self.assertIn("ADR-YYYY-MM-DD-<slug>", out.getvalue())
 
     def test_greenfield_gets_the_kit_defaults(self):
         cfg = self.init()

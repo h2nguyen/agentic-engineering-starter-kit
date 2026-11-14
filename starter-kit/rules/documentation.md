@@ -40,11 +40,13 @@ One file per decision under `docs/adr/`. Create it with
 convention declared in `registries.json` — the tool derives the name, and a
 hand-typed one is how a file ends up outside the grammar the gate enforces.
 
-Two naming conventions ship. The **MADR** style is
-`adr-NNNN-short-title.md` (`filename_prefix: "adr-"`, `id_width: 4`),
-publishing as `ADR-0001`. The **date-slug** style is `<date>-<slug>.md`,
-publishing as `ADR-<date>-<slug>`; it needs no allocator and therefore cannot
-collide.
+Two naming conventions ship, and `registries.json` says which one this
+repository uses — `python3 scripts/registry_tool.py list` prints the exact
+shape. The **date-slug** style is what a fresh install declares:
+`adr-<date>-<slug>.md`, publishing as `ADR-<date>-<slug>`; it needs no
+allocator and therefore cannot collide. The **MADR** style is
+`adr-NNNN-short-title.md` (`"id_scheme": "numeric"`, `id_width: 4`),
+publishing as `ADR-0001`.
 
 A numbered convention is the reason the identifier gate exists: the *file*
 never conflicts, because two decisions are two paths, but two branches both

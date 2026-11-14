@@ -1135,8 +1135,17 @@ def cmd_init(args) -> int:
         "output": "CHANGELOG.md",
         "categories": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"],
     })
-    if os.path.isfile(os.path.join(root, "CHANGELOG.md")):
-        notes.append("changelog: CHANGELOG.md exists -> run `adopt --registry changelog` to move its [Unreleased] bullets into a fragment")
+    changelog_path = os.path.join(root, "CHANGELOG.md")
+    if os.path.isfile(changelog_path):
+        with open(changelog_path, encoding="utf-8") as fh:
+            generated = "BEGIN GENERATED: changelog" in fh.read()
+        if generated:
+            # bootstrap installs the template changelog before it runs init,
+            # so "exists" alone used to tell a brand-new repository to adopt
+            # the empty file it had just been given.
+            notes.append("changelog: CHANGELOG.md already carries the generated region -> nothing to adopt")
+        else:
+            notes.append("changelog: CHANGELOG.md exists -> run `adopt --registry changelog` to move its [Unreleased] bullets into a fragment")
     else:
         notes.append("changelog: none found -> install CHANGELOG.md.template, or let bootstrap do it")
 
@@ -1186,20 +1195,38 @@ def cmd_init(args) -> int:
                 f"tighten it once the records carry them"
             )
     else:
-        notes.append(f"decision records: none found -> {adr_dir}/, MADR naming adr-NNNN-<slug>.md")
+        # Say what the config below actually produces. Nothing here sets a
+        # scheme, so the registry takes the slug default — a note promising
+        # MADR numbers sent adopters looking for ADR-0001 in a repository
+        # whose first record would be ADR-<date>-<slug>.
+        notes.append(
+            f"decision records: none found -> {adr_dir}/, files named "
+            f"adr-YYYY-MM-DD-<slug>.md and cited as ADR-YYYY-MM-DD-<slug> "
+            f"(for MADR numbering, adr-NNNN-<slug>.md, add \"id_scheme\": "
+            f"\"numeric\" to this registry before the first record)"
+        )
     registries.append(adr)
 
-    scheme = "numeric" if any(r.get("id_scheme") == "numeric" for r in registries) else "slug"
+    # The top-level scheme is the default for registries that set none, so it
+    # stays the collision-free one. A registry whose existing records are
+    # numbered carries "numeric" itself, above. Deriving the default from
+    # those used to hand a repository with adr-tools records and no knowledge
+    # base yet a numeric knowledge base — the allocator this layout exists to
+    # avoid, and not what the note printed about it said.
+    rules_dir = next(
+        (d for d in (".claude/rules", "docs/agent-rules") if os.path.isdir(os.path.join(root, d))),
+        ".claude/rules",
+    )
     config = {
         "_readme": [
             "Written by `registry_tool.py init` from what this repository already had.",
             "Edit freely; re-run `init --force` to regenerate from the files on disk.",
             "See the shared-registries rule for what each field means.",
         ],
-        "id_scheme": scheme,
+        "id_scheme": "slug",
         "id_width": 3,
         "regen_command": "make registry-generate",
-        "rule_pointer": ".claude/rules/shared-registries.md",
+        "rule_pointer": f"{rules_dir}/shared-registries.md",
         "registries": registries,
     }
     with open(target, "w", encoding="utf-8") as fh:
@@ -1355,7 +1382,11 @@ def cmd_list(args) -> int:
         target = reg.output or "(one file per entry — not assembled)"
         print(f"  {reg.name}")
         print(f"    kind       {reg.kind}")
-        print(f"    scheme     {reg.id_scheme}  →  {reg.id_pattern}")
+        if reg.kind == "changelog":
+            # Bullets are never cited, so there is no identifier to describe.
+            print("    scheme     —  (bullets carry no identifier; fragments are named <date>-<slug>.md)")
+        else:
+            print(f"    scheme     {reg.id_scheme}  →  {reg.id_pattern}")
         print(f"    fragments  {reg.fragments}/  ({count} entries)")
         print(f"    output     {target}")
     return 0
