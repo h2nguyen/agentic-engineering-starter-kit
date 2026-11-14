@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [3.0.0] — 2026-11-14
+
+<!-- category: Added -->
 ### Added
 
 - `make constitution` (`scripts/check-constitution.sh`), installed for every tool. It fails, with file and line, while the constitution links to a file that does not exist or still carries a template placeholder — the template's `testing.md` and `security.md` example lines, `<Project Name>`, an unfilled stack row. `make lint` checks neither, so a constitution could be committed half filled in with every gate green. Angle brackets that belong in a constitution are left alone: anything in a fenced block or backticks, HTML tags and comments, a single word such as `Option<T>`. Rule files and `docs/rule-reference/` are never read.
@@ -33,6 +49,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- category: Changed -->
 ### Changed
 
+- **Breaking — why this release is 3.0.0.** The coverage gate passed in three cases where CI did not run `make lint`, or `make lint` did not run a gate. Closing them can fail a repository that passed on 2.0.0, and each is repaired in a file of your own — a workflow, or your `lint:` line — which ADR-0008 makes a major release. A fresh install is not affected, and neither is a repository whose `make lint` runs from a push or pull-request workflow in the repository root with all five gates chained. A repository that stays on 2.0.0 is not touched: the installer never overwrites a file. The three changes are marked Breaking below, and each fails `make lint` with the fix.
 - **Breaking:** `check-ci-lint-coverage.sh` no longer counts a reusable workflow (`on: workflow_call`) that nothing calls. It counts one only when a workflow that a push, pull request or merge queue triggers reaches it through `uses: ./.github/workflows/<file>`, directly or through other reusable workflows. If your `make lint` runs only in a reusable workflow, call it from a workflow with one of those triggers.
 - **Breaking:** the coverage gate now reads a workflow-level `defaults.run.working-directory`. A workflow that runs its steps in another directory no longer covers the root Makefile; a job default or a step's own `working-directory` of `.` still does. The nearest setting wins: step, job, workflow, root.
 - **Breaking:** the coverage gate requires `lint` to reach every gate the kit installed — `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` — where it checked three. If you keep your own Makefile and its `lint:` line leaves out `kb-shape` or `ci-lint-coverage`, add it; the failure names the target. A repository installed before a gate existed, with no such script, is not held to it.
@@ -54,8 +71,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The kit's own `AGENTS.md` linked to `changelog.d/`, a directory that does not exist in a checkout once a release has consumed its fragments. The directory now keeps a README.
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [2.0.0] — 2026-11-14
 
