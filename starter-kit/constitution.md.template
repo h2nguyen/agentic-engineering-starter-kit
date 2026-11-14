@@ -72,4 +72,5 @@ make registry-generate
 ```
 
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
-Shortcut, and a `Related:` line naming the rule or check that now prevents it.
+Shortcut, and a `Related:` line naming the rule or check that now prevents it
+(`RULE:<rule file name>`, `SCRIPT:<check script name>`).

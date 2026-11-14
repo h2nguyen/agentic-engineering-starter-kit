@@ -325,7 +325,8 @@ make registry-generate
 ```
 
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
-Shortcut, and a `Related:` line naming the rule or check that now prevents it.
+Shortcut, and a `Related:` line naming the rule or check that now prevents it
+(`RULE:<rule file name>`, `SCRIPT:<check script name>`).
 ````
 
 ### 3.3 Rule files
@@ -658,7 +659,7 @@ rule file or enforcement script now encodes it).
 
 **Debug Shortcut:** The quick check that confirms this issue next time.
 
-**Related:** RULE:working-principles
+**Related:** <RULE:name-of-the-rule or SCRIPT:name-of-the-check that now prevents this — delete the line if there is none>
 ```
 
 ### 3.10 Applying this with any agentic tool

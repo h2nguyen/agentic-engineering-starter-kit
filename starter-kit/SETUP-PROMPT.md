@@ -143,7 +143,10 @@ Create, at the locations your detected tool expects (Appendix A.1):
    is self-contained: the imperative first, a WRONG/CORRECT code pair, gotchas
    with their source cited, and a runnable litmus check.
 2. **Enforcement** — wire an umbrella lint target that CI runs on every PR
-   (create it if the repo has none), and **have the workflow invoke that
+   (create it if the repo has none; where a Makefile already exists the
+   installer leaves it alone, so add `include registry.mk` and the gate targets
+   to its lint target yourself — that edit is yours to make, and the coverage
+   gate fails until it is made), and **have the workflow invoke that
    aggregate target rather than listing its parts**: a workflow that enumerates
    sub-targets drifts away from the lint target one PR at a time, silently,
    until checks the rule files call enforced have not run in months. The kit
@@ -224,7 +227,10 @@ Appendix A.7 — the sequence:
 6. Write the handoff summary: what was installed; what was deliberately
    deferred (specialist reviewer agents, hooks, external tool servers, the meta
    layer) and — from Appendix A.6 — the **signal** that should trigger each
-   deferred artifact later.
+   deferred artifact later. On Claude Code the installer leaves a SessionStart
+   hook skeleton and its settings entry: fill it in if sessions need
+   environment setup, or remove the entry if they do not — either is fine, and
+   the handoff says which.
 7. Commit on the feature branch with a clear message and propose the PR.
 
 ## Success criteria
@@ -457,8 +463,10 @@ never there.
 - **Adopting, not imposing.** In a repository that already has these files,
   infer the convention from what exists and declare *that*; move existing
   content into fragments losslessly; append merge attributes to an existing
-  `.gitattributes` rather than replacing it; never edit an existing Makefile,
-  but verify the gates are reached and fail loudly if not. AsciiDoc artifacts
+  `.gitattributes` rather than replacing it. An installer never edits an
+  existing Makefile — whoever adopts the layer adds the include line and the
+  gate targets by hand — but it verifies the gates are reached and fails
+  loudly if not. AsciiDoc artifacts
   are outside the generator's grammar — declare them out of the layout rather
   than half-adopting them.
 
