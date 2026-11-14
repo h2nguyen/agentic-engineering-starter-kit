@@ -783,7 +783,7 @@ def cmd_note(graph: Graph, args) -> int:
             if len(rows) > NOTE_CITERS_SHOWN:
                 lines.append(
                     f"  … and {len(rows) - NOTE_CITERS_SHOWN} more — "
-                    f"python3 scripts/graph_tool.py impact {node.token}"
+                    f"make graph-impact NODE={node.token}"
                 )
             lines.append(
                 "If this edit renamed it, removed it or changed what it requires, "

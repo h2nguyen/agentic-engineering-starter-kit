@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit",
             "timeout": 20
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop",
             "timeout": 30
           }
         ]

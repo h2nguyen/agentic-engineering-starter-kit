@@ -16,6 +16,10 @@ set -euo pipefail
 # always ship together, so that holds whether they were installed into a repo's
 # scripts/ directory or are being run from the kit itself.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Python under whatever name this machine gives it (python3, python, py -3).
+# The fallback is for a repository that copied this gate from a newer kit
+# without the launcher beside it.
+PY="$HERE/python.sh"; [ -x "$PY" ] || PY=python3
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 if [ -f "$HERE/registry_tool.py" ]; then
@@ -35,7 +39,7 @@ fi
 ARGS=(generate --check)
 [ $# -gt 0 ] && ARGS+=(--registry "$1")
 
-if python3 "$TOOL" "${ARGS[@]}"; then
+if "$PY" "$TOOL" "${ARGS[@]}"; then
   exit 0
 fi
 

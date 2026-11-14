@@ -29,6 +29,7 @@ ok()  { printf '  ok   — %s\n' "$1"; pass=$((pass + 1)); }
 bad() { printf '  FAIL — %s\n' "$1"; fail=$((fail + 1)); }
 
 BOOTSTRAP="$KIT_DIR/bootstrap.sh"
+PY="$KIT_DIR/scripts/python.sh"   # Python under whatever name this machine gives it
 if [ ! -f "$BOOTSTRAP" ]; then
   echo "SKIP: bootstrap.sh not found beside this test (only runs from the kit itself)"
   exit 0
@@ -45,7 +46,7 @@ fresh_repo() { # $1 = dir
   git -C "$1" config commit.gpgsign false
 }
 field() { # $1 = JSON text, $2 = dotted path → the value, or nothing
-  printf '%s' "$1" | python3 -c '
+  printf '%s' "$1" | "$PY" -c '
 import json, sys
 try:
     value = json.load(sys.stdin)
@@ -55,13 +56,23 @@ try:
 except Exception:
     pass' "$2"
 }
+# The hook is run the way Claude Code runs it: the command string registered
+# in settings.json, through `sh -c`, with $CLAUDE_PROJECT_DIR set. Calling the
+# file directly would test a command nobody registered.
+registered() { # $1 = event (PostToolUse|Stop) → the command settings.json registers for it
+  "$PY" -c 'import json, sys; print(json.load(open(sys.argv[1]))["hooks"][sys.argv[2]][0]["hooks"][0]["command"])' \
+    "$R/.claude/settings.json" "$1" 2>/dev/null
+}
+run_hook() { # $1 = registered command; the event JSON on stdin
+  CLAUDE_PROJECT_DIR="$R" sh -c "$1"
+}
 post_edit() { # $1 = session, $2 = file → the hook output in $OUT, its status in $RC
   OUT="$(printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s"}}' \
-           "$1" "$(dirname "$2")" "$2" | python3 "$HOOK" post-edit 2>"$WORK/err")"; RC=$?
+           "$1" "$(dirname "$2")" "$2" | run_hook "$ON_EDIT" 2>"$WORK/err")"; RC=$?
 }
 stop() { # $1 = session, $2 = cwd, $3 = stop_hook_active (true|false)
   OUT="$(printf '{"session_id":"%s","cwd":"%s","hook_event_name":"Stop","stop_hook_active":%s}' \
-           "$1" "$2" "$3" | python3 "$HOOK" stop 2>"$WORK/err")"; RC=$?
+           "$1" "$2" "$3" | run_hook "$ON_STOP" 2>"$WORK/err")"; RC=$?
 }
 
 echo "=== install: the hook lands for Claude Code, registered, and for no other tool ==="
@@ -70,7 +81,7 @@ R="$WORK/my project"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/install.log" 2>&1 || { bad "bootstrap exited non-zero"; cat "$WORK/install.log"; }
 HOOK="$R/.claude/hooks/workspace-graph.py"
 [ -x "$HOOK" ] && ok "the hook is installed and executable" || bad "no executable .claude/hooks/workspace-graph.py"
-python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$R/.claude/settings.json" 2>/dev/null \
+"$PY" -c 'import json,sys; json.load(open(sys.argv[1]))' "$R/.claude/settings.json" 2>/dev/null \
   && ok "the installed settings.json is valid JSON" || bad "settings.json does not parse"
 settings="$(cat "$R/.claude/settings.json" 2>/dev/null)"
 case "$settings" in
@@ -78,7 +89,16 @@ case "$settings" in
     ok "settings.json registers it after an edit and at the end of a turn, with the project path quoted" ;;
   *) bad "settings.json does not register both hook events with a quoted project path" ;;
 esac
-matcher="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["PostToolUse"][0]["matcher"])' "$R/.claude/settings.json" 2>/dev/null)"
+ON_EDIT="$(registered PostToolUse)"; ON_STOP="$(registered Stop)"
+# `python3` is not Python everywhere: on Windows it can be a Store alias, and
+# the interpreter is `python` or `py`. A hook registered by a fixed name fails
+# there, and a hook fails where nobody is looking.
+case "$ON_EDIT$ON_STOP" in
+  *python3*|*"python "*) bad "a hook command names the interpreter itself instead of going through scripts/python.sh" ;;
+  *scripts/python.sh*scripts/python.sh*) ok "both hook commands start Python through scripts/python.sh, not by a fixed name" ;;
+  *) bad "the hook commands do not go through scripts/python.sh: $ON_EDIT" ;;
+esac
+matcher="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["PostToolUse"][0]["matcher"])' "$R/.claude/settings.json" 2>/dev/null)"
 case "$matcher" in *Edit*Write*) ok "the edit hook matches the Edit and Write tools" ;; *) bad "the edit hook's matcher is '$matcher'" ;; esac
 for tool in agents cursor copilot; do
   O="$WORK/$tool"; fresh_repo "$O"; "$BOOTSTRAP" --tool "$tool" --target "$O" >/dev/null 2>&1
@@ -142,7 +162,7 @@ echo "=== the checkout the file is in, not the one the session started in ==="
 W="$WORK/worktree copy"; git clone -q "$R" "$W" 2>/dev/null
 printf '#!/usr/bin/env bash\n# Enforces: RULE:testing — only in this checkout\nexit 0\n' > "$W/scripts/check-only-here.sh"
 OUT="$(printf '{"session_id":"s3","cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$R" "$W/.claude/rules/testing.md" \
-        | CLAUDE_PROJECT_DIR="$R" python3 "$HOOK" post-edit 2>/dev/null)"
+        | run_hook "$ON_EDIT" 2>/dev/null)"
 case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
   *check-only-here.sh*) ok "the citers come from the edited file's own checkout" ;;
   *) bad "the hook read the session's checkout instead of the file's" ;;
@@ -174,9 +194,9 @@ stop s5 "$R" false
 git -C "$R" mv .claude/rules/test-layout.md .claude/rules/testing.md
 
 echo "=== a hook that cannot do its job is silent, and exits 0 ==="
-OUT="$(printf 'this is not json' | python3 "$HOOK" post-edit 2>&1)"; RC=$?
+OUT="$(printf 'this is not json' | run_hook "$ON_EDIT" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "input that is not JSON: silent" || bad "malformed input: rc=$RC out=$OUT"
-OUT="$(: | python3 "$HOOK" stop 2>&1)"; RC=$?
+OUT="$(: | run_hook "$ON_STOP" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "no input at all: silent" || bad "empty input: rc=$RC out=$OUT"
 mkdir -p "$WORK/loose"; printf 'x\n' > "$WORK/loose/notes.md"
 post_edit s6 "$WORK/loose/notes.md"
@@ -191,8 +211,29 @@ stop s6 "$B" false
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "a broken registries.json is the gate's to report, not a reason to hold a turn" \
   || bad "a config error held the turn: $OUT"
 git -C "$R" mv .claude/rules/testing.md .claude/rules/test-layout.md
-OUT="$(printf '{"session_id":"s7","cwd":"%s","stop_hook_active":false}' "$R" | WORKSPACE_GRAPH_HOOK=off python3 "$HOOK" stop 2>&1)"; RC=$?
+OUT="$(printf '{"session_id":"s7","cwd":"%s","stop_hook_active":false}' "$R" | WORKSPACE_GRAPH_HOOK=off run_hook "$ON_STOP" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "WORKSPACE_GRAPH_HOOK=off switches it off for a run" || bad "the off switch did not silence the hook"
+git -C "$R" mv .claude/rules/test-layout.md .claude/rules/testing.md
+
+echo "=== a machine where Python is not called python3 ==="
+# What Windows looks like from Git Bash: python3 is on PATH and is not Python,
+# and the interpreter answers to `python`.
+REAL_PY="$("$PY" -c 'import sys; print(sys.executable)')"
+SHADOW="$WORK/not-python3"; mkdir -p "$SHADOW"
+printf '#!/bin/sh\necho "Python was not found; run without arguments to install from the Store" >&2\nexit 49\n' > "$SHADOW/python3"
+printf '#!/bin/sh\nexec "%s" "$@"\n' "$REAL_PY" > "$SHADOW/python"; chmod +x "$SHADOW/python3" "$SHADOW/python"
+event="$(printf '{"session_id":"s8","cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$R" "$R/.claude/rules/testing.md")"
+OUT="$(printf '%s' "$event" | ( unset PYTHON; PATH="$SHADOW:$PATH" CLAUDE_PROJECT_DIR="$R" sh -c "python3 \"\$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit" ) 2>/dev/null)"
+[ -z "$OUT" ] && ok "control: registered as 'python3 <hook>', the hook says nothing there — and nothing says it failed (defect reproduced)" \
+  || bad "control: the fixed-name command worked on a machine where python3 is not Python"
+OUT="$(printf '%s' "$event" | ( unset PYTHON; PATH="$SHADOW:$PATH" run_hook "$ON_EDIT" ) 2>"$WORK/err")"
+case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
+  *scripts/check-tests.sh:2*) ok "as registered, the hook finds Python under its other name and the citers arrive" ;;
+  *) bad "the registered hook command said nothing where Python is called python: $(cat "$WORK/err")" ;;
+esac
+git -C "$R" mv .claude/rules/testing.md .claude/rules/test-layout.md
+OUT="$(printf '{"session_id":"s8","cwd":"%s","stop_hook_active":false}' "$R" | ( unset PYTHON; PATH="$SHADOW:$PATH" run_hook "$ON_STOP" ) 2>/dev/null)"
+[ "$(field "$OUT" decision)" = "block" ] && ok "and a broken link still holds the turn there" || bad "the stop hook said nothing where Python is called python"
 git -C "$R" mv .claude/rules/test-layout.md .claude/rules/testing.md
 
 echo "=== nothing is left behind in the repository ==="
@@ -203,7 +244,7 @@ pyc="$(find "$R" -name '__pycache__' -o -name '*.pyc' | grep -v '/.git/' | wc -l
 [ "$pyc" -eq 0 ] && ok "and no bytecode" || bad "the hook left $pyc bytecode path(s)"
 
 echo "=== a repository whose settings predate the hook is told what to add ==="
-python3 - "$R/.claude/settings.json" <<'PY'
+"$PY" - "$R/.claude/settings.json" <<'PY'
 import json, sys
 path = sys.argv[1]
 data = json.load(open(path))

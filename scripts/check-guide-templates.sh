@@ -21,7 +21,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 GUIDE="${1:-AGENTIC-ENGINEERING-GUIDE.md}"
 KIT="${2:-starter-kit}"
 
-python3 - "$GUIDE" "$KIT" <<'PY'
+starter-kit/scripts/python.sh - "$GUIDE" "$KIT" <<'PY'
 import difflib, pathlib, re, sys
 
 guide_path, kit = sys.argv[1], pathlib.Path(sys.argv[2])

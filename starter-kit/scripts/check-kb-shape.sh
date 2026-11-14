@@ -29,8 +29,11 @@ set -euo pipefail
 # width, and one of them is wrong about the same file. Env vars and the
 # defaults below apply only where no registry is declared.
 _cfg=""
-if [ -f registries.json ] && command -v python3 >/dev/null 2>&1; then
-  _cfg="$(python3 - <<'PY' 2>/dev/null
+# Python under whatever name this machine gives it; the fallback is for a
+# repository that copied this gate from a newer kit without the launcher.
+_py="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python.sh"; [ -x "$_py" ] || _py=python3
+if [ -f registries.json ] && "$_py" -c 'pass' >/dev/null 2>&1; then
+  _cfg="$("$_py" - <<'PY' 2>/dev/null
 import json
 cfg = json.load(open("registries.json"))
 kb = next((r for r in cfg.get("registries", []) if r.get("kind", "entries") == "entries" and r.get("output")), None)
