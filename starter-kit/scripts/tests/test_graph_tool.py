@@ -210,6 +210,21 @@ class EntryTest(GraphTestCase):
         code, _, err = self.run_tool("check")
         self.assertEqual((code, err), (0, ""))
 
+    def test_a_registry_prefix_with_a_hyphen_resolves(self):
+        # The prefix used to be read as the text before the FIRST hyphen, so a
+        # registry called BUG-REPORT could be declared and never cited.
+        self.config["registries"].append(
+            {"name": "bugs", "kind": "entries", "id_prefix": "BUG-REPORT", "fragments": "bugs.d"})
+        self.save_config()
+        self.write("bugs.d/2026-01-01-crash.md", "# Crash\n")
+        self.write(".claude/rules/testing.md", "# Testing Rules\n\n**Related:** BUG-REPORT-2026-01-01-crash\n")
+        code, _, err = self.run_tool("check")
+        self.assertEqual((code, err), (0, ""))
+        self.write(".claude/rules/testing.md", "# Testing Rules\n\n**Related:** BUG-REPORT-2026-01-01-gone\n")
+        code, _, err = self.run_tool("check")
+        self.assertEqual(code, 1)
+        self.assertIn("no BUG-REPORT entry has that identifier", err)
+
     def test_changelog_fragments_are_not_entries(self):
         self.write("changelog.d/2026-08-29-thing.md", "# Thing\n\n**Related:** RULE:deleted\n")
         self.assertEqual(self.run_tool("check")[0], 0)
@@ -225,6 +240,18 @@ class LinkLineTest(GraphTestCase):
         code, out, err = self.run_tool("check")
         self.assertEqual((code, err), (0, ""))
         self.assertIn("no typed links yet", out)
+
+    def test_an_unclosed_fence_is_reported_instead_of_hiding_what_follows(self):
+        # Everything after an unclosed fence reads as code, so a dangling link
+        # below it would never be looked at — and the gate would say OK.
+        self.write(
+            ".claude/rules/testing.md",
+            "# Testing Rules\n\n```bash\nmake test\n\n**Related:** RULE:gone\n",
+        )
+        code, _, err = self.run_tool("check")
+        self.assertEqual(code, 1)
+        self.assertIn(".claude/rules/testing.md:3", err)
+        self.assertIn("never closed", err)
 
     def test_only_a_scripts_header_block_is_read(self):
         self.write(
@@ -328,6 +355,10 @@ class AllowlistTest(GraphTestCase):
         code, _, err = self.run_tool("check")
         self.assertEqual(code, 0)
         self.assertIn("note: docs/adr/adr-0002-retry-policy.md:3 cites RULE:retired", err)
+
+    def test_a_path_written_with_a_leading_dot_slash_still_matches(self):
+        self.write(".graph-link-allowlist", "./docs/adr/adr-0002-retry-policy.md RULE:retired  # immutable record\n")
+        self.assertEqual(self.run_tool("check")[0], 0)
 
     def test_a_pair_without_a_reason_is_rejected(self):
         self.write(".graph-link-allowlist", "docs/adr/adr-0002-retry-policy.md RULE:retired\n")

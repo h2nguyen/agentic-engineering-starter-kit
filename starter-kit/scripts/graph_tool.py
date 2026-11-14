@@ -86,7 +86,6 @@ NOT_A_HANDOFF_TARGET = ("RULE", "DOC")
 
 MARKDOWN_EXTENSIONS = (".md", ".mdc", ".markdown")
 PATH_TOKEN = re.compile(r"^([A-Z][A-Z0-9_]*):([A-Za-z0-9._/-]+)$")
-ID_TOKEN = re.compile(r"^([A-Z][A-Z0-9]*)-([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)$")
 _LABEL_ALT = "|".join(re.escape(label) for label in LABELS)
 MARKDOWN_LINK = re.compile(r"^\*\*(%s):\*\*[ \t]*(.*)$" % _LABEL_ALT)
 COMMENT_LINK = re.compile(r"^\s*(?:#|//)\s*(%s):[ \t]+(.*)$" % _LABEL_ALT)
@@ -337,30 +336,39 @@ class Graph:
             except (OSError, UnicodeDecodeError):
                 continue
             if node.path.lower().endswith(MARKDOWN_EXTENSIONS):
-                found = self._markdown_links(lines)
+                found = self._markdown_links(node, lines)
             else:
                 found = self._header_links(lines)
             for line_no, label, value in found:
                 self._read_link(node, line_no, label, value)
 
-    @staticmethod
-    def _markdown_links(lines: list[str]):
+    def _markdown_links(self, source: Node, lines: list[str]):
         """Link lines outside fenced code — an example is not a citation."""
-        fence = None
+        fence, opened_at, hidden = None, 0, 0
         for number, line in enumerate(lines, 1):
             opened = FENCE.match(line)
             if opened:
                 marker = opened.group(1)
                 if fence is None:
-                    fence = marker
+                    fence, opened_at, hidden = marker, number, 0
                 elif marker[0] == fence[0] and len(marker) >= len(fence):
                     fence = None
                 continue
-            if fence is not None:
-                continue
             match = MARKDOWN_LINK.match(line)
+            if fence is not None:
+                hidden += 1 if match else 0
+                continue
             if match:
                 yield number, match.group(1), match.group(2)
+        if fence is not None and hidden:
+            # Everything below an unclosed fence reads as code, so the links
+            # down there were skipped. Saying OK about a file that was only
+            # half read is the silent failure this gate exists to prevent.
+            self.problems.append(Problem(source.path, opened_at, "", "", [
+                f"the code fence opened here is never closed, so {hidden} link line(s) "
+                f"below it were read as code and not checked.",
+                f"Close the fence with a line of {fence[0] * 3}.",
+            ], False))
 
     @staticmethod
     def _header_links(lines: list[str]):
@@ -412,7 +420,7 @@ class Graph:
             return
 
         path_token = PATH_TOKEN.match(token)
-        id_token = ID_TOKEN.match(token)
+        entry_kind = self._entry_kind(token)
         targets: list[Node] = []
         kind = ""
         if path_token and path_token.group(1) in self.globs:
@@ -420,8 +428,8 @@ class Graph:
             targets = self.by_alias.get(kind, {}).get(name, [])
             if not targets:
                 return reject(*self._missing_file(label, token, kind, name), dangling=True)
-        elif id_token and id_token.group(1) in self.entry_ids:
-            kind = id_token.group(1)
+        elif entry_kind:
+            kind = entry_kind
             hit = self.entry_ids[kind].get(token)
             if hit is None:
                 return reject(*self._missing_entry(label, token, kind), dangling=True)
@@ -455,10 +463,20 @@ class Graph:
             )
         self.edges.append(Edge(source, label, token, targets, source.path, line_no))
 
+    def _entry_kind(self, token: str) -> str:
+        """The registry a token belongs to: the longest declared prefix it starts with.
+
+        Longest, not first: a prefix may itself contain a hyphen (BUG-REPORT),
+        and reading the text before the first hyphen as the prefix made such a
+        registry impossible to cite.
+        """
+        fits = [prefix for prefix in self.entry_ids if token.startswith(prefix + "-")]
+        return max(fits, key=len) if fits else ""
+
     def _looked_in(self, kind: str) -> str:
         """The globs for a kind — only the ones this layout has, when it has any."""
         here = [g for g in self.globs[kind]
-                if "*" in g and os.path.isdir(os.path.join(self.root, g.split("*")[0]) or self.root)]
+                if "*" in g and os.path.isdir(os.path.join(self.root, g.split("*")[0]))]
         return ", ".join(here or self.globs[kind])
 
     def _missing_file(self, label: str, token: str, kind: str, name: str) -> list[str]:
@@ -500,9 +518,9 @@ class Graph:
         path_token = PATH_TOKEN.match(wanted)
         if path_token:
             return list(self.by_alias.get(path_token.group(1), {}).get(path_token.group(2), []))
-        id_token = ID_TOKEN.match(wanted)
-        if id_token:
-            hit = self.entry_ids.get(id_token.group(1), {}).get(wanted)
+        entry_kind = self._entry_kind(wanted)
+        if entry_kind:
+            hit = self.entry_ids[entry_kind].get(wanted)
             return [hit] if hit else []
         return []
 
@@ -555,7 +573,9 @@ def load_allowlist(root: str) -> tuple[dict, list[str]]:
                     f"Say why the citing file cannot be repaired."
                 )
                 continue
-            entries[(_posix(fields[0]), fields[1])] = number
+            # ./docs/x.md and docs/x.md are the same file; the graph knows it
+            # by the second spelling.
+            entries[(_posix(os.path.normpath(fields[0])), fields[1])] = number
     return entries, errors
 
 
