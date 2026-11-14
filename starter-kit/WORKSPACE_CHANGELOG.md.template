@@ -2,14 +2,16 @@
 
 Audit history for this repo's AI/agent configuration (constitution, rules,
 skills, agents, commands, hooks, settings). Maintained by the
-`ai-engineering-workspace-audit` skill — one entry per run, newest first.
+`ai-engineering-workspace-audit` skill and the `agent-coach` — one entry per
+audit run or coach cycle, newest first, below the format block.
 This file is the record that stops future audits from re-litigating settled
 decisions: the "deliberately NOT changed" list is as load-bearing as the
 changes themselves.
 
-Entry format — copy per run:
+Entry format — copy per run. A coach cycle uses the same shape: its proposals
+go in the changes table with "approved" or "rejected" in place of the rung.
 
-## <YYYY-MM-DD> — <quick|full> audit
+## <YYYY-MM-DD> — <quick|full> audit | agent-coach cycle
 
 **Mode:** <quick|full>. **Baseline:** `<branch@short-sha>`. **Branch:** `<working branch>`.
 

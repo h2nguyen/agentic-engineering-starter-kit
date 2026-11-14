@@ -55,7 +55,7 @@ Produce a scorecard per agent:
 | Precision proxy | Low false-positive tendency | Patterns likely to over-flag |
 | Recency | Cites only live tickets/versions | Count of stale references |
 
-Classify each agent: **Ready** / **Needs refresh** / **Gap**.
+Classify each agent: **Ready** (aligned with the rules it holds; nothing to change) / **Needs refresh** (an instruction is stale or contradicts a rule) / **Gap** (a rule or gate in its domain that it does not cover).
 
 ### 3. PROPOSE — minimal diffs
 
@@ -74,11 +74,11 @@ Batch the proposals and present them. STOP and wait for approval.
 
 ### 4. APPLY (only approved) → 5. MEASURE
 
-Apply approved edits with `Edit`. Record what changed in the proposal log so the NEXT cycle can ask "did this reduce escapes/false-positives?" Re-run any agent self-checks affected. Note rejected proposals too — a repeated rejection is itself a signal that your diagnosis heuristic needs tuning (improve yourself, not just them).
+Apply approved edits with `Edit`. Record the cycle — each proposal, whether it was approved or rejected, and what the next cycle should measure — as an entry in the workspace changelog (`.claude/WORKSPACE_CHANGELOG.md`; `docs/WORKSPACE_CHANGELOG.md` where the tool has no `.claude/`). That file is the proposal log: it is where the NEXT cycle reads the acceptance rate and asks "did this reduce escapes/false-positives?" An edit to an agent file is workspace-internal, so it is recorded there and not in the product changelog. Re-run any agent self-checks affected. Note rejected proposals too — a repeated rejection is itself a signal that your diagnosis heuristic needs tuning (improve yourself, not just them).
 
 ## Cadence
 
-Run a cycle when ANY of: a rule file changed materially; a new decision record landed that an agent should encode; a knowledge-base ISSUE was added for something an agent should have caught; a new CI check was added with no owning agent; or on a periodic schedule (monthly is a reasonable default). Don't run constantly — churn on agent files erodes their stability and reviewability.
+Run a cycle when ANY of: a rule file changed what it requires (a reworded sentence is not a trigger); a new decision record landed that an agent should encode; a knowledge-base ISSUE was added for something an agent should have caught; a new CI check was added with no owning agent; or on a periodic schedule (monthly is a reasonable default). Don't run constantly — churn on agent files erodes their stability and reviewability.
 
 ## Self-improvement (reflect on the coach, too)
 
