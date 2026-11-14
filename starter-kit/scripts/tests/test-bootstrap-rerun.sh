@@ -65,9 +65,11 @@ changed="$(git -C "$R" status --short)"
 [ -z "$changed" ] && ok "regenerating a fresh install changes nothing" \
   || bad "the installed templates are not what the generator writes: $(echo "$changed" | tr '\n' ' ')"
 git -C "$R" checkout -q -- . 2>/dev/null
-( cd "$R" && ./scripts/check-registry-drift.sh 2>&1 ) | grep -q 'non-canonical' \
-  && bad "a fresh install's drift gate reports a merge that never happened" \
-  || ok "a fresh install's drift gate reports nothing to normalise"
+drift="$( cd "$R" && ./scripts/check-registry-drift.sh 2>&1 )"
+case "$drift" in
+  *non-canonical*) bad "a fresh install's drift gate reports a merge that never happened" ;;
+  *) ok "a fresh install's drift gate reports nothing to normalise" ;;
+esac
 # The catalog is in the kit, not in the repository installed into. With
 # --target the two are different directories, and a relative path names a
 # file the reader's repository does not have.
@@ -240,8 +242,15 @@ case "$out" in
                     || bad "'make graph-impact' without NODE exits 0" ;;
   *) bad "'make graph-impact' without NODE does not say to pass NODE=<KIND:name>" ;;
 esac
-( cd "$R" && make graph-impact NODE=RULE:documentation 2>&1 ) | grep -q '^RULE:documentation — ' \
-  && ok "and with NODE it answers" || bad "'make graph-impact NODE=RULE:documentation' does not answer"
+# Capture before matching: under `pipefail`, `grep -q` leaving at its first
+# hit kills `make` with SIGPIPE while it is still writing, and the pipeline
+# then reports a command that answered correctly as one that failed. GNU Make
+# 4 on Linux writes enough after the first line for that to happen every time.
+out="$( cd "$R" && make graph-impact NODE=RULE:documentation 2>&1 )"
+case "$out" in
+  *"RULE:documentation — "*) ok "and with NODE it answers" ;;
+  *) bad "'make graph-impact NODE=RULE:documentation' does not answer" ;;
+esac
 
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"
