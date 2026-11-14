@@ -28,7 +28,9 @@ It reads the checkout the edited file is in (or, at stop, the session's
 current directory) — not $CLAUDE_PROJECT_DIR, which in a worktree still names
 the main checkout.
 
-Registered in .claude/settings.json. To switch it off for a run, set
+Registered in .claude/settings.json, where it is started through
+scripts/python.sh — Python under whatever name the machine gives it — and
+never as `python3 …`. To switch it off for a run, set
 WORKSPACE_GRAPH_HOOK=off; to remove it, delete its two entries there. To see
 why it stayed silent, set WORKSPACE_GRAPH_HOOK_DEBUG=1.
 
@@ -77,10 +79,14 @@ def repository(start):
 
 def graph_tool(root, *argv):
     """Run the repository's own graph tool; no bytecode left in the repository."""
+    # sys.executable: the interpreter that is running this hook is one that
+    # works here, whatever it is called. UTF-8 both ways: the tool prints
+    # dashes and arrows, which a Windows code page cannot encode.
     return subprocess.run(
         [sys.executable, "-B", TOOL, *argv],
-        cwd=root, capture_output=True, text=True, timeout=TOOL_TIMEOUT,
-        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
+        cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=TOOL_TIMEOUT,
+        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONUTF8="1"),
     )
 
 

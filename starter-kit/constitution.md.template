@@ -71,6 +71,10 @@ python3 scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
 make registry-generate
 ```
 
+Where Python has another name than `python3` (Windows: `python`, `py`), write
+`./scripts/python.sh` in its place, here and in every rule: it finds the
+interpreter this machine has.
+
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
 Shortcut, and a `Related:` line naming the rule or check that now prevents it
 (`RULE:<rule file name>`, `SCRIPT:<check script name>`).

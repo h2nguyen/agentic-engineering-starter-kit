@@ -13,16 +13,20 @@
 # graph-links, check-ci-lint-coverage.sh fails and says so — an installed gate that nothing
 # runs is indistinguishable from no gate at all.
 
+# Python is started through scripts/python.sh, which finds it under whatever
+# name this machine gives it (python3, python, py -3). To choose one yourself:
+#     make lint PYTHON=/path/to/python
+
 .PHONY: registry-generate registry-list registry-drift registry-ids kb-shape \
         graph-links graph-impact graph-coverage ci-lint-coverage registry-test
 
 ## registry-generate — assemble every registry artifact from its fragments.
 registry-generate:
-	python3 scripts/registry_tool.py generate
+	./scripts/python.sh scripts/registry_tool.py generate
 
 ## registry-list — show the declared registries and their entry counts.
 registry-list:
-	python3 scripts/registry_tool.py list
+	./scripts/python.sh scripts/registry_tool.py list
 
 ## registry-drift — the generated artifacts say what their fragments say.
 registry-drift:
@@ -48,12 +52,12 @@ graph-impact:
 	  echo "Usage: make graph-impact NODE=<KIND:name>   e.g. NODE=RULE:documentation, NODE=ADR-0002, NODE=HUMAN, or a file path" >&2; \
 	  exit 2; \
 	fi
-	@python3 scripts/graph_tool.py impact $(NODE)
+	@./scripts/python.sh scripts/graph_tool.py impact $(NODE)
 
 ## graph-coverage — which rules a script enforces and an agent reviews.
 ## A report for audits and the health checklist, never a gate.
 graph-coverage:
-	@python3 scripts/graph_tool.py coverage
+	@./scripts/python.sh scripts/graph_tool.py coverage
 
 ## ci-lint-coverage — every lint sub-target actually runs in CI, and the
 ## registry and link gates are actually reached by lint.
@@ -65,7 +69,8 @@ ci-lint-coverage:
 ## -b: the suites exercise the gates' failure paths, and a passing run must
 ## not print their FAIL lines into a green `make lint`.
 registry-test:
-	python3 -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
+	./scripts/python.sh -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
 	./scripts/tests/test-ci-lint-coverage.sh
 	./scripts/tests/test-parallel-merge.sh
 	./scripts/tests/test-graph-links.sh
+	./scripts/tests/test-python-launcher.sh

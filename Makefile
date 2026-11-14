@@ -26,21 +26,22 @@ lint: registry-drift registry-ids graph-links ci-lint-coverage guide-templates r
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
-	python3 -B -m unittest discover -b -s $(KIT)/scripts/tests -p 'test_*.py'
+	$(KIT)/scripts/python.sh -B -m unittest discover -b -s $(KIT)/scripts/tests -p 'test_*.py'
 	$(KIT)/scripts/tests/test-ci-lint-coverage.sh
 	$(KIT)/scripts/tests/test-parallel-merge.sh
 	$(KIT)/scripts/tests/test-graph-links.sh
+	$(KIT)/scripts/tests/test-python-launcher.sh
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 	$(KIT)/scripts/tests/test-graph-hooks.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
-	python3 $(KIT)/scripts/registry_tool.py generate
+	$(KIT)/scripts/python.sh $(KIT)/scripts/registry_tool.py generate
 
 ## registry-list — show the declared registries and their entry counts.
 registry-list:
-	python3 $(KIT)/scripts/registry_tool.py list
+	$(KIT)/scripts/python.sh $(KIT)/scripts/registry_tool.py list
 
 ## registry-drift — the generated artifacts match their fragments.
 registry-drift:
@@ -62,11 +63,11 @@ graph-impact:
 	  echo "Usage: make graph-impact NODE=<KIND:name>   e.g. NODE=RULE:documentation, NODE=ADR-0002, NODE=HUMAN, or a file path" >&2; \
 	  exit 2; \
 	fi
-	@python3 $(KIT)/scripts/graph_tool.py impact $(NODE)
+	@$(KIT)/scripts/python.sh $(KIT)/scripts/graph_tool.py impact $(NODE)
 
 ## graph-coverage — which shipped rules a script enforces and an agent reviews.
 graph-coverage:
-	@python3 $(KIT)/scripts/graph_tool.py coverage
+	@$(KIT)/scripts/python.sh $(KIT)/scripts/graph_tool.py coverage
 
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:

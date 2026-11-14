@@ -17,6 +17,7 @@
 set -uo pipefail
 VERBOSE=0; [ "${1:-}" = "-v" ] && VERBOSE=1
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$KIT_DIR/scripts/python.sh"   # Python under whatever name this machine gives it
 WORK="$(mktemp -d)"; trap '[ "$VERBOSE" -eq 1 ] || rm -rf "$WORK"' EXIT
 pass=0; fail=0
 ok()  { printf '  ok   — %s\n' "$1"; pass=$((pass + 1)); }
@@ -60,7 +61,7 @@ grep -q 'registry block already present' "$WORK/run2.log" \
 # an empty generated region, which is not what the generator writes for an
 # empty registry, so the first `make lint` of a brand-new repository said its
 # changelog was "non-canonical after a merge" — in a repository with no merge.
-( cd "$R" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 )
+( cd "$R" && "$PY" scripts/registry_tool.py generate >/dev/null 2>&1 )
 changed="$(git -C "$R" status --short)"
 [ -z "$changed" ] && ok "regenerating a fresh install changes nothing" \
   || bad "the installed templates are not what the generator writes: $(echo "$changed" | tr '\n' ' ')"
@@ -121,7 +122,7 @@ echo "=== the installed SessionStart hook runs, also from a path with a space ==
 # space and the hook exits 127 — a non-blocking error, so it is silently gone.
 R="$WORK/with space"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --target "$R" >/dev/null 2>&1 || bad "bootstrap into a path with a space exited non-zero"
-cmd="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["SessionStart"][0]["hooks"][0]["command"])' "$R/.claude/settings.json")"
+cmd="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["SessionStart"][0]["hooks"][0]["command"])' "$R/.claude/settings.json")"
 env_file="$WORK/claude-env"; : > "$env_file"
 CLAUDE_PROJECT_DIR="$R" CLAUDE_ENV_FILE="$env_file" sh -c "$cmd" >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 0 ] && ok "the hook command runs from a project path with a space" || bad "the hook command exited $rc from a path with a space"
@@ -144,7 +145,7 @@ for tool in claude agents cursor copilot; do
   ! grep -q 'adopt --registry' "$WORK/boot-$tool.out" \
     && ok "$tool: a repository that had nothing is not told to adopt what it was just given" \
     || bad "$tool: a fresh install is told to run adopt on the template it just received"
-  pointer="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rule_pointer"])' "$R/registries.json")"
+  pointer="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["rule_pointer"])' "$R/registries.json")"
   [ -f "$R/$pointer" ] && ok "$tool: gate failures point at a rule file that exists ($pointer)" \
     || bad "$tool: registries.json points gate failures at $pointer, which is not there"
   case "$tool" in
@@ -221,7 +222,7 @@ R="$WORK/claude"
 unit="$(grep -m1 'unittest discover' "$R/registry.mk" | sed 's/^[[:space:]]*//')"
 ( cd "$R" && env -u PYTHONDONTWRITEBYTECODE make graph-links registry-ids >/dev/null 2>&1
   env -u PYTHONDONTWRITEBYTECODE sh -c "$unit" > "$WORK/unit.log" 2>&1
-  env -u PYTHONDONTWRITEBYTECODE python3 scripts/graph_tool.py impact RULE:documentation >/dev/null 2>&1 )
+  env -u PYTHONDONTWRITEBYTECODE "$PY" scripts/graph_tool.py impact RULE:documentation >/dev/null 2>&1 )
 left="$(find "$R" -name '__pycache__' -o -name '*.pyc' | grep -v '/.git/' | wc -l | tr -d ' ')"
 [ "$left" -eq 0 ] && ok "the gates, the unit tests and a direct query leave no __pycache__ in the repository" \
   || bad "the kit's tools left $left bytecode path(s) in the repository"
@@ -252,6 +253,33 @@ case "$out" in
   *) bad "'make graph-impact NODE=RULE:documentation' does not answer" ;;
 esac
 
+echo "=== a machine where Python is not called python3 ==="
+# What Windows looks like from Git Bash: python3 is on PATH and is not Python
+# (a Store alias), and the interpreter answers to `python`. Nothing the kit
+# runs may reach for python3 by name: not the installer, not a make target,
+# not a gate, not a test. One that does fails here.
+REAL_PY="$("$KIT_DIR/scripts/python.sh" -c 'import sys; print(sys.executable)' 2>/dev/null)"
+SHADOW="$WORK/not-python3"; mkdir -p "$SHADOW"
+printf '#!/bin/sh\necho "python3-is-not-python: $*" >> "%s/reached.log"\nexit 49\n' "$WORK" > "$SHADOW/python3"
+printf '#!/bin/sh\nexec "%s" "$@"\n' "$REAL_PY" > "$SHADOW/python"; chmod +x "$SHADOW/python3" "$SHADOW/python"
+R="$WORK/other name"; fresh_repo "$R"
+if ( unset PYTHON; PATH="$SHADOW:$PATH" "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/other-install.log" 2>&1 ) && [ -f "$R/registries.json" ]; then
+  ok "the installer runs, and writes registries.json, where Python is called python"
+else
+  bad "the installer failed where python3 is not Python:"; tail -4 "$WORK/other-install.log" | sed 's/^/         /'
+fi
+[ -x "$R/scripts/python.sh" ] && ok "scripts/python.sh is installed, executable" || bad "scripts/python.sh was not installed"
+if ( cd "$R" && unset PYTHON && PATH="$SHADOW:$PATH" make lint > "$WORK/other-lint.log" 2>&1 ); then
+  ok "'make lint' passes there — every gate and every suite of a fresh install"
+else
+  bad "'make lint' fails where python3 is not Python:"; grep -E "FAIL|Error|not found" "$WORK/other-lint.log" | head -6 | sed 's/^/         /'
+fi
+# The probe asks python3 one question (-c, a version check) and moves on. Any
+# other call is something that named the interpreter itself.
+named="$(grep -v 'sys.version_info' "$WORK/reached.log" 2>/dev/null | wc -l | tr -d ' ')"
+[ "$named" -eq 0 ] && ok "and nothing in the kit called python3 by name" \
+  || { bad "$named call(s) named python3 directly:"; grep -v 'sys.version_info' "$WORK/reached.log" | cut -c1-150 | sort | uniq -c | head -6 | sed 's/^/         /'; }
+
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --with-meta --target "$R" >/dev/null 2>&1 || bad "bootstrap --with-meta exited non-zero"
@@ -260,7 +288,7 @@ if ( cd "$R" && ./scripts/check-graph-links.sh > "$WORK/links-meta.log" 2>&1 ); 
 else
   bad "a Level-4 artifact cites something that was not installed:"; grep -E '^FAIL' "$WORK/links-meta.log" | head -5 | sed 's/^/         /'
 fi
-handoffs="$( cd "$R" && python3 scripts/graph_tool.py impact HUMAN 2>/dev/null | head -1 )"
+handoffs="$( cd "$R" && "$PY" scripts/graph_tool.py impact HUMAN 2>/dev/null | head -1 )"
 case "$handoffs" in
   *"(0)"*|"") bad "the installed meta loop declares no human approval gate" ;;
   *) ok "the installed meta loop declares its human approval gates as hand-offs" ;;

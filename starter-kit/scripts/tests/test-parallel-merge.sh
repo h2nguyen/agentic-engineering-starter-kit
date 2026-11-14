@@ -20,6 +20,7 @@ VERBOSE=0
 [ "${1:-}" = "-v" ] && VERBOSE=1
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$KIT_DIR/scripts/python.sh"   # Python under whatever name this machine gives it
 TOOL="$KIT_DIR/scripts/registry_tool.py"
 WORK="$(mktemp -d)"
 trap '[ "$VERBOSE" -eq 1 ] || rm -rf "$WORK"' EXIT
@@ -261,7 +262,7 @@ EOF
 <!-- END GENERATED: changelog -->
 EOF
 
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "seed: registry scaffolding"
 }
 
@@ -271,7 +272,7 @@ add_on_branch() { # $1 = repo, $2 = branch, $3... = registry_tool args
   local repo="$1" branch="$2"; shift 2
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b "$branch"
-  ( cd "$repo" && python3 scripts/registry_tool.py "$@" >/dev/null 2>&1 )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py "$@" >/dev/null 2>&1 )
   # Fill the template placeholders so the shape gate sees real content. This
   # must NOT swallow its own errors: when the substitution silently no-ops the
   # placeholders survive, the identifier gate rejects them exactly as designed,
@@ -283,7 +284,7 @@ add_on_branch() { # $1 = repo, $2 = branch, $3... = registry_tool args
   while IFS= read -r frag; do
     sed_i 's/^- <what an operator.*/- Recorded by the acceptance test./' "$frag"
   done < <(find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*')
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "registry: entry from $branch"
 }
 
@@ -307,7 +308,7 @@ contract_kb() { # $1 = id_scheme
   fi
 
   # Regenerating after the merge must pick up both entries and stay clean.
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   local entries; entries="$(grep -c '^## ISSUE-' "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.md" || echo 0)"
   if [ "$entries" -eq 2 ]; then
     ok "[$scheme] both entries survive the merge (no silent loss)"
@@ -323,13 +324,13 @@ contract_kb() { # $1 = id_scheme
   # but the collision is not, and the gate is the only thing standing between
   # that duplicate and the first rule or decision record that cites it.
   local gate="pass"
-  ( cd "$repo" && python3 scripts/registry_tool.py check >/dev/null 2>&1 ) || gate="fail"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py check >/dev/null 2>&1 ) || gate="fail"
   if [ "$scheme" = "slug" ]; then
     if [ "$gate" = "pass" ]; then
       ok "[slug] identifiers are unique by construction — nothing for the gate to catch"
     else
       bad "[slug] the gate rejected a merge that should have been collision-free"
-      [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && python3 scripts/registry_tool.py check )
+      [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && "$PY" scripts/registry_tool.py check )
     fi
   else
     if [ "$gate" = "fail" ]; then
@@ -341,7 +342,7 @@ contract_kb() { # $1 = id_scheme
 
   # The generated artifact must match its fragments exactly — a merge that
   # silently corrupted the generated region has to be loud, not tolerated.
-  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     ok "[$scheme] generated knowledge base is drift-free after the merge"
   else
     bad "[$scheme] drift check failed after the merge"
@@ -362,12 +363,12 @@ contract_no_round_trip_after_merge() {
       --title "Zulu entry sorts last" --date 2026-08-29
   sed_i 's/^\*\*Symptom:\*\* .*/**Symptom:** Stale config is served for thirty seconds after a deploy./; s/^\*\*Fix:\*\* .*/**Fix:** Warm the cache after the config has loaded, not before./' \
       "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-zulu-entry-sorts-last.md"
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "a: real body"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "a: real body"
   add_on_branch "$repo" branch-b new --registry debugging-kb \
       --title "Alpha entry sorts first" --date 2026-08-29
   sed_i 's/^\*\*Symptom:\*\* .*/**Symptom:** A request hangs instead of failing fast on timeout./; s/^\*\*Fix:\*\* .*/**Fix:** Propagate the timeout error out of the retry loop./' \
       "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-alpha-entry-sorts-first.md"
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "b: real body"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "b: real body"
   add_on_branch "$repo" branch-c new --registry changelog --category added \
       --title "Zulu change" --date 2026-08-29
   cat > "$repo/changelog.d/2026-08-29-zulu-change.md" <<'EOF'
@@ -381,7 +382,7 @@ contract_no_round_trip_after_merge() {
 
 - The zulu leak.
 EOF
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "c: two categories"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "c: two categories"
   add_on_branch "$repo" branch-d new --registry changelog --category added \
       --title "Alpha change" --date 2026-08-29
   cat > "$repo/changelog.d/2026-08-29-alpha-change.md" <<'EOF'
@@ -395,7 +396,7 @@ EOF
 
 - The alpha leak.
 EOF
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "d: two categories"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "d: two categories"
 
   git -C "$repo" checkout -q branch-a
   for b in branch-b branch-c branch-d; do
@@ -403,11 +404,11 @@ EOF
   done
 
   # Deliberately NO regenerate. This is what CI sees on the merge commit.
-  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     ok "[no-round-trip] four concurrent branches (KB + two-category changelog) merge GREEN with no regenerate commit"
   else
     bad "[no-round-trip] a clean merge still needs a follow-up regenerate commit before CI passes"
-    [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && python3 scripts/registry_tool.py generate --check )
+    [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check )
   fi
   local misfiled; misfiled="$(awk '/### Fixed/{f=1} f && /endpoint\./' "$repo/CHANGELOG.md" | wc -l)"
   if [ "$misfiled" -eq 0 ]; then
@@ -418,7 +419,7 @@ EOF
 
   # A real corruption must still be caught: hand-edit an entry body.
   sed_i 's/thirty seconds/thirty minutes/' "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.md"
-  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     bad "[no-round-trip] a hand-edited entry body passed the drift check"
   else
     ok "[no-round-trip] a hand-edited entry body is still rejected"
@@ -447,17 +448,17 @@ contract_union_boundary_is_loud() {
 
 **Fix:** Identical boilerplate line two.
 EOF
-    ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "$b"
+    ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null ); commit_all "$repo" "$b"
   done
   git -C "$repo" checkout -q branch-a
   [ "$(merge_result "$repo" branch-b)" = "clean" ] || { bad "[union-boundary] unexpected conflict"; return; }
-  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     bad "[union-boundary] an interleaved artifact passed the drift check (SILENT corruption)"
   else
     ok "[union-boundary] entries sharing 2+ identical consecutive lines: merge clean, drift check LOUD"
   fi
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 \
-      && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ) \
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null 2>&1 \
+      && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ) \
     && ok "[union-boundary] one regenerate restores a drift-free artifact with both entries" \
     || bad "[union-boundary] regenerate did not recover"
 }
@@ -483,7 +484,7 @@ contract_changelog() {
     return
   fi
 
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   local bullets; bullets="$(grep -c '^- ' "$repo/CHANGELOG.md" || echo 0)"
   if [ "$bullets" -eq 2 ]; then
     ok "[changelog] both bullets survive the merge (no silent loss)"
@@ -500,7 +501,7 @@ contract_one_fragment_many_categories() {
   scaffold_fragment_repo "$repo" slug
 
   git -C "$repo" checkout -q -b branch-multi
-  ( cd "$repo" && python3 scripts/registry_tool.py new --registry changelog \
+  ( cd "$repo" && "$PY" scripts/registry_tool.py new --registry changelog \
       --category added --title "Ledger export" --date 2026-08-29 >/dev/null 2>&1 )
   cat > "$repo/changelog.d/2026-08-29-ledger-export.md" <<'EOF'
 # Ledger export
@@ -513,7 +514,7 @@ contract_one_fragment_many_categories() {
 
 - Retry loop no longer swallows the timeout error.
 EOF
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "changelog: one fragment, two categories"
 
   local added fixed files
@@ -538,11 +539,11 @@ contract_append_vs_release() {
 
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b branch-release
-  ( cd "$repo" && python3 scripts/registry_tool.py new --registry changelog \
+  ( cd "$repo" && "$PY" scripts/registry_tool.py new --registry changelog \
       --category added --title "Initial public interface" --date 2026-08-20 >/dev/null 2>&1
     sed_i 's/^- <what an operator.*/- Initial public interface./' \
       changelog.d/2026-08-20-initial-public-interface.md
-    python3 scripts/registry_tool.py release --registry changelog \
+    "$PY" scripts/registry_tool.py release --registry changelog \
       --version 1.0.0 --date 2026-08-28 >/dev/null )
   commit_all "$repo" "release: 1.0.0"
 
@@ -554,7 +555,7 @@ contract_append_vs_release() {
     return
   fi
 
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   # The appended bullet must land in Unreleased, and the released section must
   # keep its own bullet. Losing either is the silent-loss failure mode.
   local unreleased released
@@ -578,7 +579,7 @@ contract_append_vs_release_populated() { # $1 = category the parallel branch add
   local category="$1" repo="$WORK/fragment-release-populated-$1"
   scaffold_fragment_repo "$repo" slug
   printf '# Base\n\n## Fixed\n\n- Base fix, already on main.\n' > "$repo/changelog.d/2026-08-20-base.md"
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   commit_all "$repo" "changelog: a pending bullet on main"
 
   add_on_branch "$repo" branch-append new --registry changelog --category "$category" \
@@ -586,7 +587,7 @@ contract_append_vs_release_populated() { # $1 = category the parallel branch add
 
   git -C "$repo" checkout -q main
   git -C "$repo" checkout -q -b branch-release
-  ( cd "$repo" && python3 scripts/registry_tool.py release --registry changelog \
+  ( cd "$repo" && "$PY" scripts/registry_tool.py release --registry changelog \
       --version 1.0.0 --date 2026-08-28 >/dev/null )
   commit_all "$repo" "release: 1.0.0"
 
@@ -595,10 +596,10 @@ contract_append_vs_release_populated() { # $1 = category the parallel branch add
     ok "[release/$category] a populated [Unreleased] and a release conflicted — loud, nothing hidden"
     return
   fi
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null 2>&1 )
   local copies
   copies="$(awk '/^## \[1\.0\.0\]/{f=1;next} /^## \[/{f=0} f' "$repo/CHANGELOG.md" | grep -c 'Recorded by the acceptance test' || true)"
-  if ( cd "$repo" && python3 scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py generate --check >/dev/null 2>&1 ); then
     if [ "$copies" -eq 0 ]; then
       ok "[release/$category] the parallel bullet stayed out of the released section"
     else
@@ -635,7 +636,7 @@ contract_adr_numbers() { # $1 = id_scheme
   fi
 
   local gate="pass"
-  ( cd "$repo" && python3 scripts/registry_tool.py check --registry adr >/dev/null 2>&1 ) || gate="fail"
+  ( cd "$repo" && "$PY" scripts/registry_tool.py check --registry adr >/dev/null 2>&1 ) || gate="fail"
 
   if [ "$scheme" = "numeric" ]; then
     if [ "$gate" = "fail" ]; then
@@ -648,7 +649,7 @@ contract_adr_numbers() { # $1 = id_scheme
       ok "[adr/slug] no collision to catch — identifiers are unique by construction"
     else
       bad "[adr/slug] the gate rejected a merge that should have been collision-free"
-      [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && python3 scripts/registry_tool.py check --registry adr )
+      [ "$VERBOSE" -eq 1 ] && ( cd "$repo" && "$PY" scripts/registry_tool.py check --registry adr )
     fi
   fi
 }
@@ -661,7 +662,7 @@ contract_gate_catches_duplicates() {
   local d="$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d"
   printf '# One title\n\n**Symptom:** a\n' > "$d/007-one-title.md"
   printf '# Another title\n\n**Symptom:** b\n' > "$d/007-another-title.md"
-  if ( cd "$repo" && python3 scripts/registry_tool.py check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py check >/dev/null 2>&1 ); then
     bad "[gate] duplicate numeric IDs passed the uniqueness check"
   else
     ok "[gate] duplicate numeric IDs are rejected"
@@ -670,7 +671,7 @@ contract_gate_catches_duplicates() {
   # A digit-count variant must not walk past the shape assertion.
   rm -f "$d/007-another-title.md"
   printf '# Padded variant\n\n**Symptom:** c\n' > "$d/0007-padded-variant.md"
-  if ( cd "$repo" && python3 scripts/registry_tool.py check >/dev/null 2>&1 ); then
+  if ( cd "$repo" && "$PY" scripts/registry_tool.py check >/dev/null 2>&1 ); then
     bad "[gate] a wrong-width identifier passed the shape assertion"
   else
     ok "[gate] wrong-width identifiers are rejected before uniqueness is tested"

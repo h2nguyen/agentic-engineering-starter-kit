@@ -510,7 +510,7 @@ class NoteTest(GraphTestCase):
         self.assertIn("cited by 11 file(s)", out)
         self.assertEqual(out.count("docs/kb.d/"), 8)
         self.assertIn("3 more", out)
-        self.assertIn("impact RULE:testing", out)
+        self.assertIn("make graph-impact NODE=RULE:testing", out)
 
     def test_several_files_are_each_reported(self):
         self.cite_testing_rule()

@@ -327,6 +327,10 @@ python3 scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
 make registry-generate
 ```
 
+Where Python has another name than `python3` (Windows: `python`, `py`), write
+`./scripts/python.sh` in its place, here and in every rule: it finds the
+interpreter this machine has.
+
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
 Shortcut, and a `Related:` line naming the rule or check that now prevents it
 (`RULE:<rule file name>`, `SCRIPT:<check script name>`).
@@ -549,11 +553,12 @@ Duplicated procedure text between a command and a skill WILL drift.>
 
 Use a `SessionStart` hook when agent sessions need environment setup (toolchains, daemons, env vars) — agent shells are non-interactive and skip profile files. Keep hooks **idempotent** (re-runs are no-ops — `SessionStart` fires again on resume and after a compaction) and **degrading** (a blocked download warns and continues; the session still starts).
 
-A hook that cannot run is a guard that silently stops guarding: Claude Code treats its failure as a non-blocking error, and nothing turns red. Four ways that happens, each seen in a real adoption:
+A hook that cannot run is a guard that silently stops guarding: Claude Code treats its failure as a non-blocking error, and nothing turns red. Five ways that happens, each seen in a real adoption:
 
 - **An unquoted path.** Hook commands run through `sh -c`; `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` splits at a space in the project path and exits 127 — every hook at once. Write `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/x.sh"`.
 - **A lost executable bit.** A hook committed as mode `100644` does not run in any fresh clone. Gate it: every hook is `100755` in `git ls-files -s`.
 - **A missing tool.** A guard that parses its input with `jq` does nothing where `jq` is absent — including a Stop hook's `stop_hook_active` loop guard, which then fails *open* and forces continuation after continuation. Parse with what the gates already require (`python3`), or report the missing tool from `SessionStart`.
+- **A fixed interpreter name.** `python3 …` in a hook command is right on macOS and Linux and wrong on Windows, where Python is `python` or the `py` launcher and `python3` may be a Store alias that is on PATH and is not Python. Start the interpreter through a launcher that tries each name and accepts one only after it has run a line of Python — the kit's is `scripts/python.sh`, and everything the kit runs goes through it.
 - **The wrong checkout.** In a Claude Code worktree (`.claude/worktrees/<name>/`) `$CLAUDE_PROJECT_DIR` still names the main checkout; a hook that judges paths against it guards — or lints — the wrong tree. Derive the root from the file the tool touched (`git -C "$(dirname "$file")" rev-parse --show-toplevel`) or, in a Stop hook, from the input's `cwd`.
 
 All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite the same file — a formatter and a generator reading it — race; give each file kind one hook that does both, in order.
@@ -582,7 +587,7 @@ All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite 
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit",
             "timeout": 20
           }
         ]
@@ -593,7 +598,7 @@ All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite 
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop",
             "timeout": 30
           }
         ]

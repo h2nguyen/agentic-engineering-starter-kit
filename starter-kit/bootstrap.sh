@@ -17,7 +17,7 @@
 #             changelog.d/, CHANGELOG.md, registries.json (INFERRED from what the
 #             repo already has), .gitattributes (appended to if present),
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
-#             scripts/ (registry_tool.py, graph_tool.py, check-kb-shape.sh,
+#             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
 #             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
@@ -198,6 +198,10 @@ install_file ci/lint.yml.template .github/workflows/lint.yml || true
 # constitution does not: a repository can have one and never have seen the kit.
 RERUN=1
 if install_file scripts/registry_tool.py scripts/registry_tool.py x; then RERUN=0; fi
+# Everything the kit runs starts Python through this launcher, never by a
+# fixed name: `python3` is not Python on every machine (Windows has `python`
+# and `py`, and a Store alias called python3 that is neither).
+install_file scripts/python.sh scripts/python.sh x || true
 
 # Makefile: only install the template where none exists. An existing Makefile
 # is never edited — but the registry targets ship in registry.mk precisely so
@@ -234,7 +238,7 @@ fi
 if [ -e "$TARGET/registries.json" ]; then
   SKIPPED+=("registries.json (already exists — left untouched)")
 else
-  ( cd "$TARGET" && python3 scripts/registry_tool.py init ) | sed 's/^/  init: /'
+  ( cd "$TARGET" && "$KIT_DIR/scripts/python.sh" scripts/registry_tool.py init ) | sed 's/^/  init: /'
   INSTALLED+=("registries.json (inferred from the repository's existing conventions)")
 fi
 install_file scripts/check-kb-shape.sh scripts/check-kb-shape.sh x || true
@@ -334,7 +338,7 @@ else
   echo "     and <tool-or-gate> pointers — see 'Adopting the comments-and-annotations rule' in"
   echo "     $KIT_DIR/README.md."
   echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
-  echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
+  echo "     ('make registry-list' prints the identifier shapes this repo declares.)"
   echo "  2. Optional: enable further generic skills — the catalog is $KIT_DIR/skills/common-catalog.md"
   echo "     (in the kit, not in this repository)."
   if [ "$TOOL" != claude ]; then
@@ -376,8 +380,8 @@ if [ "$TOOL" = claude ] && ! grep -q 'workspace-graph.py' "$TARGET/.claude/setti
   echo "     hook (.claude/hooks/workspace-graph.py): the agent is not told what cites a file it"
   echo "     edits, nor held once when a typed link breaks. To switch that on, add these two entries"
   echo "     inside its \"hooks\" object (the whole file to compare with: $KIT_DIR/settings.json.template):"
-  echo '         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit", "timeout": 20}]}],'
-  echo '         "Stop": [{"hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop", "timeout": 30}]}]'
+  echo '         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit", "timeout": 20}]}],'
+  echo '         "Stop": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop", "timeout": 30}]}]'
 fi
 for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
   # Guard on the count: under `set -u`, bash 3.2 (macOS) treats the expansion
@@ -389,7 +393,7 @@ for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
      && ! grep -q 'BEGIN GENERATED:' "$TARGET/$_kept" 2>/dev/null; then
     _reg=changelog; [ "$_kept" = docs/DEBUGGING-KNOWLEDGE-BASE.md ] && _reg=debugging-kb
     echo "     Your existing $_kept was left untouched. Bring it into the layout with"
-    echo "         python3 scripts/registry_tool.py adopt --registry $_reg"
+    echo "         ./scripts/python.sh scripts/registry_tool.py adopt --registry $_reg"
     echo "     — it moves the current entries into fragments losslessly, keeps every"
     echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi

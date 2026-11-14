@@ -24,6 +24,7 @@ VERBOSE=0
 [ "${1:-}" = "-v" ] && VERBOSE=1
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$KIT_DIR/scripts/python.sh"   # Python under whatever name this machine gives it
 SCRIPTS="$KIT_DIR/scripts"
 WORK="$(mktemp -d)"
 trap '[ "$VERBOSE" -eq 1 ] || rm -rf "$WORK"' EXIT
@@ -44,7 +45,7 @@ scaffold() {
   git -C "$repo" config commit.gpgsign false
   mkdir -p "$repo/scripts" "$repo/$rules" "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" \
            "$repo/docs/adr" "$repo/changelog.d"
-  for f in registry_tool.py graph_tool.py check-kb-shape.sh check-registry-drift.sh \
+  for f in python.sh registry_tool.py graph_tool.py check-kb-shape.sh check-registry-drift.sh \
            check-registry-ids.sh check-graph-links.sh; do
     [ -f "$SCRIPTS/$f" ] && cp "$SCRIPTS/$f" "$repo/scripts/$f" && chmod +x "$repo/scripts/$f"
   done
@@ -92,7 +93,7 @@ EOF
 # Enforces: RULE:testing § The Rule — every module has a test file.
 echo "OK: tests present"
 EOF
-  ( cd "$repo" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$repo" && "$PY" scripts/registry_tool.py generate >/dev/null )
   git -C "$repo" add -A && git -C "$repo" commit -q -m "seed"
 }
 
@@ -115,7 +116,7 @@ write_entry() {
 
 **Related:** $3
 EOF
-  ( cd "$1" && python3 scripts/registry_tool.py generate >/dev/null )
+  ( cd "$1" && "$PY" scripts/registry_tool.py generate >/dev/null )
 }
 
 older_gates() { # the three gates that predate this one
@@ -183,7 +184,7 @@ EOF
   out="$(graph_gate "$repo")" || { bad "the starting state should be green"; show "$out"; return; }
 
   # What an agent reads BEFORE the rename: the same reverse index the gate uses.
-  out="$( cd "$repo" && python3 scripts/graph_tool.py impact RULE:testing 2>&1 )"
+  out="$( cd "$repo" && "$PY" scripts/graph_tool.py impact RULE:testing 2>&1 )"
   case "$out" in
     *"scripts/check-tests.sh:2"*) ;; *) bad "impact does not list the enforcing script"; show "$out" ;;
   esac

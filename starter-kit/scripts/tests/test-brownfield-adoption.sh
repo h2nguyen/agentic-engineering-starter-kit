@@ -18,6 +18,7 @@
 set -uo pipefail
 VERBOSE=0; [ "${1:-}" = "-v" ] && VERBOSE=1
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$KIT_DIR/scripts/python.sh"   # Python under whatever name this machine gives it
 WORK="$(mktemp -d)"; trap '[ "$VERBOSE" -eq 1 ] || rm -rf "$WORK"' EXIT
 pass=0; fail=0
 ok()  { printf '  ok   — %s\n' "$1"; pass=$((pass + 1)); }
@@ -142,7 +143,7 @@ grep -q '^\*\.sh text eol=lf' "$R/.gitattributes" && grep -q 'merge=union' "$R/.
   && ok "re-running bootstrap does not append the block twice" || bad "gitattributes block duplicated on re-run"
 
 # 2. The inferred config matches the conventions on disk.
-cfg="$(python3 -c "import json;c=json.load(open('$R/registries.json'));a=[r for r in c['registries'] if r['name']=='adr'][0];k=[r for r in c['registries'] if r['name']=='debugging-kb'][0];print(a.get('filename_prefix',''),a['id_width'],a.get('id_scheme',c['id_scheme']),k.get('id_scheme',c['id_scheme']),k.get('id_width',c['id_width']))")"
+cfg="$("$PY" -c "import json;c=json.load(open('$R/registries.json'));a=[r for r in c['registries'] if r['name']=='adr'][0];k=[r for r in c['registries'] if r['name']=='debugging-kb'][0];print(a.get('filename_prefix',''),a['id_width'],a.get('id_scheme',c['id_scheme']),k.get('id_scheme',c['id_scheme']),k.get('id_width',c['id_width']))")"
 [ "$cfg" = " 4 numeric numeric 3" ] \
   && ok "registries.json inferred adr-tools naming (no prefix, width 4) and a frozen numeric KB (width 3)" \
   || bad "inferred config was '$cfg' (expected ' 4 numeric numeric 3')"
@@ -152,8 +153,8 @@ cfg="$(python3 -c "import json;c=json.load(open('$R/registries.json'));a=[r for 
 [ -f "$R/docs/adr/0001-record-architecture-decisions.md" ] && ok "existing ADR filenames untouched" || bad "an ADR was renamed"
 
 # 3. Adoption is lossless and identifier-preserving.
-( cd "$R" && python3 scripts/registry_tool.py adopt --registry changelog --date 2026-09-03 >/dev/null 2>&1 ) || bad "adopt changelog failed"
-( cd "$R" && python3 scripts/registry_tool.py adopt --registry debugging-kb >/dev/null 2>&1 ) || bad "adopt knowledge base failed"
+( cd "$R" && "$PY" scripts/registry_tool.py adopt --registry changelog --date 2026-09-03 >/dev/null 2>&1 ) || bad "adopt changelog failed"
+( cd "$R" && "$PY" scripts/registry_tool.py adopt --registry debugging-kb >/dev/null 2>&1 ) || bad "adopt knowledge base failed"
 for text in "Ledger export endpoint (#41)." "Retry no longer swallows timeouts (#39)." "Multi-tenant accounts."; do
   grep -qF "$text" "$R/CHANGELOG.md" || bad "changelog lost: $text"
 done
@@ -216,13 +217,13 @@ grep -q "already reaches every gate" "$WORK/rerun-chained.log" && ! grep -q 'inc
 
 # 5. Parallel work is clean and green on the adopted repository.
 git -C "$R" checkout -q -b feat-a
-( cd "$R" && python3 scripts/registry_tool.py new --registry changelog --title "Feature A" --date 2026-09-04 >/dev/null 2>&1
+( cd "$R" && "$PY" scripts/registry_tool.py new --registry changelog --title "Feature A" --date 2026-09-04 >/dev/null 2>&1
   sed_i 's/^- <what an operator.*/- Feature A shipped./' changelog.d/2026-09-04-feature-a.md
-  python3 scripts/registry_tool.py new --registry debugging-kb --title "Feature A bug" >/dev/null 2>&1
+  "$PY" scripts/registry_tool.py new --registry debugging-kb --title "Feature A bug" >/dev/null 2>&1
   sed_i 's/<fill in>/Specific to feature A./g' docs/DEBUGGING-KNOWLEDGE-BASE.d/003-feature-a-bug.md
   make registry-generate >/dev/null 2>&1 ); git -C "$R" add -A; git -C "$R" commit -q -m "feat a"
 git -C "$R" checkout -q main; git -C "$R" checkout -q -b feat-b
-( cd "$R" && python3 scripts/registry_tool.py new --registry changelog --title "Feature B" --date 2026-09-04 >/dev/null 2>&1
+( cd "$R" && "$PY" scripts/registry_tool.py new --registry changelog --title "Feature B" --date 2026-09-04 >/dev/null 2>&1
   sed_i 's/^- <what an operator.*/- Feature B shipped./' changelog.d/2026-09-04-feature-b.md
   make registry-generate >/dev/null 2>&1 ); git -C "$R" add -A; git -C "$R" commit -q -m "feat b"
 git -C "$R" checkout -q feat-a

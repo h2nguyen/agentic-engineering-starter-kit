@@ -17,6 +17,9 @@
 # Usage: check-ci-lint-coverage.sh [lint-target] [makefile]
 #        default target: lint       default makefile: Makefile
 set -euo pipefail
+# Python under whatever name this machine gives it; the fallback is for a
+# repository that copied this gate from a newer kit without the launcher.
+PYTHON_RUN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python.sh"; [ -x "$PYTHON_RUN" ] || PYTHON_RUN=python3
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
@@ -90,7 +93,7 @@ fi
 # written): the kit stays stdlib-only, and an unreadable workflow covers nothing.
 # A function, not a here-document inside $(…), which bash 3.2 misparses.
 list_ci_targets() {
-python3 - "$MAKEFILE" $workflows <<'PY'
+"$PYTHON_RUN" - "$MAKEFILE" $workflows <<'PY'
 import os, re, shlex, sys
 
 makefile, files = sys.argv[1], sys.argv[2:]

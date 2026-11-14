@@ -24,6 +24,10 @@ set -euo pipefail
 # always ship together, so that holds whether they were installed into a repo's
 # scripts/ directory or are being run from the kit itself.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Python under whatever name this machine gives it (python3, python, py -3).
+# The fallback is for a repository that copied this gate from a newer kit
+# without the launcher beside it.
+PY="$HERE/python.sh"; [ -x "$PY" ] || PY=python3
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 if [ -f "$HERE/graph_tool.py" ]; then
@@ -40,10 +44,9 @@ if [ ! -f registries.json ]; then
   exit 0
 fi
 
-if python3 "$TOOL" check; then
+if "$PY" "$TOOL" check; then
   exit 0
 fi
-SHOWN="${TOOL#"$(pwd)"/}"
 
 echo ""
 echo "A typed link names an artifact that is not there. Fix the CITING line:"
@@ -53,7 +56,7 @@ echo "make a link resolve — other files cite it too."
 echo ""
 echo "See what cites an artifact before renaming or deleting it:"
 echo ""
-echo "    python3 $SHOWN impact <KIND:name>"
+echo "    make graph-impact NODE=<KIND:name>"
 echo ""
 echo "RENAMED? Update the token in every citer — an accepted decision record"
 echo "included: a link line is a pointer, not part of what the record decided."
