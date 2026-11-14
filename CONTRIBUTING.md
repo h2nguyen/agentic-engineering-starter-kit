@@ -16,7 +16,9 @@ and `bootstrap.sh` are read in the kit, so they may point at the guide.)
 
 ## Commands
 
-Nothing to install: `git`, `make`, `bash` 3.2+ and `python3` 3.9+.
+Nothing to install: `git`, `make`, `bash` 3.2+ and Python 3.9+, under whatever
+name your machine gives it — the make targets find it through
+`starter-kit/scripts/python.sh`.
 
 | Command | What it does |
 |---|---|
@@ -39,6 +41,7 @@ Nothing to install: `git`, `make`, `bash` 3.2+ and `python3` 3.9+.
    | `starter-kit/scripts/tests/test_registry_tool.py`, `test_graph_tool.py` | The two tools, unit level |
    | `test-parallel-merge.sh` | Two branches add registry entries and merge clean and green |
    | `test-graph-links.sh` | A typed link to nothing fails; a rename names every citer |
+   | `test-python-launcher.sh` | `scripts/python.sh` finds Python as `python3`, `python` or `py -3`, and skips a name that is not Python |
    | `test-ci-lint-coverage.sh` | A gate CI never runs is detected |
    | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where |
    | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
@@ -87,6 +90,10 @@ Four invariants every such change keeps, each with a test behind it:
 - **The installer never overwrites a file and is safe to re-run.**
 - **Every artifact lands for all four tools**, or the installer says why not.
 - **Bash and the Python standard library only.** No packages, no network.
+- **Python is never started by a fixed name.** A make target, a gate, a test,
+  a hook command: each goes through `scripts/python.sh`. `python3` is not
+  Python on every machine, and `test-bootstrap-rerun.sh` runs a whole fresh
+  install on a machine where it is not.
 - **Nothing speculative.** An artifact ships on day 1 only when waiting for a
   signal would mean waiting for one that never comes; that argument goes in a
   decision record (see ADR-0002 and ADR-0004).
