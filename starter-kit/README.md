@@ -143,7 +143,7 @@ can fill. Two things to do once, right after bootstrap:
    |---|---|
    | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `python3 scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
    | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
-   | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key) |
+   | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
    | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence |
 
    `<EVAL-RECORD-ID>` appears in the prompt-file example and the survivors

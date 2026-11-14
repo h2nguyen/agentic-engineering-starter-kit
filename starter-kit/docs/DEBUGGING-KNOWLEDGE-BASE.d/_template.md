@@ -13,4 +13,4 @@ rule file or enforcement script now encodes it).
 
 **Debug Shortcut:** The quick check that confirms this issue next time.
 
-**Related:** RULE:working-principles
+**Related:** <RULE:name-of-the-rule or SCRIPT:name-of-the-check that now prevents this — delete the line if there is none>
