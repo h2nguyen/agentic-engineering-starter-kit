@@ -231,7 +231,9 @@ Appendix A.7 — the sequence:
    hook skeleton and its settings entry: fill it in if sessions need
    environment setup, or remove the entry if they do not — either is fine, and
    the handoff says which.
-7. Commit on the feature branch with a clear message and propose the PR.
+7. Commit on the feature branch with a clear message and propose the PR. Leave
+   a `starter-kit/` directory out of the commit: it is the installer, nothing
+   installed refers back to it, and it can be deleted once the setup is done.
 
 ## Success criteria
 
