@@ -29,6 +29,8 @@ declares one, the optional `graph.nodes` map of kind → glob.
   graph_tool.py check                 (the gate: every typed link resolves)
   graph_tool.py impact <node|path>    (what cites this, and what it cites)
   graph_tool.py coverage              (which rules have a script and a reviewer)
+  graph_tool.py note <path>...        (what an editor of this file should be told;
+                                       silent when there is nothing to say)
 """
 
 from __future__ import annotations
@@ -510,11 +512,25 @@ class Graph:
 
     # -- lookups ----------------------------------------------------------
 
+    def at(self, path: str) -> Node | None:
+        """The node a file path names, however the path reached the file.
+
+        An editor may report a path through a symlinked directory — macOS hands
+        out /var/… for what is /private/var/… on disk — while git and this tool
+        see the physical one. Both spellings are the same file.
+        """
+        for full, root in ((os.path.abspath(path), self.root),
+                           (os.path.realpath(path), os.path.realpath(self.root))):
+            node = self.by_path.get(_posix(os.path.relpath(full, root)))
+            if node is not None:
+                return node
+        return None
+
     def find(self, wanted: str) -> list[Node]:
         """A node by token, by any alias, or by the path of its file."""
-        rel = _posix(os.path.relpath(os.path.abspath(wanted), self.root))
-        if rel in self.by_path:
-            return [self.by_path[rel]]
+        node = self.at(wanted)
+        if node is not None:
+            return [node]
         path_token = PATH_TOKEN.match(wanted)
         if path_token:
             return list(self.by_alias.get(path_token.group(1), {}).get(path_token.group(2), []))
@@ -731,6 +747,55 @@ def cmd_coverage(graph: Graph, args) -> int:
     return 0
 
 
+NOTE_CITERS_SHOWN = 8
+
+
+def cmd_note(graph: Graph, args) -> int:
+    """What whoever just edited a file should be told about it — or nothing.
+
+    `impact` answers a question somebody asked. This answers one nobody did: it
+    is what an editor hook prints after every edit, so it speaks only when the
+    file is cited by another artifact or carries a link that resolves to
+    nothing, and is silent for every other file. It never fails — a link that
+    does not resolve is reported here and gated by `check`.
+    """
+    allowed, _ = load_allowlist(graph.root)
+    blocks: list[str] = []
+    for wanted in args.paths:
+        node = graph.at(wanted)
+        if node is None:
+            continue
+        lines: list[str] = []
+        for problem in sorted(graph.problems, key=lambda p: (p.line, p.token)):
+            if problem.path != node.path:
+                continue
+            if problem.dangling and (problem.path, problem.token) in allowed:
+                continue  # sanctioned once, in the allowlist; not news on every edit
+            head, *rest = problem.lines
+            lines.append(f"{problem.path}:{problem.line} — {head}")
+            lines.extend(f"  {line}" for line in rest)
+        cited_by = [e for e in graph.inbound(node) if e.source is not node]
+        if cited_by:
+            files = len({e.path for e in cited_by})
+            rows = _edge_rows(cited_by, lambda e: e.source.token)
+            lines.append(f"{node.token} ({node.path}) is cited by {files} file(s):")
+            lines.extend(rows[:NOTE_CITERS_SHOWN])
+            if len(rows) > NOTE_CITERS_SHOWN:
+                lines.append(
+                    f"  … and {len(rows) - NOTE_CITERS_SHOWN} more — "
+                    f"python3 scripts/graph_tool.py impact {node.token}"
+                )
+            lines.append(
+                "If this edit renamed it, removed it or changed what it requires, "
+                "update those files in the same change."
+            )
+        if lines:
+            blocks.append("\n".join(lines))
+    if blocks:
+        print("\n\n".join(blocks))
+    return 0
+
+
 # --------------------------------------------------------------------------
 # entry point
 # --------------------------------------------------------------------------
@@ -746,6 +811,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_impact = sub.add_parser("impact", help="what cites an artifact, and what it cites")
     p_impact.add_argument("node", help="KIND:name, a registry identifier, a file path, or HUMAN")
     sub.add_parser("coverage", help="which rules have an enforcing script and a reviewing agent")
+    p_note = sub.add_parser("note", help="what an editor of these files should be told; silent when nothing")
+    p_note.add_argument("paths", nargs="+", help="the files that were just edited")
     return parser
 
 
@@ -769,7 +836,8 @@ def main(argv: list[str] | None = None) -> int:
     except GraphError as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
-    return {"check": cmd_check, "impact": cmd_impact, "coverage": cmd_coverage}[args.command](graph, args)
+    commands = {"check": cmd_check, "impact": cmd_impact, "coverage": cmd_coverage, "note": cmd_note}
+    return commands[args.command](graph, args)
 
 
 if __name__ == "__main__":
