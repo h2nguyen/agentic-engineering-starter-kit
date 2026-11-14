@@ -234,6 +234,34 @@ else
   bad "merge conflicted on the adopted repository"
 fi
 
+# 6. Decision records named by date — the kit's own default, and a common
+# convention without it. The installer read the year as a four-digit number,
+# declared the directory numbered, and said the existing identifiers were
+# preserved; every record of one year was then the same identifier, ADR-2026.
+D="$(dirname "$R")/dated"; mkdir -p "$D/docs/adr"; git -C "$D" init -q -b main
+git -C "$D" config user.email t@example.invalid; git -C "$D" config user.name t; git -C "$D" config commit.gpgsign false
+for name in 2026-03-02-use-postgres 2026-03-19-retry-policy 2026-07-01-outbox; do
+  printf '# %s\n\n## Status\nAccepted\n## Context\nWhy.\n## Decision\nWe will.\n## Consequences\nThen.\n' "$name" > "$D/docs/adr/$name.md"
+done
+"$BOOTSTRAP" --tool agents --target "$D" > "$D.install.log" 2>&1 || bad "bootstrap into a repository with date-named records failed"
+cfg="$("$PY" -c "import json;c=json.load(open('$D/registries.json'));a=[r for r in c['registries'] if r['name']=='adr'][0];print(a.get('id_scheme'),repr(a.get('filename_prefix')))")"
+[ "$cfg" = "slug ''" ] && ok "date-named decision records are declared date-slug, with no filename prefix" \
+  || bad "date-named records were declared as '$cfg' (expected \"slug ''\")"
+( cd "$D" && ./scripts/check-registry-ids.sh >/dev/null 2>&1 ) \
+  && ok "the identifier gate passes on them: three records in one year are three identifiers" \
+  || bad "the identifier gate rejects date-named records: $( cd "$D" && ./scripts/check-registry-ids.sh 2>&1 | head -1 )"
+( cd "$D" && "$PY" scripts/registry_tool.py list 2>/dev/null ) | grep -q 'ADR-YYYY-MM-DD' \
+  && ok "and are cited by date and slug, not by year" || bad "the declared identifier shape is not ADR-YYYY-MM-DD-<slug>"
+new="$( cd "$D" && "$PY" scripts/registry_tool.py new --registry adr --title "Fourth decision" --date 2026-09-04 2>/dev/null | tail -1 )"
+[ "$new" = "docs/adr/2026-09-04-fourth-decision.md" ] && ok "a new record follows the convention that was there" \
+  || bad "a new record was created as '$new'"
+# The control: the same three files in a registry that IS numbered are refused
+# by name, and the allocator does not count on from the year.
+"$PY" -c "import json;p='$D/registries.json';c=json.load(open(p));a=[r for r in c['registries'] if r['name']=='adr'][0];a['id_scheme']='numeric';a['id_width']=4;json.dump(c,open(p,'w'),indent=2)"
+out="$( cd "$D" && ./scripts/check-registry-ids.sh 2>&1 )" && bad "a numbered registry accepted date-named records" || {
+  case "$out" in *"named by date"*) ok "in a registry that numbers its records, a date-named file is refused, and the message says why" ;;
+    *) bad "date-named records failed the numbered registry without saying why: $(printf '%s' "$out" | head -1)" ;; esac; }
+
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repo kept in $R"
 [ "$fail" -eq 0 ] || exit 1

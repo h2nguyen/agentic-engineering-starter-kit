@@ -142,7 +142,8 @@ Declared in `registries.json`; both are supported and the choice is per project.
 - **`numeric`** — `ISSUE-042`. Short and familiar. The allocator reads only the
   local checkout, so parallel branches **will** be handed the same number: here
   the uniqueness gate is not a safety net, it is the mechanism. Set `id_width`
-  to the exact digit count in use.
+  to the exact digit count in use. A file named by date in a numbered registry
+  is refused: at width 4 its year would read as the number.
 
 **Never renumber an identifier that is already on the default branch.** When
 the gate reports a collision, rename the fragment that has *not* landed yet. If

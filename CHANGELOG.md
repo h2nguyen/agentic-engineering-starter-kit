@@ -48,6 +48,8 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- category: Fixed -->
 ### Fixed
 
+- `registry_tool.py init` — and so `bootstrap.sh`, which runs it — declared a directory of date-named decision records (`2026-03-02-use-postgres.md`, `adr-2026-03-02-…`) as numbered at width 4, reading the year as the number. Every record of one year was then the same identifier, `ADR-2026`, and the identifier gate failed on a repository the installer had just said it preserved. Such records are now declared date-slug with the filename prefix they have. If an earlier install left you with `"id_scheme": "numeric"` on date-named records, set it to `"slug"`.
+- In a registry that numbers its records at width 4, a file named by date passed every gate as record `<year>` — `adr-2026-11-14-x.md` was `ADR-2026` — and the next `registry_tool.py new` allocated `2027`. The identifier gate now refuses a date-named file in a numbered registry and says what to rename it to, and the allocator no longer counts a year as a number. A record that really is number 2026 (`adr-2026-a-decision.md`) is unaffected.
 - Upgrade step 2 in the kit README left `scripts/tests/test-graph-hooks.sh` in your repository: its `cp` copied every suite and its `rm` removed only two of the ones that stay in the kit. The line now removes all four. If you upgraded to 2.0.0 by those steps, delete the file; nothing runs it.
 - The kit's own `AGENTS.md` linked to `changelog.d/`, a directory that does not exist in a checkout once a release has consumed its fragments. The directory now keeps a README.
 
