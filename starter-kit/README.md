@@ -50,8 +50,9 @@ knowledge-base and changelog skeletons in their fragment layout + the
 `.gitattributes`, `Makefile` and CI workflow that make the registry gates and
 the typed-link gate run
 (+ the prompt-enhancer, semver, registry-entry and registry-conflict-triage
-skills on Claude Code) to that tool's locations, and never overwrites existing
-files. Then: fill in the constitution's `<placeholders>` and the project rows of
+skills on Claude Code, and the hook that hands the typed links to the agent —
+[below](#the-workspace-graph-hook-claude-code)) to that tool's locations, and
+never overwrites existing files. Then: fill in the constitution's `<placeholders>` and the project rows of
 the comments-and-annotations rule
 ([how](#adopting-the-comments-and-annotations-rule)), run `make lint` to
 confirm the gates pass, enable further common skills from
@@ -101,7 +102,8 @@ confirm the gates pass, enable further common skills from
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
 | `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
 | `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
-| `settings.json.template` | `.claude/settings.json` | Registers the SessionStart hook below. Keep the entry while the hook file exists; delete both together if sessions need no setup |
+| `settings.json.template` | `.claude/settings.json` | Registers the two hooks below. Keep the SessionStart entry while its hook file exists; delete both together if sessions need no setup |
+| `hooks/workspace-graph.py` | `.claude/hooks/workspace-graph.py` | Ready to use — after an edit it tells the agent who cites the file; at the end of a turn it holds the turn once if a typed link broke. See [The workspace-graph hook](#the-workspace-graph-hook-claude-code) |
 | `hooks/session-start.sh.template` | `.claude/hooks/session-start.sh` | Installed executable (`chmod +x` after a manual copy). A skeleton that does nothing until you fill in the toolchain steps a session needs |
 | `scripts/check-kb-shape.sh` | `scripts/check-kb-shape.sh` | Ready to run; already chained into the installed `make lint` (guards the KB's graph-ready shape) |
 | `scripts/check-convention.sh.template` | `docs/agent-templates/check-convention.sh.template` | Template — copy to `scripts/check-<convention>.sh`, `chmod +x`, wire into your lint target |
@@ -167,10 +169,12 @@ whichever version you started from. For why a file changed, search the kit's
    them, delete the directory and run step 1 again — the installer puts them
    back, pointing at the rule location of your tool.
 
-   On Claude Code, the kit's skills, its `agent-coach` and its audit command
-   are also its own. List the ones that differ, then copy each one that no
-   commit of yours has changed (`git log --oneline -- <file>` again):
+   On Claude Code, the kit's skills, its `agent-coach`, its audit command and
+   the workspace-graph hook are also its own. List the ones that differ, then
+   copy each one that no commit of yours has changed (`git log --oneline --
+   <file>` again):
    ```bash
+   diff -q "$KIT"/starter-kit/hooks/workspace-graph.py .claude/hooks/workspace-graph.py
    diff -rq "$KIT"/starter-kit/skills .claude/skills | grep '^Files'
    diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
    diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
@@ -232,6 +236,35 @@ workspace — and, where you keep one, a line in the workspace changelog.
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
 | `duplicate identifier … claimed by 2 fragments` | Two branches took the same number | Rename the fragment that has not been merged yet. Never renumber one that has |
 | `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step | Have the workflow run `make lint`, the aggregate target |
+
+## The workspace-graph hook (Claude Code)
+
+The typed links are only useful to an agent that looks them up. On Claude Code
+the kit does the looking, with one hook registered for two events in
+`.claude/settings.json`:
+
+| When | What the agent gets |
+|---|---|
+| After it edits a file (`Edit`, `Write`) | If another artifact cites the file, or the file now carries a link that resolves to nothing: the citing files and lines. For any other file: nothing |
+| When it ends its turn | If a typed link no longer resolves — a rename done through the shell, say — the turn is held once and the failure is handed back, so the break is repaired or reported before "done" |
+
+You do nothing, and mostly see nothing: the hook is silent unless it has
+something to say, and it says each distinct thing once per session. It is
+context, not a gate — `make lint` stays the gate, it never changes a file, and
+when it cannot do its job it ends silent.
+
+| To | Do this |
+|---|---|
+| Switch it off for one run | `WORKSPACE_GRAPH_HOOK=off` in the environment |
+| Remove it | Delete the `PostToolUse` and `Stop` entries that name `workspace-graph.py` from `.claude/settings.json` |
+| See why it said nothing | `WORKSPACE_GRAPH_HOOK_DEBUG=1`; the reason goes to the hook's stderr |
+| Add it to a repository installed before it existed | Re-run `bootstrap.sh`: it adds the hook file and prints the two entries to put in your `settings.json`, which it never edits |
+
+Claude Code asks you to approve an edit to a file under `.claude/` — a rule,
+for instance — before it happens; the hook runs after the edit, so it runs
+after your approval. The other three tools get the same answer on demand, from
+`python3 scripts/graph_tool.py note <file>`; a hook for them waits until their
+hook formats are verified (ADR-0006 in the kit's repository).
 
 ## Adopting the comments-and-annotations rule
 
@@ -315,6 +348,7 @@ into `make lint`.
   file, not a path, so it holds in every tool layout. `make lint` fails on a
   link that names nothing, and `make graph-impact NODE=<KIND:name>` lists what
   cites an artifact before you rename, delete or rewrite it (guide § 3.12).
+  On Claude Code a hook hands the agent that list after an edit, unasked.
 - PR-only trunk: agents never commit to the default branch.
 - Placeholders are written `<like-this>`; grep for `<` after filling in a template
   to catch leftovers.

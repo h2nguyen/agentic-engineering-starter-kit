@@ -76,7 +76,7 @@ self-improvement loop. To move an existing install to a newer kit, see
 | [`starter-kit/commands/`](starter-kit/commands/) | Slash-command template + the audit command entry point |
 | [`starter-kit/scripts/`](starter-kit/scripts/) | `registry_tool.py` (fragment generator + identifier gate), `graph_tool.py` (typed-link gate + impact and coverage queries) behind `check-graph-links.sh`, `check-kb-shape.sh`, the registry drift/identifier gates, the CI-coverage gate, tests + the parallel-merge and typed-link acceptance tests, and an enforcement-script template |
 | [`starter-kit/docs/`](starter-kit/docs/), `changelog.d/`, `registries.json.template`, `gitattributes.template`, `Makefile.template`, `ci/` | The shared-append-only-registry layer: fragment directories, declaration, merge behaviour, lint target and CI workflow (guide § 3.11) |
-| [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, `WORKSPACE_CHANGELOG.md.template` | Session-bootstrap hook skeleton, tool settings, audit-history skeleton |
+| [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, `WORKSPACE_CHANGELOG.md.template` | Session-bootstrap hook skeleton; the workspace-graph hook, which on Claude Code tells the agent what cites a file it has just edited; tool settings; audit-history skeleton |
 | [`docs/adr/`](docs/adr/) | Decision records for this project — starting with why the repo is canonical and a plugin is a future distribution channel |
 | [`AGENTS.md`](AGENTS.md), [`CONTRIBUTING.md`](CONTRIBUTING.md) | How an agent installs or changes the kit; how a person changes it — tests, gates, changelog, release |
 

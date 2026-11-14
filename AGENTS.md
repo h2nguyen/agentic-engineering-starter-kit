@@ -54,7 +54,9 @@ that changes a file is run against the target.
 7. **Do what the installer said it left to you.** If the project already had a
    Makefile, add the two lines it printed (`registry-test` on that line is
    optional). If it kept an existing changelog or knowledge base, run the
-   `adopt` command it printed.
+   `adopt` command it printed. If, on Claude Code, it kept an existing
+   `.claude/settings.json`, show the user the two hook entries it printed and
+   add them only with their approval: that file is theirs.
 8. **Verify.** In the target, `make lint` must exit 0, with an `OK:` line for
    each gate and no `FAIL`. A failure names the file, the line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.

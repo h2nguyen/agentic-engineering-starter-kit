@@ -230,7 +230,10 @@ Appendix A.7 — the sequence:
    deferred artifact later. On Claude Code the installer leaves a SessionStart
    hook skeleton and its settings entry: fill it in if sessions need
    environment setup, or remove the entry if they do not — either is fine, and
-   the handoff says which.
+   the handoff says which. It also installs the workspace-graph hook
+   (`.claude/hooks/workspace-graph.py`, two entries in `settings.json`), which
+   needs nothing filled in: leave it registered, and say in the handoff that
+   the agent is now told what cites a file it edits.
 7. Commit on the feature branch with a clear message and propose the PR. Leave
    a `starter-kit/` directory out of the commit: it is the installer, nothing
    installed refers back to it, and it can be deleted once the setup is done.

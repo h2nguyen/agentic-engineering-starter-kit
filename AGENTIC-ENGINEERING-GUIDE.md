@@ -222,7 +222,8 @@ your-repo/
 │   ├── commands/
 │   │   └── <command>.md             # thin /command entry points
 │   ├── hooks/
-│   │   └── session-start.sh         # optional environment bootstrap
+│   │   ├── session-start.sh         # optional environment bootstrap
+│   │   └── workspace-graph.py       # hands the typed links to the agent (§3.12)
 │   └── WORKSPACE_CHANGELOG.md       # audit history of this configuration
 ├── registries.json                  # declares the shared append-only registries (§3.11)
 ├── .gitattributes                   # merge behaviour for those registries (§3.11)
@@ -557,6 +558,8 @@ A hook that cannot run is a guard that silently stops guarding: Claude Code trea
 
 All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite the same file — a formatter and a generator reading it — race; give each file kind one hook that does both, in order.
 
+**A hook that hands over context is not a gate, and must not behave like one.** The kit ships one such hook, for the workspace graph (§3.12): after an edit it tells the agent who cites the file, and at the end of a turn it holds the turn once if a typed link broke. The rules it follows are the ones any context hook needs: say nothing unless there is something to say; say each distinct thing once per session; end silent with exit 0 when the job cannot be done; never change a file; always let go a turn another stop hook already continued. The gate behind it is still `make lint`.
+
 **`settings.json` template** (starter kit: `settings.json.template`)
 
 ```json
@@ -800,7 +803,7 @@ Both live in the same files, use the same tokens and are checked by the same gat
 3. **Resolution is gated from commit one.** A dangling link is silent, which is the argument that made the registry layer a day-1 default (§3.11): waiting for the signal means waiting for a signal that never comes. A syntax check without resolution validates the shape of a citation nobody follows.
 4. **Nothing is stored.** The graph is rebuilt from the files on every run. A committed index would be one more shared file that every pull request rewrites — the §3.11 defect, reintroduced by its own cure.
 5. **Examples are not edges.** Fenced blocks and underscore-prefixed files are not read, so templates and this guide can show the syntax.
-6. **Ask before you edit.** `make graph-impact NODE=<token>` before renaming, deleting or rewriting an artifact; its "Cited by" list is the change set. A link line is a pointer, so it follows a rename even inside an accepted decision record; only a *retired* artifact leaves such a record with a link it cannot repair.
+6. **Ask before you edit.** `make graph-impact NODE=<token>` before renaming, deleting or rewriting an artifact; its "Cited by" list is the change set. A link line is a pointer, so it follows a rename even inside an accepted decision record; only a *retired* artifact leaves such a record with a link it cannot repair. Asking is a thing to remember, so where the agent tool can run a command after an edit, a hook does the looking and hands over the answer.
 
 **What the starter kit ships**
 
@@ -809,6 +812,8 @@ Both live in the same files, use the same tokens and are checked by the same gat
 | `graph_tool.py check` behind `check-graph-links.sh` | resolves every typed link; fails with `file:line`, the names that do exist, and the fix | day 1, every tool; chained into `make lint` |
 | `graph_tool.py impact <token>` | what cites an artifact and what it cites — the reverse index the gate already builds | day 1 (`make graph-impact`) |
 | `graph_tool.py coverage` | which rules a script enforces and an agent reviews; which gates no agent cites | day 1 (`make graph-coverage`); its regular readers, the audit and the coach, arrive at Level 4 |
+| `graph_tool.py note <path>` | what the editor of a file should be told — who cites it, and any link in it that resolves to nothing — and nothing at all otherwise | day 1, every tool; it is what an edit-time hook calls |
+| `workspace-graph.py` hook | after an edit, adds `note` to the agent's context; at the end of a turn, holds it once if a typed link broke. Context, not a gate | day 1 on Claude Code, registered in `settings.json`; other tools when their hook formats are verified |
 | typed links in the shipped gates, skills, agent and command | the kit's own artifacts are the first nodes, so a fresh install has a graph to resolve | with each artifact |
 | `workspace-graph` skill | impact-before-edit and coverage as a procedure | `--with-meta` |
 | `.graph-link-allowlist` | the one sanctioned exception — an immutable decision record citing a retired rule — keyed on the (file, token) pair, reason mandatory, reported on every run | created on first need |
@@ -976,7 +981,7 @@ Run quarterly (or as the quick-audit report):
 
 Everything in this guide produces *documents*; graph engineering treats them as a **graph**. The term names two things. In most current writing it means **orchestration topology**: agents, loops, tools and human checkpoints as nodes, hand-offs and shared state as edges. This guide has used it from its first version for a **knowledge graph** over workspace artifacts: every rule, KB entry, ADR, skill and enforcement script a node, every typed cross-reference an edge. The kit means both, over one substrate (§3.12) — the same tokens and the same gate, two families of edge.
 
-**What ships** (§3.12): stable, never-reused identifiers; the three typed link lines; a gate that resolves every link on every pull request; and two queries over the resolved graph — *what cites this?* and *which rules have a script and a reviewer?* That is enough for an agent to answer *"which rules and checks exist because of this incident?"* and *"what does this rule invalidate if it changes?"* before it edits, and for a reviewer to see where each workflow stops for a human.
+**What ships** (§3.12): stable, never-reused identifiers; the three typed link lines; a gate that resolves every link on every pull request; and two queries over the resolved graph — *what cites this?* and *which rules have a script and a reviewer?* That is enough for an agent to answer *"which rules and checks exist because of this incident?"* and *"what does this rule invalidate if it changes?"* before it edits, and for a reviewer to see where each workflow stops for a human. On Claude Code the first of those answers no longer waits to be asked for: a hook hands the agent the citers of a file it has just edited, and holds a turn once when a link broke (ADR-0006). That is impact at the moment of the edit, not retrieval — it never loads an artifact the agent did not touch.
 
 **What is still deferred**, per the anti-speculation rule (§4.5) — each with the signal that should bring it in:
 

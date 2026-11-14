@@ -41,6 +41,7 @@ Nothing to install: `git`, `make`, `bash` 3.2+ and `python3` 3.9+.
    | `test-graph-links.sh` | A typed link to nothing fails; a rename names every citer |
    | `test-ci-lint-coverage.sh` | A gate CI never runs is detected |
    | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where |
+   | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
 
 3. **Make the change.**
@@ -77,6 +78,7 @@ cause; none of these has a quiet override.
 |---|---|
 | A default rule | `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table |
 | A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; an acceptance test with a control case; the `starter-kit/README.md` table |
+| A hook | The file under `starter-kit/hooks/`; its entry in `settings.json.template` and in the guide's embedded copy; an install line in `bootstrap.sh`, Claude Code only; a case for each thing it says and each way it stays silent in `test-graph-hooks.sh`; the README section. A hook that adds context never blocks, never edits and ends silent when it cannot run |
 | A skill or agent | A self-contained directory or file — no path into the rest of the kit; an install line in `bootstrap.sh`; `skills/common-catalog.md`; the README tables |
 | A template | The kit file and the guide's embedded copy, together |
 
