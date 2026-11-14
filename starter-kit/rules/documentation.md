@@ -123,8 +123,11 @@ make graph-links                     # every typed link resolves (part of make l
 **Litmus test:** does `make graph-links` pass, and does every check script and
 reviewer agent added in this PR carry an `Enforces` line naming its rule?
 
-An accepted ADR is immutable, so it cannot follow a rule that is later
-retired. That one case goes in `.graph-link-allowlist` as
+A link line is a pointer, not part of what a record decides. When a cited
+artifact is **renamed**, update the token in every citer — in an accepted ADR
+too: that keeps the record reachable from what it cites and changes nothing it
+decided. When a cited artifact is **retired**, an accepted ADR cannot follow
+it. That one case goes in `.graph-link-allowlist` as
 `<citing file> <token>  # reason`; the gate reports the exemption on every run
 and fails once it is stale.
 

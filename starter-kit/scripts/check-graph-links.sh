@@ -13,8 +13,9 @@
 #
 # Sanctioned dangling links live in .graph-link-allowlist, keyed on the
 # (citing file, token) PAIR with a mandatory reason. The legitimate case is an
-# accepted decision record: it is immutable, so it cannot be edited to follow a
-# rule that was later retired.
+# accepted decision record citing an artifact that was later RETIRED: the
+# record cannot follow something that is gone. A RENAME is not that case — the
+# token is updated in the record too, because a link line is a pointer.
 #
 # Usage: check-graph-links.sh
 set -euo pipefail
@@ -54,8 +55,11 @@ echo "See what cites an artifact before renaming or deleting it:"
 echo ""
 echo "    python3 $SHOWN impact <KIND:name>"
 echo ""
-echo "If the citing file is immutable (an accepted decision record), record the"
-echo "pair in .graph-link-allowlist instead, with the reason:"
+echo "RENAMED? Update the token in every citer — an accepted decision record"
+echo "included: a link line is a pointer, not part of what the record decided."
+echo ""
+echo "RETIRED, and the citing file is an accepted decision record? It cannot"
+echo "follow. Record the pair in .graph-link-allowlist, with the reason:"
 echo ""
 echo "    <citing file> <token>  # why it cannot be repaired"
 echo ""
