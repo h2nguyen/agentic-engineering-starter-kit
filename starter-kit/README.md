@@ -80,7 +80,7 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
 | `scripts/graph_tool.py` | `scripts/graph_tool.py` | Ready to run — `check` (the gate), `impact <KIND:name>` (what cites an artifact, and what it cites), `coverage` (which rules a script enforces and an agent reviews). Rebuilt from the files on every run, so there is nothing to regenerate |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, the parallel-merge and typed-link acceptance tests, and the brownfield-adoption and bootstrap re-run tests (both run from the kit) — chained into `make lint` |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, and the parallel-merge and typed-link acceptance tests — chained into `make lint`. The brownfield-adoption and bootstrap re-run suites test the installer itself, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | `docs/agent-templates/_rule-template.md` | Template — copy per new domain rule file (installed by bootstrap; never loaded) |
