@@ -14,9 +14,11 @@ de-branded: its material is illustration, never prescription.
 
 `git`, `make`, `bash` 3.2 or newer and `python3` 3.9 or newer — standard
 library only. Nothing to install, no network access, no per-clone `git config`.
-The kit's own checks pass on macOS with the system bash 3.2 and Python 3.9 in
-a clean clone with an empty home directory; the CI workflow it installs runs
-on `ubuntu-latest`.
+The kit's own checks, and a fresh install for each of the four tools, pass in
+a clean clone on macOS (system bash 3.2, GNU Make 3.81, Python 3.9) and on
+Linux (Debian 12, bash 5.2, GNU Make 4.3, Python 3.9, as a non-root user with
+networking off). Python 3.12 and 3.13 pass as well. The CI workflow the kit
+installs runs on `ubuntu-latest`.
 
 ## Quick start — three entry points
 
