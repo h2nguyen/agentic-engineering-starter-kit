@@ -57,6 +57,10 @@ graph-links:
 
 ## graph-impact — what cites NODE, e.g. make graph-impact NODE=RULE:documentation
 graph-impact:
+	@if [ -z "$(NODE)" ]; then \
+	  echo "Usage: make graph-impact NODE=<KIND:name>   e.g. NODE=RULE:documentation, NODE=ADR-0002, NODE=HUMAN, or a file path" >&2; \
+	  exit 2; \
+	fi
 	@python3 $(KIT)/scripts/graph_tool.py impact $(NODE)
 
 ## graph-coverage — which shipped rules a script enforces and an agent reviews.
