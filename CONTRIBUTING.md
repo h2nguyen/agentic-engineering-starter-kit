@@ -22,7 +22,7 @@ name your machine gives it — the make targets find it through
 
 | Command | What it does |
 |---|---|
-| `make lint` | Everything CI runs: this repository's gates, the unit tests and the acceptance suites. About two minutes |
+| `make lint` | Everything CI runs: this repository's gates, the unit tests and the acceptance suites. About three minutes |
 | `make kit-smoke` | Installs the kit into a throwaway repository and runs *its* `make lint` |
 | `make registry-generate` | Rebuilds `CHANGELOG.md` from `changelog.d/` |
 | `make graph-impact NODE=RULE:documentation` | What cites an artifact — run it before renaming or deleting one |
@@ -42,10 +42,13 @@ name your machine gives it — the make targets find it through
    | `test-parallel-merge.sh` | Two branches add registry entries and merge clean and green |
    | `test-graph-links.sh` | A typed link to nothing fails; a rename names every citer |
    | `test-python-launcher.sh` | `scripts/python.sh` finds Python as `python3`, `python` or `py -3`, and skips a name that is not Python |
-   | `test-ci-lint-coverage.sh` | A gate CI never runs is detected |
-   | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where |
+   | `test-ci-lint-coverage.sh` | A gate CI never runs is detected: which workflows count, which directory a step runs in, which installed gates lint must reach |
+   | `test-constitution.sh` | `check-constitution.sh`: a dead link and an unfilled placeholder fail; the angle brackets that belong in a constitution do not |
+   | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where, and which tool it installs for when it is not told |
+   | `test-upgrade.sh` | The README's upgrade steps, run as written on an older install an adopter customized: theirs stays theirs, the kit's becomes the newer kit's, lint ends green |
    | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
+   | `scripts/tests/test-eval-run.sh` | `scripts/eval-run.sh`, this repository's evaluation recorder (below) |
 
 3. **Make the change.**
 4. **Add a changelog fragment**, written for the adopter — what they will
@@ -74,13 +77,15 @@ cause; none of these has a quiet override.
 | `rule-budget` | Every rule file the kit ships stays under 250 lines; worked examples go to `starter-kit/rules/reference/` |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
 | `ci-lint-coverage` | Every check in `make lint` really runs in CI |
+| `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
 
 ## Adding to what the installer ships
 
 | You add | Also change |
 |---|---|
 | A default rule | `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table |
-| A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; an acceptance test with a control case; the `starter-kit/README.md` table |
+| A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; the gate list in `check-ci-lint-coverage.sh` and in the installer's "does not reach" message; an acceptance test with a control case; the `starter-kit/README.md` table; the `lint:` line `test-upgrade.sh` edits in step 5. A gate that is on by default is a MAJOR release (ADR-0008) — ship it unchained first, as `constitution` was |
+| A suite that needs `bootstrap.sh` | The `find` exclusions in `install_tree`, and the `rm -f` line of the README's upgrade step 2 — `test-upgrade.sh` fails when one is missing from either |
 | A hook | The file under `starter-kit/hooks/`; its entry in `settings.json.template` and in the guide's embedded copy; an install line in `bootstrap.sh`, Claude Code only; a case for each thing it says and each way it stays silent in `test-graph-hooks.sh`; the README section. A hook that adds context never blocks, never edits and ends silent when it cannot run |
 | A skill or agent | A self-contained directory or file — no path into the rest of the kit; an install line in `bootstrap.sh`; `skills/common-catalog.md`; the README tables |
 | A template | The kit file and the guide's embedded copy, together |
@@ -110,6 +115,9 @@ this way; the recipe:
 2. Give a small model one task at a time, in plain words, with the repository
    path and nothing else — no explanation of the kit. Start a fresh agent per
    task, so each begins from the repository alone, as a new session would.
+   **Start it in the scratch directory, not in this checkout**, and where the
+   tool that runs the agent takes a working directory per command, set it on
+   every command.
 3. After each task, run `make lint` yourself and read the diff. Ask the agent
    for every command it ran and every place it guessed; the guesses are the
    findings.
@@ -122,6 +130,47 @@ Three things that distorted results until they were controlled for:
 the agent's session showed this repository's recent commit subjects, which
 gave away one answer; and a scratch copy cloned from an earlier run carried
 that run's finished branch.
+
+### Running the commands, and keeping what they printed
+
+A fourth was not a distortion but a breach. An agent told in prose to work
+only in the scratch project ran its first build command with no working
+directory. It inherited this checkout as its default and wrote two files into
+it. And what the run left as evidence was a summary of the commands, not their
+output. An instruction is not a boundary, and a summary is not a record.
+
+So the commands **you** run in an evaluation — the independent tests, the
+gates, the probes — go through `scripts/eval-run.sh`:
+
+```bash
+scripts/eval-run.sh --cwd /abs/scratch/project --log /abs/scratch/log \
+    --guard "$PWD" --label "independent acceptance tests" -- \
+    ./scripts/python.sh -B /abs/scratch/evaluator/test_acceptance.py .
+```
+
+| It does | So that |
+|---|---|
+| Refuses to run without `--cwd`, and refuses a relative or missing one | No command runs in "wherever the session happened to be" |
+| Appends a record to `<log>/commands.jsonl` — command, cwd, start and end in UTC, exit status, outcome — and keeps stdout and stderr in a file each | The report can quote the output, and a reader can tell what was observed from what an agent said it did |
+| `--expect fail` records `expected-fail`, and `unexpected-pass` if the command passes | A negative test is labelled as one, and a broken one is not mistaken for a pass |
+| `--guard <dir>`: compares every file under the directory, and a checkout's HEAD and branch, before and after; a change fails the run with exit 97 and lists the paths | A stray write into this checkout is caught by the command that made it, not found at the end |
+
+**What it does not do.** It does not stop a write: a guard reports that a
+directory changed, after it changed. And it sees only the commands you pass
+it — an agent's own tool calls go wherever the agent's harness sends them.
+Keeping an agent out of this checkout is the harness's job: start it in the
+scratch directory, give it no path here, and where the harness can confine a
+session — a container, another user, a read-only mount — use that. Then guard
+this checkout on your own commands anyway, record `git status --short` here
+before the first task and after the last, and put both in the report. Say in
+the report which of these you had: "guarded and found unchanged" is a
+different claim from "isolated".
+
+In the report, keep three things apart: what a command recorded here printed,
+what an agent reported about itself, and what was inferred. Only the first is
+an observation. Name the model and its settings exactly as they were run;
+a single guided run with no baseline shows that the workflow can be followed,
+not that the kit caused the result.
 
 ## Releasing
 

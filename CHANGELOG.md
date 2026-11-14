@@ -21,14 +21,35 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+### Added
+
+- `make constitution` (`scripts/check-constitution.sh`), installed for every tool. It fails, with file and line, while the constitution links to a file that does not exist or still carries a template placeholder — the template's `testing.md` and `security.md` example lines, `<Project Name>`, an unfilled stack row. `make lint` checks neither, so a constitution could be committed half filled in with every gate green. Angle brackets that belong in a constitution are left alone: anything in a fenced block or backticks, HTML tags and comments, a single word such as `Option<T>`. Rule files and `docs/rule-reference/` are never read.
+- The check is **not** part of `make lint`: add `constitution` to your own `lint:` line to hold it on every pull request. The installer's next steps, the kit's `AGENTS.md`, the README and the setup prompt now name it as the check that onboarding is finished. ADR-0009 records why it ships unchained.
+- `scripts/tests/test-constitution.sh`, run by `registry-test`.
+- "The constitution check" in the kit README, and Troubleshooting rows for its two messages, for the installer's several-tools message and for any installed gate that lint does not reach.
+- In the kit's repository: `starter-kit/scripts/tests/test-upgrade.sh` runs the README's upgrade steps as written — the commands of steps 1 and 2 are read out of the README — on an install shaped like 1.x and, where the tag is present, on a real 1.1.0 install, each customized as an adopter would. It checks that the constitution, `settings.json`, your rules, `registries.json`, registry entries, workflow and tests come out byte for byte as they went in, that the kit's files become the newer kit's, and that lint ends green. ADR-0011 records this, and why the kit still writes no version manifest into your repository.
+- In the kit's repository: `scripts/eval-run.sh`, for evaluating a change by applying the kit. It refuses a command with no explicit working directory, records command, directory, start, end, exit status and output, labels a test that is meant to fail, and reports — after the fact — a command that changed a directory it was told to guard. `CONTRIBUTING.md` says what it does and does not isolate.
 
 <!-- category: Changed -->
+### Changed
+
+- **Breaking:** `check-ci-lint-coverage.sh` no longer counts a reusable workflow (`on: workflow_call`) that nothing calls. It counts one only when a workflow that a push, pull request or merge queue triggers reaches it through `uses: ./.github/workflows/<file>`, directly or through other reusable workflows. If your `make lint` runs only in a reusable workflow, call it from a workflow with one of those triggers.
+- **Breaking:** the coverage gate now reads a workflow-level `defaults.run.working-directory`. A workflow that runs its steps in another directory no longer covers the root Makefile; a job default or a step's own `working-directory` of `.` still does. The nearest setting wins: step, job, workflow, root.
+- **Breaking:** the coverage gate requires `lint` to reach every gate the kit installed — `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` — where it checked three. If you keep your own Makefile and its `lint:` line leaves out `kb-shape` or `ci-lint-coverage`, add it; the failure names the target. A repository installed before a gate existed, with no such script, is not held to it.
+- A workflow in another repository (`owner/repo/…@ref`) and a `uses:` that is not a literal local path are never counted as coverage: the gate cannot read them. If your lint runs there, list the targets in `.ci-lint-coverage-allowlist` with the reason.
+- When the coverage gate fails, it lists what it read and did not count — an uncalled reusable workflow, a call it could not follow — under "Read and not counted". Its header now states what "covered" means: a step that is not visibly switched off names the target. That is evidence CI runs it, not proof.
+- `bootstrap.sh` no longer chooses between tools. When the target has the files of more than one — `CLAUDE.md` beside `AGENTS.md`, `.claude/` beside `.cursor/` — it asks which is primary, and with no terminal to ask at it stops before writing anything and lists them. Pass `--tool`. Earlier versions installed for the first it looked for (Claude Code, then Cursor, then Copilot, then `AGENTS.md`) without saying so. `AGENTS.md` beside `.cursor/` is still Cursor alone: that is where the Cursor layout keeps its constitution.
+- Upgrade step 1 in the kit README says to add `--tool` in a repository with two tools' files, and step 5 names the five gates the coverage gate now holds.
 
 <!-- category: Deprecated -->
 
 <!-- category: Removed -->
 
 <!-- category: Fixed -->
+### Fixed
+
+- Upgrade step 2 in the kit README left `scripts/tests/test-graph-hooks.sh` in your repository: its `cp` copied every suite and its `rm` removed only two of the ones that stay in the kit. The line now removes all four. If you upgraded to 2.0.0 by those steps, delete the file; nothing runs it.
+- The kit's own `AGENTS.md` linked to `changelog.d/`, a directory that does not exist in a checkout once a release has consumed its fragments. The directory now keeps a README.
 
 <!-- category: Security -->
 

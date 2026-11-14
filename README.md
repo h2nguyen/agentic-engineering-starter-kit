@@ -37,7 +37,7 @@ installs runs on `ubuntu-latest`.
    tells it how to install the kit into your project.
 2. **Script.** From a checkout of this repository:
    ```bash
-   ./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool, or asks
+   ./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool; asks if it finds none, or several
    ./starter-kit/bootstrap.sh --target /path/to/your-repo --tool claude   # claude | agents | cursor | copilot
    ```
    It installs to that tool's expected locations, never overwrites a file and
@@ -50,10 +50,13 @@ installs runs on `ubuntu-latest`.
 1. Fill in the constitution's `<placeholders>` and the project rows of the
    comments-and-annotations rule —
    [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
-2. Run `make lint`. A working install prints an `OK:` line for each of its five
+2. Run `make constitution`. It names every template placeholder and every
+   link to a file that does not exist that step 1 left in the constitution,
+   and passes when there is none.
+3. Run `make lint`. A working install prints an `OK:` line for each of its five
    gates and no `FAIL`. If your repository already had a Makefile, the
    installer left it alone and printed the two lines to add.
-3. Commit on a feature branch.
+4. Commit on a feature branch.
 
 Later, once the workspace has real mass, `--with-meta` adds the Level-4
 self-improvement loop. To move an existing install to a newer kit, see

@@ -208,7 +208,9 @@ Appendix A.7 — the sequence:
 
 ## Phase 4 — Verify and hand off
 
-1. No leftover placeholders: search the new files for `<` markers. The
+1. No leftover placeholders: search the new files for `<` markers. For the
+   constitution, where the kit is present, `make constitution` does this
+   search and exits non-zero until it is clean. The
    comments-and-annotations rule is the one exception — its
    `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>` and
    `<EVAL-RECORD-ID>` are pointers to resolve, and the other angle-bracket
@@ -216,9 +218,10 @@ Appendix A.7 — the sequence:
    examples to make the search come back empty.
 2. Every command documented in the constitution has been executed successfully
    in this session.
-3. Every internal link in the new files resolves — and every typed link
-   (Appendix A.10): `make graph-links` where the kit is present, by hand
-   otherwise.
+3. Every internal link in the new files resolves — `make constitution`
+   checks the constitution's, and reports a template example rule that this
+   project never wrote — and every typed link (Appendix A.10): `make
+   graph-links` where the kit is present, by hand otherwise.
 4. The umbrella lint target passes, and every check chained into it is reachable
    from a CI workflow step.
 5. Harmonize-track runs only: cross-check the ledger — every item is preserved
