@@ -212,6 +212,34 @@ for tool in claude agents cursor copilot; do
   else
     bad "$tool: an installed typed link does not resolve:"; grep -E '^FAIL' "$WORK/links-$tool.log" | head -5 | sed 's/^/         /'
   fi
+  # Installed is not onboarded. The link gate above is green on a constitution
+  # that still has every template placeholder and two links to example rules
+  # nobody wrote — which is how one was committed that way. The constitution
+  # check is what reads it: every such line, in this layout's paths.
+  ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
+  [ "$rc" -ne 0 ] && ok "$tool: 'make constitution' fails on a constitution nobody has filled in" \
+    || bad "$tool: 'make constitution' passed on the untouched template"
+  unreported=""
+  for n in $(awk '/^## Debugging/ {exit} /</ {print NR}' "$c"); do
+    grep -q "^FAIL: ${c#"$R"/}:$n — " "$WORK/constitution-$tool.log" || unreported="$unreported $n"
+  done
+  [ -z "$unreported" ] && ok "$tool: every template line that opens a placeholder is reported by number" \
+    || bad "$tool: template placeholder lines the check did not report:$unreported"
+  grep -q "link '${rules_dir#"$R"/}/testing.md' names a file that does not exist" "$WORK/constitution-$tool.log" \
+    && grep -q "link '${rules_dir#"$R"/}/security.md' names a file that does not exist" "$WORK/constitution-$tool.log" \
+    && ok "$tool: and the two example rules the template links to, which no install has" \
+    || bad "$tool: the links to testing.md and security.md were not reported"
+  # What filling it in comes to, mechanically: every placeholder line and both
+  # example links gone. The Debugging section keeps its angle brackets — a
+  # command argument in a fence, two token shapes in backticks — and must pass.
+  cp "$c" "$WORK/constitution-$tool.orig"
+  awk '/^## Debugging/ {keep=1} keep || !(/</ || /testing\.md/ || /security\.md/ || /^constraints that shape/)' \
+    "$WORK/constitution-$tool.orig" > "$c"
+  ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ) \
+    && grep -q '<symptom>' "$c" \
+    && ok "$tool: with those lines gone it passes, and the angle brackets that belong there stayed" \
+    || { bad "$tool: a filled-in constitution still fails:"; grep -E '^FAIL' "$WORK/constitution-$tool.log" | head -3 | sed 's/^/         /'; }
+  cp "$WORK/constitution-$tool.orig" "$c"
 done
 
 echo "=== the kit's own tools leave no bytecode behind in the repository ==="

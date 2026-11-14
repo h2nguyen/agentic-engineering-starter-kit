@@ -22,7 +22,8 @@
 #             repo already has), .gitattributes (appended to if present),
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
 #             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
-#             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh)
+#             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh,
+#             check-constitution.sh)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
@@ -42,7 +43,7 @@ while [ $# -gt 0 ]; do
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
-    -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -294,6 +295,11 @@ install_file scripts/check-ci-lint-coverage.sh scripts/check-ci-lint-coverage.sh
 # nothing resolves it is a citation nobody will know has gone stale.
 install_file scripts/graph_tool.py scripts/graph_tool.py x || true
 install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
+# The constitution's own check: its links name files that exist, and no
+# template placeholder is left in it. A command the next steps name
+# (`make constitution`), not a prerequisite of `lint`: it would fail a
+# constitution that passed before, and that is the adopter's call to make.
+install_file scripts/check-constitution.sh scripts/check-constitution.sh x || true
 install_tree scripts/tests scripts/tests || true
 
 # The templates a workspace grows from. They used to stay in the kit, and a
@@ -388,7 +394,10 @@ else
     echo "     On $TOOL nothing loads a skill by itself: one you want becomes a playbook"
     echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."
   fi
-  echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
+  echo "  3. Run 'make constitution'. It fails, naming the line, for as long as $CONSTITUTION"
+  echo "     links to a file that does not exist or still carries a template <placeholder> —"
+  echo "     'make lint' does not check either, so a green lint does not mean step 1 is done."
+  echo "     Then run 'make lint' — the registry gates, the knowledge-base shape check, the"
   echo "     typed-link gate and the CI-coverage check are already chained into it, and"
   echo "     the installed workflow invokes that same target so nothing can fall out of CI."
 fi
