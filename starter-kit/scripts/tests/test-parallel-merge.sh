@@ -279,7 +279,7 @@ add_on_branch() { # $1 = repo, $2 = branch, $3... = registry_tool args
   local frag
   while IFS= read -r frag; do
     sed_i 's/<fill in>/Recorded by the acceptance test./g' "$frag"
-  done < <(find "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" -name '*.md' ! -name '_*')
+  done < <(find "$repo/docs/DEBUGGING-KNOWLEDGE-BASE.d" -name '*.md' ! -name '_*' 2>/dev/null)
   while IFS= read -r frag; do
     sed_i 's/^- <what an operator.*/- Recorded by the acceptance test./' "$frag"
   done < <(find "$repo/changelog.d" -maxdepth 1 -name '*.md' ! -name 'README*')

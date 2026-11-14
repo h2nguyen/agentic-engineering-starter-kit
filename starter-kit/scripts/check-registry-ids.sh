@@ -48,6 +48,7 @@ echo ""
 echo "Rename the fragment that has NOT been merged yet, then regenerate."
 echo "Never renumber an identifier that is already on the default branch:"
 echo "rules, decision records and code comments cite it by name, and renaming"
-echo "it breaks every one of those citations silently."
+echo "it breaks every one of those citations — the link gate catches the typed"
+echo "ones, and nothing catches a mention in a comment or a sentence."
 echo ""
 exit 1
