@@ -572,6 +572,29 @@ All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite 
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py post-edit",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace-graph.py stop",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
