@@ -82,11 +82,14 @@ file is renamed. Write it as a **typed link** — a line that names the other
 artifact by a stable token — and `make lint` checks that every token still
 names something.
 
-| Line | Says | May name |
+| Line | Says | Names |
 |---|---|---|
 | `**Related:**` | this artifact cites that one | any artifact |
-| `**Enforces:**` | this script or reviewer holds that rule | a rule, a decision record, a document |
+| `**Enforces:**` | this script or reviewer holds that rule | the rule — or the decision record or document that states it |
 | `**Hands off to:**` | who or what runs next | a skill, an agent, a command, a script, or `HUMAN` |
+
+The gate rejects a hand-off to a rule, a document or a registry entry: none of
+them runs next. What an `Enforces` line names is a convention it does not check.
 
 Tokens are `RULE:<name>`, `SKILL:<name>`, `AGENT:<name>`, `COMMAND:<name>`,
 `SCRIPT:<file name>`, `DOC:<name>`, and the identifiers of knowledge-base

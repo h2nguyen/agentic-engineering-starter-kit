@@ -95,7 +95,7 @@ make graph-impact NODE=RULE:documentation   # what cites an artifact — before 
 | **Test first** | A failing case in the acceptance suite before the change, with a control case where it closes a defect |
 | **The installer** | Never overwrites a file; safe to re-run; every artifact lands for all four tools, or the installer says why not |
 | **Dependencies** | Bash and the Python standard library. No packages, no network |
-| **`starter-kit/` stands alone** | A file there is read in a repository that does not contain this one. No path into the rest of this repository |
+| **What the installer copies stands alone** | An installed file is read in a repository that does not contain this one: no path into the kit, or into the rest of this repository. `starter-kit/README.md` and `bootstrap.sh` stay in the kit and may link to the guide |
 | **Templates** | A template embedded in the guide is byte-identical to its kit file; change both together |
 | **Links** | `Related:`, `Enforces:` and `Hands off to:` lines name artifacts that exist. Run `make graph-impact` before a rename |
 | **Changelog** | A fragment per change via `registry_tool.py new --registry changelog`; never edit `CHANGELOG.md` by hand |

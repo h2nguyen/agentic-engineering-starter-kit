@@ -86,7 +86,7 @@ confirm the gates pass, enable further common skills from
 | `scripts/check-ci-lint-coverage.sh` | `scripts/check-ci-lint-coverage.sh` | Chained into `make lint`; proves the other gates reach CI |
 | `scripts/graph_tool.py` | `scripts/graph_tool.py` | Ready to run — `check` (the gate), `impact <KIND:name>` (what cites an artifact, and what it cites), `coverage` (which rules a script enforces and an agent reviews). Rebuilt from the files on every run, so there is nothing to regenerate |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, and the parallel-merge and typed-link acceptance tests — chained into `make lint`. The brownfield-adoption and bootstrap re-run suites test the installer itself, so they stay in the kit |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption and bootstrap re-run suites test the installer itself, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `rules/_rule-template.md` | `docs/agent-templates/_rule-template.md` | Template — copy per new domain rule file (installed by bootstrap; never loaded) |
@@ -101,8 +101,8 @@ confirm the gates pass, enable further common skills from
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
 | `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
 | `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
-| `settings.json.template` | `.claude/settings.json` | Remove the hook entry if you don't need one yet |
-| `hooks/session-start.sh.template` | `.claude/hooks/session-start.sh` | `chmod +x`; fill in toolchain steps |
+| `settings.json.template` | `.claude/settings.json` | Registers the SessionStart hook below. Keep the entry while the hook file exists; delete both together if sessions need no setup |
+| `hooks/session-start.sh.template` | `.claude/hooks/session-start.sh` | Installed executable (`chmod +x` after a manual copy). A skeleton that does nothing until you fill in the toolchain steps a session needs |
 | `scripts/check-kb-shape.sh` | `scripts/check-kb-shape.sh` | Ready to run; already chained into the installed `make lint` (guards the KB's graph-ready shape) |
 | `scripts/check-convention.sh.template` | `docs/agent-templates/check-convention.sh.template` | Template — copy to `scripts/check-<convention>.sh`, `chmod +x`, wire into your lint target |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | Generated — start empty; add the first entry at the first >30-min bug |
@@ -131,39 +131,75 @@ confirm the gates pass, enable further common skills from
 `bootstrap.sh` never overwrites a file. Re-running it from a newer kit
 therefore **adds** what is new and leaves every file you already have exactly
 as it is — including the kit's own scripts. Moving to a newer kit is these
-steps, in order, from the root of your repository (`KIT` is a checkout of the
-newer kit):
+steps, in order, on a branch, from the root of your repository (`KIT` is a
+checkout of the newer kit).
 
-1. **Add what is new.**
+The kit does not record in your repository which version it was installed
+from, and it does not need to: every step compares your files with the kit's,
+whichever version you started from. The kit's `CHANGELOG.md` says why each
+file changed.
+
+1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
+   layer (`agent-coach`, the workspace-audit skill).
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
+   Its "Installed" list is what the newer kit added. Everything under
+   "Skipped" was left as it was.
 2. **Replace the files the kit owns.** They hold nothing of your project, so
-   copying is safe:
+   copying is safe. `git status` first: if one of them shows your own edits,
+   merge that file by hand instead.
    ```bash
    cp "$KIT"/starter-kit/scripts/*.py "$KIT"/starter-kit/scripts/check-*.sh scripts/
    cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
    cp "$KIT"/starter-kit/registry.mk registry.mk
+   cp "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md docs/DEBUGGING-KNOWLEDGE-BASE.d/
    rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh
    ```
    The last line removes the two suites that test the installer; they stay in
-   the kit and are not run from your repository.
-3. **Merge the rule files; do not copy them.** Yours may carry your project's
-   fill-ins. Compare each with the kit's and take the changes:
+   the kit and are not run from your repository. Your own `check-*.sh` scripts
+   and tests are not touched: only files the kit has are copied.
+
+   The templates in `docs/agent-templates/` are the kit's too. To refresh
+   them, delete the directory and run step 1 again — the installer puts them
+   back, pointing at the rule location of your tool.
+
+   On Claude Code, the kit's skills, its `agent-coach` and its audit command
+   are also its own. List the ones that differ, then copy each one you have
+   not edited:
    ```bash
-   diff -u .claude/rules/documentation.md "$KIT"/starter-kit/rules/documentation.md
+   diff -rq "$KIT"/starter-kit/skills .claude/skills | grep '^Files'
+   diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
+   diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
    ```
-   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.) The
-   release notes in the kit's `CHANGELOG.md` say which rules changed.
-4. **Chain any new gate into your lint target.** If you keep your own
+3. **Merge the rule files; do not copy them.** Yours may carry your project's
+   fill-ins. List the rules that differ, then compare each and take the
+   kit's changes:
+   ```bash
+   diff -rq "$KIT"/starter-kit/rules .claude/rules | grep '^Files'
+   diff -u .claude/rules/documentation.md "$KIT"/starter-kit/rules/documentation.md
+   diff -rq "$KIT"/starter-kit/rules/reference docs/rule-reference | grep '^Files'
+   ```
+   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.) A
+   rule you never edited differs only by the kit's changes, so copying it is
+   the merge. Where a newer kit moved a rule's examples to
+   `docs/rule-reference/`, carry your fill-ins to the same lines there.
+4. **Leave what is yours.** The constitution (`CLAUDE.md`, `AGENTS.md` or
+   `.github/copilot-instructions.md`), `Makefile`, `registries.json`, the CI
+   workflow, `.claude/settings.json` and its hook, the workspace changelog,
+   and every changelog fragment, knowledge-base entry and decision record are
+   never replaced. If the kit's changelog names a wording change in the
+   constitution template, apply it by hand.
+5. **Chain any new gate into your lint target.** If you keep your own
    Makefile, its `lint:` line must name every gate `registry.mk` defines —
    `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`.
-5. **Run `make lint` and fix what it reports.** Each failure names the file,
-   the line and the fix. Coming from a kit older than 1.2.0, expect one kind:
-   a check script whose header still reads `# Enforces: <rule> — see <file>`
-   must name its rule as a token, `# Enforces: RULE:<name> — <what it checks>`.
+6. **Run `make lint` and fix what it reports.** Each failure names the file,
+   the line and the fix. If your repository had no `scripts/graph_tool.py`
+   before step 1, expect one kind: a check script whose header still reads
+   `# Enforces: <rule> — see <file>` must name its rule as a token,
+   `# Enforces: RULE:<name> — <what it checks>`.
 
-Commit the upgrade on a branch of its own, like any other change.
+Commit the upgrade on its branch, like any other change.
 
 ## Troubleshooting
 
@@ -190,13 +226,18 @@ can fill. Two things to do once, right after bootstrap:
    ```bash
    # once, from the repo root: which comment tokens does my tooling read?
    grep -rnoE 'noqa|eslint-disable|prettier-ignore|pragma|@ts-(ignore|expect-error)|<!-- *[a-zA-Z-]+ *-->' \
-     .github/ Makefile* *.toml *.cfg *.config.* .*rc* 2>/dev/null | sort -u
+     --include='Makefile*' --include='*.mk' --include='*.toml' --include='*.cfg' --include='*.yml' \
+     --include='*.yaml' --include='*.config.*' --include='.*rc*' --exclude-dir=.git . | sort -u
    ```
 
-   Adapt the pattern and the paths to the tools you actually run; the point is
-   the list, not the command. Every shape that turns up is configuration, not
-   commentary, and goes into the table with the gate that reads it in the last
-   column.
+   Adapt the pattern and the file names to the tools you actually run; the
+   point is the list, not the command. Every shape that turns up is configuration, not commentary,
+   and goes into the table with the gate that reads it in the last column. The
+   kit's own markers will be among the hits; they are in the first table
+   already. **Nothing of your own turns up:** that is a valid answer for a
+   project with no linter directives yet. Replace the table's placeholder row
+   with one line saying so — "none yet; add a row when a tool starts reading
+   a comment" — instead of leaving the placeholder or inventing a marker.
 2. **Resolve the pointers.** Four placeholders stay in the rule — and in its
    on-demand examples, `docs/rule-reference/comments-and-annotations.md` — on purpose,
    because their value belongs to the adopting project:
