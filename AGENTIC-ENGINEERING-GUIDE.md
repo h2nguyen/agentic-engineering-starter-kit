@@ -287,7 +287,7 @@ make dev          # start local stack
 make test         # full test suite
 make lint         # lint + enforcement checks (must pass before any PR)
 make registry-generate   # rebuild CHANGELOG.md and the knowledge base from fragments
-make graph-impact NODE=RULE:testing   # what cites an artifact — run before renaming, deleting or rewriting it
+make graph-impact NODE=RULE:documentation   # what cites an artifact — run before renaming, deleting or rewriting it
 ```
 
 ## Non-Negotiable Rules

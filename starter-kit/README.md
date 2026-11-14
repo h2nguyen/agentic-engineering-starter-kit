@@ -76,7 +76,7 @@ confirm the gates pass, enable further common skills from
 | `CHANGELOG.md.template` | `CHANGELOG.md` | Skip if you already have one — run `registry_tool.py adopt --registry changelog` on it instead |
 | `changelog.d/` | `changelog.d/` | One fragment per change; categories are `## ` headings inside it |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | One file per entry — the authored source of the KB |
-| `Makefile.template` | `Makefile` | Greenfield only — includes `registry.mk`. An existing Makefile is never touched; bootstrap prints the two lines to add and verifies they took effect |
+| `Makefile.template` | `Makefile` | Greenfield only — includes `registry.mk`. An existing Makefile is never touched; bootstrap prints the two lines to add, and says whether `make lint` reaches the gates yet (run it again after the edit to confirm) |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
@@ -131,13 +131,13 @@ confirm the gates pass, enable further common skills from
 `bootstrap.sh` never overwrites a file. Re-running it from a newer kit
 therefore **adds** what is new and leaves every file you already have exactly
 as it is — including the kit's own scripts. Moving to a newer kit is these
-steps, in order, on a branch, from the root of your repository (`KIT` is a
-checkout of the newer kit).
+steps, in order, on a branch (`chore/upgrade-agentic-kit`, say), from the root
+of your repository. `KIT` is a checkout of the newer kit.
 
 The kit does not record in your repository which version it was installed
 from, and it does not need to: every step compares your files with the kit's,
-whichever version you started from. The kit's `CHANGELOG.md` says why each
-file changed.
+whichever version you started from. For why a file changed, search the kit's
+`CHANGELOG.md` for its name.
 
 1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
    layer (`agent-coach`, the workspace-audit skill).
@@ -145,11 +145,14 @@ file changed.
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
    Its "Installed" list is what the newer kit added. Everything under
-   "Skipped" was left as it was.
+   "Skipped" was left as it was. If you keep your own Makefile, it also names
+   any gate your `lint` target does not reach yet (step 5).
 2. **Replace the files the kit owns.** They hold nothing of your project, so
-   copying is safe. `git status` first: if one of them shows your own edits,
-   merge that file by hand instead.
+   copying is safe — unless you changed one yourself. The first command lists
+   the commits that touched them; a file one of your own commits changed is
+   merged by hand instead of copied.
    ```bash
+   git log --oneline -- scripts registry.mk
    cp "$KIT"/starter-kit/scripts/*.py "$KIT"/starter-kit/scripts/check-*.sh scripts/
    cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
    cp "$KIT"/starter-kit/registry.mk registry.mk
@@ -165,31 +168,47 @@ file changed.
    back, pointing at the rule location of your tool.
 
    On Claude Code, the kit's skills, its `agent-coach` and its audit command
-   are also its own. List the ones that differ, then copy each one you have
-   not edited:
+   are also its own. List the ones that differ, then copy each one that no
+   commit of yours has changed (`git log --oneline -- <file>` again):
    ```bash
    diff -rq "$KIT"/starter-kit/skills .claude/skills | grep '^Files'
    diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
    diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
    ```
-3. **Merge the rule files; do not copy them.** Yours may carry your project's
-   fill-ins. List the rules that differ, then compare each and take the
-   kit's changes:
+3. **Update the rule files — merge the one you filled in, copy the rest.**
+   List the rules that differ from the kit's:
    ```bash
    diff -rq "$KIT"/starter-kit/rules .claude/rules | grep '^Files'
-   diff -u .claude/rules/documentation.md "$KIT"/starter-kit/rules/documentation.md
    diff -rq "$KIT"/starter-kit/rules/reference docs/rule-reference | grep '^Files'
    ```
-   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.) A
-   rule you never edited differs only by the kit's changes, so copying it is
-   the merge. Where a newer kit moved a rule's examples to
-   `docs/rule-reference/`, carry your fill-ins to the same lines there.
+   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.)
+   - **`comments-and-annotations.md` is merged, never copied.** It carries
+     your project's rows and pointers — the ones
+     [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule)
+     had you fill in. Take the kit's file, then put your second table and your
+     pointers back; a copy would reset them to placeholders. Its reference
+     file, `docs/rule-reference/comments-and-annotations.md`, carries the same
+     pointers and gets the same values.
+     ```bash
+     diff -u .claude/rules/comments-and-annotations.md "$KIT"/starter-kit/rules/comments-and-annotations.md
+     ```
+     While you are there, re-read your own rows: they describe the project as
+     it was on the day of the install.
+   - **The other rules are used as shipped**, so for one that no commit of
+     yours has changed, copying the kit's file is the whole merge. One you
+     did change is merged by hand, the same way.
 4. **Leave what is yours.** The constitution (`CLAUDE.md`, `AGENTS.md` or
    `.github/copilot-instructions.md`), `Makefile`, `registries.json`, the CI
-   workflow, `.claude/settings.json` and its hook, the workspace changelog,
-   and every changelog fragment, knowledge-base entry and decision record are
-   never replaced. If the kit's changelog names a wording change in the
-   constitution template, apply it by hand.
+   workflow, the workspace changelog, and every changelog fragment,
+   knowledge-base entry and decision record are never replaced. Two of yours
+   started as kit skeletons, and a fix to a skeleton reaches you only by
+   hand — compare them and take what applies:
+   ```bash
+   diff -u .claude/hooks/session-start.sh "$KIT"/starter-kit/hooks/session-start.sh.template
+   diff -u .claude/settings.json "$KIT"/starter-kit/settings.json.template
+   ```
+   (Claude Code only.) The constitution template is the third; a change to it
+   is named in the kit's changelog.
 5. **Chain any new gate into your lint target.** If you keep your own
    Makefile, its `lint:` line must name every gate `registry.mk` defines —
    `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`.
@@ -199,7 +218,9 @@ file changed.
    `# Enforces: <rule> — see <file>` must name its rule as a token,
    `# Enforces: RULE:<name> — <what it checks>`.
 
-Commit the upgrade on its branch, like any other change.
+Commit the upgrade on its branch, like any other change. It needs no
+changelog fragment — your changelog describes your project, not its agent
+workspace — and, where you keep one, a line in the workspace changelog.
 
 ## Troubleshooting
 
@@ -235,9 +256,10 @@ can fill. Two things to do once, right after bootstrap:
    and goes into the table with the gate that reads it in the last column. The
    kit's own markers will be among the hits; they are in the first table
    already. **Nothing of your own turns up:** that is a valid answer for a
-   project with no linter directives yet. Replace the table's placeholder row
-   with one line saying so — "none yet; add a row when a tool starts reading
-   a comment" — instead of leaving the placeholder or inventing a marker.
+   project with no linter directives yet. The second table's rows are examples
+   of kinds, so leave them, and add one line under the table saying so —
+   "none yet; add a row when a tool starts reading a comment" — instead of
+   inventing a marker.
 2. **Resolve the pointers.** Four placeholders stay in the rule — and in its
    on-demand examples, `docs/rule-reference/comments-and-annotations.md` — on purpose,
    because their value belongs to the adopting project:
@@ -247,7 +269,11 @@ can fill. Two things to do once, right after bootstrap:
    | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `python3 scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
    | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
    | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
-   | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence |
+   | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence. None of your own yet: `make lint`, which runs the kit's gates |
+
+   Write a shape exactly as `registry_tool.py list` prints it. The date-slug
+   form ends in `<slug>`, and that angle-bracket token is part of the shape,
+   not something left to fill.
 
    `<EVAL-RECORD-ID>` appears in the reference file's prompt-file example and survivors
    table: fill it with wherever your project records evaluation evidence for

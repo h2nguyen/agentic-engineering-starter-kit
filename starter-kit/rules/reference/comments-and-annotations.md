@@ -5,9 +5,10 @@ what to do; this file shows it. It is **not** loaded into every session — open
 it when you are about to add, shorten or review an annotation and want the
 worked shape. Nothing here adds to the rule or relaxes it.
 
-Its `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>` and
-`<EVAL-RECORD-ID>` tokens are the same project pointers the rule file carries;
-resolve them here when you resolve them there.
+The examples name decision records, knowledge-base entries, tickets and
+evaluation records by the same project pointers the rule file carries
+(`<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<EVAL-RECORD-ID>`
+until a project fills them in). Fill them here when you fill them there.
 
 ## Worked examples
 
