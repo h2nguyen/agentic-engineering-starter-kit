@@ -92,6 +92,11 @@ a skill only when it triggers:
   in reference files they read on demand; rarely-used specialists may be
   richer.
 
+Which class a rule file falls in depends on the tool. Claude Code loads every
+file in `.claude/rules/` that has no `paths:` front matter into every session;
+a tool that loads only its constitution reads a rule file when the constitution
+links to it. Say which you assumed.
+
 Treat files over their class budget as candidates for the Phase 3 remediation
 ladder, not for summarization — summarizing first is exactly how context and
 hard-won guidance get destroyed. Also flag the inverse: multi-topic files
@@ -162,7 +167,10 @@ stop at the first rung that resolves the finding — rungs 1–3 are lossless,
 which is why deletion sits last:
 
 1. RELOCATE — move detail out of always-loaded files into on-demand skills or
-   reference docs, leaving a one-line pointer behind.
+   reference docs, leaving a one-line pointer behind. Where the repo has no
+   home for such a reference yet, use `docs/rule-reference/<rule>.md` — where
+   the starter kit's own trimmed rules keep theirs — and name that path in the
+   pointer.
 2. SPLIT — divide multi-topic files into single-topic files, each with a clear
    name, a description/trigger that makes it discoverable, and a
    cross-reference from its parent (progressive disclosure: lean entry file +
@@ -174,6 +182,10 @@ which is why deletion sits last:
 Anti-fragmentation guard: never split below the level of a coherent topic. A
 fragment that cannot be found, or that separates a guideline from the context
 needed to apply it, is worse than a long file — merge such fragments back.
+Where the guard and a budget pull against each other, the guard wins: a file
+whose illustrations have moved and whose remaining text is one coherent topic
+stays whole above its target. Record it as over target, with the reason,
+rather than splitting it to meet a number.
 
 **Deletion policy.** The default posture is preserve: project learnings are
 expensive to rediscover and cheap to keep. Remove content only when at least
@@ -205,7 +217,14 @@ Show evidence rather than asserting success: always-loaded line/token count
 before vs. after; duplicates merged; ledger check (every item preserved or its
 removal justified); the share of findings resolved at rungs 1–2 vs. 3–4 (a
 healthy audit resolves most findings losslessly); and a dry run of one
-representative task confirming the workspace still behaves as intended.
+representative task confirming the workspace still behaves as intended — the
+lint target plus one skill or reviewer exercised on a known change is enough.
+
+Prove a relocation lossless rather than asserting it: every non-blank line
+removed from the source is found verbatim in the destination, or is still in
+the source. List separately any line you changed on purpose. A configuration
+change, such as a model pin, is not a ladder rung; report it beside the ladder
+share, not inside it.
 
 ## Guardrails
 
@@ -213,7 +232,9 @@ representative task confirming the workspace still behaves as intended.
   concerns and makes the run hard to review and trust.
 - Preserve the project's voice, language, and naming conventions.
 - Where a best practice or tool behavior may have changed since training,
-  verify against current official documentation before asserting it.
+  verify against current official documentation before asserting it. If this
+  session has no way to consult it, say so, and mark the judgment as resting
+  on this repository's own rules.
 - Report context spend honestly; if the audit's own context degrades, pause
   and recommend a fresh session rather than pushing through.
 
