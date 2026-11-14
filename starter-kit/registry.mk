@@ -44,6 +44,10 @@ graph-links:
 ## rewriting a rule, skill, agent, command or script:
 ##     make graph-impact NODE=RULE:testing
 graph-impact:
+	@if [ -z "$(NODE)" ]; then \
+	  echo "Usage: make graph-impact NODE=<KIND:name>   e.g. NODE=RULE:documentation, NODE=ADR-0002, NODE=HUMAN, or a file path" >&2; \
+	  exit 2; \
+	fi
 	@python3 scripts/graph_tool.py impact $(NODE)
 
 ## graph-coverage — which rules a script enforces and an agent reviews.

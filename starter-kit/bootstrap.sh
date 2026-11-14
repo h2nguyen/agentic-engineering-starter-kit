@@ -155,8 +155,10 @@ DEFAULT_RULES=(working-principles documentation comments-and-annotations version
 
 # The constitution links its rules as .claude/rules/…; every other layout keeps
 # them under docs/agent-rules/, so the links are rewritten on those tools.
-if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
-  retarget_rule_links "$CONSTITUTION"
+RERUN=1
+if install_file constitution.md.template "$CONSTITUTION"; then
+  RERUN=0
+  if [ "$TOOL" != claude ]; then retarget_rule_links "$CONSTITUTION"; fi
 fi
 for rule in "${DEFAULT_RULES[@]}"; do
   install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
@@ -246,16 +248,23 @@ install_tree scripts/tests scripts/tests || true
 # on Claude Code everything in it is loaded into every session. And every name
 # begins with an underscore or ends in .template, which is what tells the link
 # gate these are scaffolding and their <placeholders> are not citations.
-install_file rules/_rule-template.md docs/agent-templates/_rule-template.md || true
-install_file scripts/check-convention.sh.template docs/agent-templates/check-convention.sh.template || true
-install_file skills/_template/SKILL.md docs/agent-templates/_skill-template.md || true
-install_file agents/_agent-template.md docs/agent-templates/_agent-template.md || true
+#
+# The templates name rule files as .claude/rules/…, so on the other layouts
+# the path is rewritten — in the run that installs the file and in no other.
+# On a re-run the template is the adopter's, and a file the installer skipped
+# is a file it does not modify.
+install_template() { # $1 = kit-relative src, $2 = name under docs/agent-templates/
+  if install_file "$1" "docs/agent-templates/$2" && [ "$TOOL" != claude ]; then
+    retarget_rule_links "docs/agent-templates/$2"
+  fi
+  return 0
+}
+install_template rules/_rule-template.md _rule-template.md
+install_template scripts/check-convention.sh.template check-convention.sh.template
+install_template skills/_template/SKILL.md _skill-template.md
+install_template agents/_agent-template.md _agent-template.md
 if [ "$TOOL" = claude ]; then
-  install_file commands/_command-template.md docs/agent-templates/_command-template.md || true
-else
-  for _tpl in _rule-template.md check-convention.sh.template _skill-template.md _agent-template.md; do
-    retarget_rule_links "docs/agent-templates/$_tpl"
-  done
+  install_template commands/_command-template.md _command-template.md
 fi
 
 # The changelog rule is only correct once the registry layer is present, so it
@@ -295,14 +304,29 @@ if [ ${#SKIPPED[@]} -gt 0 ]; then
   echo "Skipped:"; printf '  = %s\n' "${SKIPPED[@]}"
 fi
 echo ""
+if [ "$RERUN" -eq 1 ]; then
+  # A re-run is read by someone adding the Level-4 layer or moving to a newer
+  # kit. The list below is the first-install list; most of it is already done,
+  # and none of it says the one thing this reader needs to know.
+  echo "$CONSTITUTION already existed, so this run only ADDED what was missing. No file"
+  echo "that was already here was changed — not your rules, and not the kit's own scripts."
+  echo "To move those to this version of the kit, follow 'Upgrading an existing install'"
+  echo "in $KIT_DIR/README.md."
+  echo "The steps below are the first-install steps; skip the ones already done."
+  echo ""
+fi
 echo "Next steps:"
-echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' <constitution-file>)."
+echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' $CONSTITUTION)."
+echo "     The template shows example rows, commands and links. Keep what your project has,"
+echo "     and delete the rest: a command that does not run, a stack row with nothing in it,"
+echo "     a link to a rule file that was not installed. Run a command before you keep it."
 echo "     Then the project rows of the comments-and-annotations rule: the second half of"
 echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
 echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
 echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
 echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
-echo "  2. Enable common generic skills — see $(basename "$KIT_DIR")/skills/common-catalog.md."
+echo "  2. Enable common generic skills — see $KIT_DIR/skills/common-catalog.md"
+echo "     (in the kit, not in this repository)."
 echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
 echo "     typed-link gate and the CI-coverage check are already chained into it, and"
 echo "     the installed workflow invokes that same target so nothing can fall out of CI."
@@ -312,6 +336,9 @@ if [ "$MAKEFILE_KEPT" -eq 1 ]; then
   echo "     with two lines (registry.mk was installed next to it):"
   echo "         include registry.mk"
   echo "         lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
+  echo "     Keep your own test target among the prerequisites. The kit's own suites are the"
+  echo "     separate target 'registry-test'; add it to the same line if you want them run"
+  echo "     with every lint (the installed Makefile does, for a repository that had none)."
   # Capture before matching: `grep -q` exits at its first hit, and under
   # `pipefail` the SIGPIPE that kills `make` becomes the pipeline's status, so
   # a correctly chained lint target would be reported to the user as unchained.

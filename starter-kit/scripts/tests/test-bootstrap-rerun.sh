@@ -56,6 +56,38 @@ grep -q 'registry block already present' "$WORK/run2.log" \
   && ok "second run does not tell a repository already in the fragment layout to adopt" \
   || bad "second run tells an already-migrated repository to run adopt"
 
+# A fresh install has to read as canonical. The changelog template used to ship
+# an empty generated region, which is not what the generator writes for an
+# empty registry, so the first `make lint` of a brand-new repository said its
+# changelog was "non-canonical after a merge" — in a repository with no merge.
+( cd "$R" && python3 scripts/registry_tool.py generate >/dev/null 2>&1 )
+changed="$(git -C "$R" status --short)"
+[ -z "$changed" ] && ok "regenerating a fresh install changes nothing" \
+  || bad "the installed templates are not what the generator writes: $(echo "$changed" | tr '\n' ' ')"
+git -C "$R" checkout -q -- . 2>/dev/null
+( cd "$R" && ./scripts/check-registry-drift.sh 2>&1 ) | grep -q 'non-canonical' \
+  && bad "a fresh install's drift gate reports a merge that never happened" \
+  || ok "a fresh install's drift gate reports nothing to normalise"
+# The catalog is in the kit, not in the repository installed into. With
+# --target the two are different directories, and a relative path names a
+# file the reader's repository does not have.
+grep -q "$KIT_DIR/skills/common-catalog.md" "$WORK/run1.log" \
+  && ok "the next steps name the skills catalog by a path that exists" \
+  || bad "the next steps name the skills catalog by a path relative to nothing"
+# What the first run says to do is done by the second. A re-run is read by
+# someone upgrading, and it never updates a file — so it has to say that, and
+# where the upgrade steps are, instead of repeating the first-install list.
+grep -q 'Upgrading an existing install' "$WORK/run2.log" \
+  && ok "a re-run says it updated nothing and points at the upgrade steps" \
+  || bad "a re-run reads like a first install and never mentions upgrading"
+! grep -q 'Upgrading an existing install' "$WORK/run1.log" \
+  && ok "and a first install does not" || bad "a first install talks about upgrading"
+# An agent filling in the constitution keeps whatever the template shows. The
+# next steps have to say that an example with no counterpart is deleted.
+grep -qi 'delete' "$WORK/run1.log" \
+  && ok "the next steps say to delete template examples the project has no counterpart for" \
+  || bad "the next steps never say what to do with an example the project lacks"
+
 echo "=== run without --target: a project is installed into, the kit's own repository is not ==="
 # The kit's repository carries agent instructions of its own now, so tool
 # detection succeeds there. Run from its root with no --target, the installer
@@ -152,6 +184,14 @@ for tool in claude agents cursor copilot; do
   if [ "$tool" != claude ]; then
     ! grep -rq '\.claude/rules/' "$tdir" && ok "$tool: the templates point at docs/agent-rules/, where this layout keeps rules" \
       || bad "$tool: a template still points at .claude/rules/"
+    # Retargeting belongs to the install. On a re-run the template is the
+    # adopter's file, and the installer does not modify a file it skipped.
+    printf '\nOurs: see .claude/rules/legacy.md\n' >> "$tdir/_rule-template.md"
+    "$BOOTSTRAP" --tool "$tool" --target "$R" >/dev/null 2>&1
+    grep -q '\.claude/rules/legacy\.md' "$tdir/_rule-template.md" \
+      && ok "$tool: a re-run leaves a template the adopter edited exactly as it is" \
+      || bad "$tool: a re-run rewrote a template that already existed"
+    grep -v 'legacy\.md' "$tdir/_rule-template.md" > "$WORK/tpl" && cp "$WORK/tpl" "$tdir/_rule-template.md"
   fi
   # The gates cite the rules they enforce by token, not by path, so the same
   # header has to resolve whether the rules landed in .claude/rules/ or in
@@ -183,6 +223,17 @@ left="$(find "$R" -name '__pycache__' -o -name '*.pyc' | grep -v '/.git/' | wc -
 grep -q '^Ran [0-9]* tests' "$WORK/unit.log" && ! grep -q '^FAIL' "$WORK/unit.log" \
   && ok "a passing unit-test run prints no FAIL line" \
   || bad "a passing unit-test run prints $(grep -c '^FAIL' "$WORK/unit.log") FAIL line(s)"
+
+# `make graph-impact` with the variable forgotten used to hand the tool no
+# argument, and the reader an argparse usage line that never mentions NODE.
+out="$( cd "$R" && make graph-impact 2>&1 )"; rc=$?
+case "$out" in
+  *"NODE=RULE:"*) [ "$rc" -ne 0 ] && ok "'make graph-impact' without NODE says how to name one, and fails" \
+                    || bad "'make graph-impact' without NODE exits 0" ;;
+  *) bad "'make graph-impact' without NODE does not say to pass NODE=<KIND:name>" ;;
+esac
+( cd "$R" && make graph-impact NODE=RULE:documentation 2>&1 ) | grep -q '^RULE:documentation — ' \
+  && ok "and with NODE it answers" || bad "'make graph-impact NODE=RULE:documentation' does not answer"
 
 echo "=== the Level-4 artifacts' links resolve once installed ==="
 R="$WORK/meta"; fresh_repo "$R"
