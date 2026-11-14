@@ -126,7 +126,12 @@ that run's finished branch.
 ## Releasing
 
 A release promotes `[Unreleased]` into a version section and consumes the
-fragments. New functionality is a MINOR bump, a fix-only release a PATCH.
+fragments. New functionality is a MINOR bump, a fix-only release a PATCH. A
+release is MAJOR when a repository that passed `make lint` on the previous
+version and follows the upgrade steps fails it, or has to edit a file of its
+own — a gate that is on by default and can fail what passed before, a changed
+format (ADR-0008). Mark each such bullet **Breaking** in its fragment, and
+give the release commit a `BREAKING CHANGE:` footer.
 
 ```bash
 git checkout -b release/<X.Y.Z>
