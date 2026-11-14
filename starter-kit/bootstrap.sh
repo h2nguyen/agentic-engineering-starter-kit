@@ -155,10 +155,8 @@ DEFAULT_RULES=(working-principles documentation comments-and-annotations version
 
 # The constitution links its rules as .claude/rules/…; every other layout keeps
 # them under docs/agent-rules/, so the links are rewritten on those tools.
-RERUN=1
-if install_file constitution.md.template "$CONSTITUTION"; then
-  RERUN=0
-  if [ "$TOOL" != claude ]; then retarget_rule_links "$CONSTITUTION"; fi
+if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
+  retarget_rule_links "$CONSTITUTION"
 fi
 for rule in "${DEFAULT_RULES[@]}"; do
   install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
@@ -188,7 +186,11 @@ install_file registry-id-duplicate-allowlist.template .registry-id-duplicate-all
 install_file ci-lint-coverage-allowlist.template .ci-lint-coverage-allowlist || true
 install_file registry.mk registry.mk || true
 install_file ci/lint.yml.template .github/workflows/lint.yml || true
-install_file scripts/registry_tool.py scripts/registry_tool.py x || true
+# The registry tool is the kit's own file and nothing else's, so finding it
+# already here is what tells a re-run from a first install. An existing
+# constitution does not: a repository can have one and never have seen the kit.
+RERUN=1
+if install_file scripts/registry_tool.py scripts/registry_tool.py x; then RERUN=0; fi
 
 # Makefile: only install the template where none exists. An existing Makefile
 # is never edited — but the registry targets ship in registry.mk precisely so
@@ -304,49 +306,61 @@ if [ ${#SKIPPED[@]} -gt 0 ]; then
   echo "Skipped:"; printf '  = %s\n' "${SKIPPED[@]}"
 fi
 echo ""
+echo "Next steps:"
 if [ "$RERUN" -eq 1 ]; then
   # A re-run is read by someone adding the Level-4 layer or moving to a newer
-  # kit. The list below is the first-install list; most of it is already done,
-  # and none of it says the one thing this reader needs to know.
-  echo "$CONSTITUTION already existed, so this run only ADDED what was missing. No file"
-  echo "that was already here was changed — not your rules, and not the kit's own scripts."
-  echo "To move those to this version of the kit, follow 'Upgrading an existing install'"
-  echo "in $KIT_DIR/README.md."
-  echo "The steps below are the first-install steps; skip the ones already done."
-  echo ""
+  # kit. The first-install steps are done, and repeating them hides the one
+  # thing this reader needs to know.
+  echo "  This repository already had the kit, so this run only ADDED what was missing"
+  echo "  (the 'Installed' list above, if any). No file that was already here was changed —"
+  echo "  not your rules, and not the kit's own scripts."
+  echo "  1. To move those to this version of the kit, follow 'Upgrading an existing install'"
+  echo "     in $KIT_DIR/README.md."
+  echo "  2. Run 'make lint'."
+else
+  echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' $CONSTITUTION)."
+  echo "     The template shows example rows, commands and links. Keep what your project has,"
+  echo "     and delete the rest: a command that does not run, a stack row with nothing in it,"
+  echo "     a link to a rule file that was not installed. Run a command before you keep it."
+  echo "     Then the project rows of the comments-and-annotations rule: the second half of"
+  echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
+  echo "     and <tool-or-gate> pointers — see 'Adopting the comments-and-annotations rule' in"
+  echo "     $KIT_DIR/README.md."
+  echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
+  echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
+  echo "  2. Optional: enable further generic skills — the catalog is $KIT_DIR/skills/common-catalog.md"
+  echo "     (in the kit, not in this repository)."
+  if [ "$TOOL" != claude ]; then
+    echo "     On $TOOL nothing loads a skill by itself: one you want becomes a playbook"
+    echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."
+  fi
+  echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
+  echo "     typed-link gate and the CI-coverage check are already chained into it, and"
+  echo "     the installed workflow invokes that same target so nothing can fall out of CI."
 fi
-echo "Next steps:"
-echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' $CONSTITUTION)."
-echo "     The template shows example rows, commands and links. Keep what your project has,"
-echo "     and delete the rest: a command that does not run, a stack row with nothing in it,"
-echo "     a link to a rule file that was not installed. Run a command before you keep it."
-echo "     Then the project rows of the comments-and-annotations rule: the second half of"
-echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
-echo "     and <tool-or-gate> pointers — see the kit README, 'Adopting the comments-and-annotations rule'."
-echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
-echo "     ('python3 scripts/registry_tool.py list' prints the identifier shapes this repo declares.)"
-echo "  2. Enable common generic skills — see $KIT_DIR/skills/common-catalog.md"
-echo "     (in the kit, not in this repository)."
-echo "  3. Run 'make lint' — the registry gates, the knowledge-base shape check, the"
-echo "     typed-link gate and the CI-coverage check are already chained into it, and"
-echo "     the installed workflow invokes that same target so nothing can fall out of CI."
-echo "     Merge the targets into your existing Makefile if you had one."
 if [ "$MAKEFILE_KEPT" -eq 1 ]; then
-  echo "     Your existing Makefile was left untouched. Chain the registry gates in"
-  echo "     with two lines (registry.mk was installed next to it):"
-  echo "         include registry.mk"
-  echo "         lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
-  echo "     Keep your own test target among the prerequisites. The kit's own suites are the"
-  echo "     separate target 'registry-test'; add it to the same line if you want them run"
-  echo "     with every lint (the installed Makefile does, for a repository that had none)."
   # Capture before matching: `grep -q` exits at its first hit, and under
   # `pipefail` the SIGPIPE that kills `make` becomes the pipeline's status, so
   # a correctly chained lint target would be reported to the user as unchained.
   _dry_lint="$(make -n -C "$TARGET" lint 2>/dev/null || true)"
-  if [ "${_dry_lint#*check-registry-drift.sh}" != "$_dry_lint" ]; then
-    echo "     (verified: 'make lint' already reaches the registry gates)"
+  # Every gate, not the first one: a Makefile that chained the gates of an
+  # older kit reaches some of them, and the one it misses is the news.
+  _unchained=""
+  for _gate in registry-drift registry-ids kb-shape graph-links ci-lint-coverage; do
+    if [ "${_dry_lint#*check-$_gate.sh}" = "$_dry_lint" ]; then _unchained="$_unchained $_gate"; fi
+  done
+  if [ -z "$_unchained" ]; then
+    echo "     Your existing Makefile was left untouched, and 'make lint' already reaches every gate."
   else
-    echo "     Until then 'make lint' is green and checks nothing of the registry layer;"
+    echo "     Your existing Makefile was left untouched, and its 'make lint' does not reach:$_unchained"
+    echo "     Chain the gates in with two lines (registry.mk is installed next to it):"
+    echo "         include registry.mk"
+    echo "         lint: registry-drift registry-ids kb-shape graph-links ci-lint-coverage <your existing prerequisites>"
+    echo "     Keep your own test target among the prerequisites. Those two lines are all"
+    echo "     that is required. Optional: the kit's own suites are the target 'registry-test';"
+    echo "     add it to the same line to run them with every lint, as the installed Makefile"
+    echo "     does for a repository that had none."
+    echo "     Until then 'make lint' passes without running them;"
     echo "     check-ci-lint-coverage.sh reports exactly that once it is chained in."
   fi
 fi
@@ -365,9 +379,11 @@ for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
     echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi
 done
-echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
-echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
-echo "     (the documentation rule's table says which, and what each must carry)."
+if [ "$RERUN" -eq 0 ]; then
+  echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
+  echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
+  echo "     (the documentation rule's table says which, and what each must carry)."
+fi
 case "$TOOL" in
   cursor)
     echo "  Note (cursor): rules were installed to docs/agent-rules/ and linked from AGENTS.md."

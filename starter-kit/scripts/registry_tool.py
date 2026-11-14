@@ -1121,7 +1121,7 @@ def cmd_init(args) -> int:
                     f"{sorted(widths)} — left at the default; fix the headings, then re-run init --force"
                 )
         else:
-            notes.append("knowledge base: present, no entries yet -> slug scheme (default)")
+            notes.append("knowledge base: in the fragment layout, no entries yet -> slug scheme (default)")
     elif os.path.isfile(adoc):
         notes.append(
             "knowledge base: found docs/DEBUGGING-KNOWLEDGE-BASE.adoc — AsciiDoc is not "
@@ -1146,7 +1146,7 @@ def cmd_init(args) -> int:
             # bootstrap installs the template changelog before it runs init,
             # so "exists" alone used to tell a brand-new repository to adopt
             # the empty file it had just been given.
-            notes.append("changelog: CHANGELOG.md already carries the generated region -> nothing to adopt")
+            notes.append("changelog: CHANGELOG.md is in the fragment layout -> nothing to adopt")
         else:
             notes.append("changelog: CHANGELOG.md exists -> run `adopt --registry changelog` to move its [Unreleased] bullets into a fragment")
     else:

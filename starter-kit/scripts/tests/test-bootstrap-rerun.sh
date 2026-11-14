@@ -74,6 +74,11 @@ git -C "$R" checkout -q -- . 2>/dev/null
 grep -q "$KIT_DIR/skills/common-catalog.md" "$WORK/run1.log" \
   && ok "the next steps name the skills catalog by a path that exists" \
   || bad "the next steps name the skills catalog by a path relative to nothing"
+# init runs after the installer has put the changelog and the knowledge base
+# in place, and used to describe them as things the repository "already" had.
+! grep -qE 'already carries|knowledge base: present' "$WORK/run1.log" \
+  && ok "a first install is not told its repository already had a changelog and a knowledge base" \
+  || bad "init describes the files the installer just created as already present"
 # What the first run says to do is done by the second. A re-run is read by
 # someone upgrading, and it never updates a file — so it has to say that, and
 # where the upgrade steps are, instead of repeating the first-install list.
@@ -82,6 +87,9 @@ grep -q 'Upgrading an existing install' "$WORK/run2.log" \
   || bad "a re-run reads like a first install and never mentions upgrading"
 ! grep -q 'Upgrading an existing install' "$WORK/run1.log" \
   && ok "and a first install does not" || bad "a first install talks about upgrading"
+! grep -q "Fill in the constitution" "$WORK/run2.log" \
+  && ok "and a re-run does not repeat the first-install steps" \
+  || bad "a re-run tells a repository that has the kit to fill in the constitution again"
 # An agent filling in the constitution keeps whatever the template shows. The
 # next steps have to say that an example with no counterpart is deleted.
 grep -qi 'delete' "$WORK/run1.log" \
