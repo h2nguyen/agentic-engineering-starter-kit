@@ -52,14 +52,16 @@ that changes a file is run against the target.
      [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
      `python3 scripts/registry_tool.py list` prints the identifier shapes.
 7. **Do what the installer said it left to you.** If the project already had a
-   Makefile, add the two lines it printed. If it kept an existing changelog or
-   knowledge base, run the `adopt` command it printed.
+   Makefile, add the two lines it printed (`registry-test` on that line is
+   optional). If it kept an existing changelog or knowledge base, run the
+   `adopt` command it printed.
 8. **Verify.** In the target, `make lint` must exit 0, with an `OK:` line for
    each gate and no `FAIL`. A failure names the file, the line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.
 9. **Commit on the branch.** Do not push or open a pull request unless asked.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
-   out of the commit.
+   out of the commit. The install itself needs no changelog fragment: the
+   project's changelog describes the project, not its agent workspace.
 10. **Report** what was installed, what you filled in and what each fact came
     from, what you guessed and want confirmed, and what the kit deliberately
     defers until the project shows a need for it.
