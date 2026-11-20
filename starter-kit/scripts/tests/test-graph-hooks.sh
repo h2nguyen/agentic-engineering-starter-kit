@@ -11,7 +11,9 @@
 #   4. a hook that cannot do its job is silent and exits 0: it adds context,
 #      it is not a gate, and `make lint` is still the gate behind it;
 #   5. it judges the checkout the edited file is in, and leaves nothing behind
-#      in the repository.
+#      in the repository;
+#   6. that checkout must be the project or one of its worktrees: the graph
+#      tool of any other repository is never run.
 #
 # The control case is the reason the hook exists: rewriting a cited rule leaves
 # every gate green, because the link still resolves. Nothing told the editor
@@ -159,13 +161,88 @@ echo "=== the checkout the file is in, not the one the session started in ==="
 # In a Claude Code worktree $CLAUDE_PROJECT_DIR still names the main checkout.
 # The hook that runs is the main checkout's; the graph it reads must be the
 # one the edited file belongs to.
-W="$WORK/worktree copy"; git clone -q "$R" "$W" 2>/dev/null
+W="$WORK/worktree copy"
+git -C "$R" worktree add -q -b wt-copy "$W" 2>"$WORK/err" || bad "setup: git worktree add failed — $(cat "$WORK/err")"
 printf '#!/usr/bin/env bash\n# Enforces: RULE:testing — only in this checkout\nexit 0\n' > "$W/scripts/check-only-here.sh"
 OUT="$(printf '{"session_id":"s3","cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$R" "$W/.claude/rules/testing.md" \
         | run_hook "$ON_EDIT" 2>/dev/null)"
 case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
-  *check-only-here.sh*) ok "the citers come from the edited file's own checkout" ;;
+  *check-only-here.sh*) ok "the citers come from the edited file's own checkout (a worktree of the project)" ;;
   *) bad "the hook read the session's checkout instead of the file's" ;;
+esac
+
+echo "=== a checkout of another repository: its graph tool is never run ==="
+# The hook runs the graph tool of the checkout it judges. A file the agent
+# edits can sit in any repository on the machine — a clone it was asked to
+# look at, a dependency's source — and that repository's scripts/graph_tool.py
+# is code nobody here reviewed. Only the project and its worktrees are judged.
+F="$WORK/foreign repo"; fresh_repo "$F"; mkdir -p "$F/scripts" "$F/docs"
+printf 'notes\n' > "$F/docs/notes.md"
+printf 'import pathlib, sys\npathlib.Path(sys.argv[0]).with_name("RAN").write_text("x")\nprint("planted note")\n' > "$F/scripts/graph_tool.py"
+( cd "$F" && "$PY" -B scripts/graph_tool.py note docs/notes.md >/dev/null 2>&1 )
+[ -f "$F/scripts/RAN" ] && ok "control: the planted tool runs when started the way the hook starts a graph tool (the plant is live)" \
+  || bad "control: the planted tool does not run at all — the cases below would pass vacuously"
+rm -f "$F/scripts/RAN"
+post_edit s3 "$F/docs/notes.md"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && [ ! -e "$F/scripts/RAN" ] \
+  && ok "after an edit in another repository the hook is silent and runs none of its code" \
+  || bad "the hook ran another repository's graph tool after an edit (rc=$RC, out=$OUT)"
+stop s3 "$F" false
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && [ ! -e "$F/scripts/RAN" ] \
+  && ok "and when a turn ends with the session in another repository" \
+  || bad "the hook ran another repository's graph tool at stop (rc=$RC, out=$OUT)"
+C="$WORK/clone of the project"; git clone -q "$R" "$C" 2>/dev/null
+cp "$F/scripts/graph_tool.py" "$C/scripts/graph_tool.py"
+post_edit s3 "$C/.claude/rules/testing.md"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && [ ! -e "$C/scripts/RAN" ] \
+  && ok "a separate clone of the project is another repository too: silent, its tool is not run" \
+  || bad "the hook ran or spoke for a separate clone (rc=$RC, out=$OUT)"
+# A submodule has a git directory of its own, so it is another repository as
+# well, even inside the project's tree. Out of scope on purpose (ADR-0012).
+S="$WORK/submodule source"; fresh_repo "$S"; mkdir -p "$S/scripts"
+cp "$F/scripts/graph_tool.py" "$S/scripts/graph_tool.py"; printf 'notes\n' > "$S/notes.md"
+git -C "$S" add -A >/dev/null; git -C "$S" commit -q -m plant 2>/dev/null
+git -C "$W" -c protocol.file.allow=always submodule add -q "$S" vendor/sub 2>"$WORK/err" \
+  || bad "setup: git submodule add failed — $(cat "$WORK/err")"
+post_edit s3 "$W/vendor/sub/notes.md"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && [ ! -e "$W/vendor/sub/scripts/RAN" ] \
+  && ok "a submodule inside the project is not judged: silent, its tool is not run" \
+  || bad "the hook ran or spoke for a submodule (rc=$RC, out=$OUT)"
+
+echo "=== the project is found where Claude Code says it is, not where the hook file lies ==="
+# A shared .claude/ linked into many projects, or a hook registered in the
+# user's settings: the hook file is outside the project. $CLAUDE_PROJECT_DIR
+# still names it, and is what the hook trusts.
+SHARED="$WORK/shared hooks"; mkdir -p "$SHARED"; cp "$HOOK" "$SHARED/workspace-graph.py"
+event="$(printf '{"session_id":"s9","cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$R" "$R/.claude/rules/testing.md")"
+OUT="$(printf '%s' "$event" | CLAUDE_PROJECT_DIR="$R" "$PY" "$SHARED/workspace-graph.py" post-edit 2>/dev/null)"
+case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
+  *scripts/check-tests.sh:2*) ok "a hook file outside the project still serves the project \$CLAUDE_PROJECT_DIR names" ;;
+  *) bad "a hook file outside the project went silent: $OUT" ;;
+esac
+OUT="$(printf '%s' "$event" | ( unset CLAUDE_PROJECT_DIR; WORKSPACE_GRAPH_HOOK_DEBUG=1 "$PY" "$SHARED/workspace-graph.py" post-edit ) 2>"$WORK/err")"
+[ -z "$OUT" ] && grep -q 'the hook is not inside a git repository' "$WORK/err" \
+  && ok "without \$CLAUDE_PROJECT_DIR it is silent, and the debug line names the hook's own location as the cause" \
+  || bad "no project known: out=$OUT, debug=$(cat "$WORK/err")"
+
+echo "=== a git that predates --path-format ==="
+# git before 2.31 does not know --path-format and does not reject it either:
+# rev-parse echoes the option and exits 0. The shim behaves that way.
+REAL_GIT="$(command -v git)"; OLDGIT="$WORK/old-git"; mkdir -p "$OLDGIT"
+cat > "$OLDGIT/git" <<SHIM
+#!/bin/sh
+seen=0
+for a do shift; if [ "\$a" = "--path-format=absolute" ]; then seen=1; else set -- "\$@" "\$a"; fi; done
+[ \$seen -eq 1 ] && printf '%s\n' "--path-format=absolute"
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$OLDGIT/git"
+[ "$(PATH="$OLDGIT:$PATH" git -C "$R" rev-parse --path-format=absolute --git-common-dir | head -n 1)" = "--path-format=absolute" ] \
+  && ok "control: the shim echoes --path-format like git 2.30 does" || bad "control: the shim does not behave like old git"
+OUT="$(printf '%s' "${event/s9/s10}" | PATH="$OLDGIT:$PATH" run_hook "$ON_EDIT" 2>/dev/null)"
+case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
+  *scripts/check-tests.sh:2*) ok "with such a git the hook still recognises its own project" ;;
+  *) bad "with a git before 2.31 the hook went silent in its own project: $OUT" ;;
 esac
 
 echo "=== when a turn ends: a link that broke comes back once ==="
@@ -201,7 +278,9 @@ OUT="$(: | run_hook "$ON_STOP" 2>&1)"; RC=$?
 mkdir -p "$WORK/loose"; printf 'x\n' > "$WORK/loose/notes.md"
 post_edit s6 "$WORK/loose/notes.md"
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && [ ! -s "$WORK/err" ] && ok "a file outside any repository: silent" || bad "a file outside a repository: rc=$RC out=$OUT"
-B="$WORK/no tool"; git clone -q "$R" "$B" 2>/dev/null; rm -f "$B/scripts/graph_tool.py"
+B="$WORK/no tool"
+git -C "$R" worktree add -q -b wt-no-tool "$B" 2>"$WORK/err" || bad "setup: git worktree add failed — $(cat "$WORK/err")"
+rm -f "$B/scripts/graph_tool.py"
 post_edit s6 "$B/.claude/rules/testing.md"
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "a repository without the graph tool: silent after an edit" || bad "missing tool after an edit: rc=$RC out=$OUT"
 stop s6 "$B" false
