@@ -26,7 +26,10 @@ without this file. So the hook follows three rules:
 
 It reads the checkout the edited file is in (or, at stop, the session's
 current directory) — not $CLAUDE_PROJECT_DIR, which in a worktree still names
-the main checkout.
+the main checkout. That checkout must belong to the repository this hook is
+installed in: the project itself or one of its worktrees. A file in any other
+repository is never handed to that repository's graph tool, which is code
+nobody here reviewed.
 
 Registered in .claude/settings.json, where it is started through
 scripts/python.sh — Python under whatever name the machine gives it — and
@@ -57,19 +60,36 @@ def debug(message):
         print(f"workspace-graph hook: {message}", file=sys.stderr)
 
 
-def repository(start):
-    """The checkout `start` is in, if it has the graph tool — else None."""
+def rev_parse(start, *args):
+    """`git rev-parse <args>` run in `start`: its output, or None."""
     try:
         found = subprocess.run(
-            ["git", "-C", start, "rev-parse", "--show-toplevel"],
+            ["git", "-C", start, "rev-parse", *args],
             capture_output=True, text=True, timeout=TOOL_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         debug(f"git could not run in {start}: {exc}")
         return None
-    root = found.stdout.strip()
-    if found.returncode != 0 or not root:
+    out = found.stdout.strip()
+    return out if found.returncode == 0 and out else None
+
+
+def common_dir(start):
+    """The repository `start` belongs to, the same for every worktree of it."""
+    path = rev_parse(start, "--path-format=absolute", "--git-common-dir") \
+        or rev_parse(start, "--git-common-dir")  # git before 2.31: relative to `start`
+    return os.path.realpath(os.path.join(start, path)) if path else None
+
+
+def repository(start):
+    """The checkout `start` is in, if it is this project's and has the tool — else None."""
+    root = rev_parse(start, "--show-toplevel")
+    if root is None:
         debug(f"{start} is not inside a git repository")
+        return None
+    own = common_dir(os.path.dirname(os.path.abspath(__file__)))
+    if own is None or common_dir(start) != own:
+        debug(f"{root} is not this project or one of its worktrees")
         return None
     if not os.path.isfile(os.path.join(root, TOOL)):
         debug(f"{root} has no {TOOL}")
