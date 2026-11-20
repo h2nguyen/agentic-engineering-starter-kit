@@ -31,6 +31,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- category: Fixed -->
 
 <!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [3.0.1] — 2026-11-20
+
+<!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
 ### Security
 
 - The workspace-graph hook (`.claude/hooks/workspace-graph.py`) no longer runs the
@@ -41,8 +57,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
   checkout's tool as a Python script. A submodule that carries the kit keeps its own
   `make lint` as the gate (ADR-0012). To pick up the fix, copy the hook from the kit (README,
   "Upgrading an existing install", step 2).
-
-<!-- END GENERATED: changelog -->
 
 ## [3.0.0] — 2026-11-14
 
