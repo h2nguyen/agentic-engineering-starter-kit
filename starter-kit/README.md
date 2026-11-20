@@ -326,9 +326,10 @@ You do nothing, and mostly see nothing: the hook is silent unless it has
 something to say, and it says each distinct thing once per session. It is
 context, not a gate — `make lint` stays the gate, it never changes a file, and
 when it cannot do its job it ends silent. It runs only the graph tool of your
-own repository: an edited file in a worktree of it is judged by that
-worktree's graph, a file in any other repository — a clone the agent was asked
-to look at, say — by nothing.
+own repository — the one `$CLAUDE_PROJECT_DIR` names: an edited file in a
+worktree of it is judged by that worktree's graph, a file in any other
+repository — a clone the agent was asked to look at, or a submodule — by
+nothing. A submodule that carries the kit keeps its own `make lint` as the gate.
 
 | To | Do this |
 |---|---|

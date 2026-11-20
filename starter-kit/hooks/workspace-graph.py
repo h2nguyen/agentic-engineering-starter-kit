@@ -26,10 +26,11 @@ without this file. So the hook follows three rules:
 
 It reads the checkout the edited file is in (or, at stop, the session's
 current directory) — not $CLAUDE_PROJECT_DIR, which in a worktree still names
-the main checkout. That checkout must belong to the repository this hook is
-installed in: the project itself or one of its worktrees. A file in any other
-repository is never handed to that repository's graph tool, which is code
-nobody here reviewed.
+the main checkout. That checkout must belong to the project's repository —
+the one $CLAUDE_PROJECT_DIR names, or without it the one this file lies in:
+the project itself or one of its worktrees. A file in any other repository,
+a submodule included, is never handed to that repository's graph tool, which
+is code nobody here reviewed (ADR-0012).
 
 Registered in .claude/settings.json, where it is started through
 scripts/python.sh — Python under whatever name the machine gives it — and
@@ -75,10 +76,20 @@ def rev_parse(start, *args):
 
 
 def common_dir(start):
-    """The repository `start` belongs to, the same for every worktree of it."""
-    path = rev_parse(start, "--path-format=absolute", "--git-common-dir") \
-        or rev_parse(start, "--git-common-dir")  # git before 2.31: relative to `start`
-    return os.path.realpath(os.path.join(start, path)) if path else None
+    """The repository `start` belongs to, the same for every worktree of it.
+
+    Printed relative to `start` or absolute, depending on where `start` is.
+    Not --path-format=absolute: git before 2.31 echoes that option and exits 0.
+    """
+    path = rev_parse(start, "--git-common-dir")
+    if path is None or "\n" in path:
+        return None
+    return os.path.realpath(os.path.join(start, path))
+
+
+def project():
+    """The repository this hook serves: the one Claude Code names, else the hook's own."""
+    return os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.abspath(__file__))
 
 
 def repository(start):
@@ -87,8 +98,11 @@ def repository(start):
     if root is None:
         debug(f"{start} is not inside a git repository")
         return None
-    own = common_dir(os.path.dirname(os.path.abspath(__file__)))
-    if own is None or common_dir(start) != own:
+    own = common_dir(project())
+    if own is None:
+        debug(f"the hook is not inside a git repository ({project()}), and nothing names its project")
+        return None
+    if common_dir(start) != own:
         debug(f"{root} is not this project or one of its worktrees")
         return None
     if not os.path.isfile(os.path.join(root, TOOL)):
