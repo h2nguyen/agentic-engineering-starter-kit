@@ -20,9 +20,9 @@ only). No packages, no network access, no per-clone `git config`.
 Python may be called `python3`, `python` or `py` on your machine. Everything
 the kit runs itself — the make targets, the gates, the tests, the Claude Code
 hook — starts it through `scripts/python.sh`, which tries those names in that
-order and uses the first that really is Python 3.9 or newer. Where this page
-or a rule writes `python3 scripts/…` for you to type, `./scripts/python.sh
-scripts/…` is the same command on any machine. `make lint PYTHON=/path/to/python`
+order and uses the first that really is Python 3.9 or newer. The commands this
+page and the installed rules, skills and READMEs give you to type are written
+the same way, as `./scripts/python.sh scripts/…`. `make lint PYTHON=/path/to/python`
 names the interpreter yourself. On Windows, run the kit from Git Bash (with
 `make` installed) or WSL.
 
@@ -230,15 +230,19 @@ whichever version you started from. For why a file changed, search the kit's
 4. **Leave what is yours.** The constitution (`CLAUDE.md`, `AGENTS.md` or
    `.github/copilot-instructions.md`), `Makefile`, `registries.json`, the CI
    workflow, the workspace changelog, and every changelog fragment,
-   knowledge-base entry and decision record are never replaced. Two of yours
+   knowledge-base entry and decision record are never replaced. Some of yours
    started as kit skeletons, and a fix to a skeleton reaches you only by
    hand — compare them and take what applies:
    ```bash
+   diff -u changelog.d/README.md "$KIT"/starter-kit/changelog.d/README.md
+   diff -u docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md
    diff -u .claude/hooks/session-start.sh "$KIT"/starter-kit/hooks/session-start.sh.template
    diff -u .claude/settings.json "$KIT"/starter-kit/settings.json.template
    ```
-   (Claude Code only.) The constitution template is the third; a change to it
-   is named in the kit's changelog.
+   (The last two on Claude Code only.) Three more came from a kit template:
+   the constitution, and the hand-written preamble above the generated region
+   of `CHANGELOG.md` and of the knowledge base. A change to one of those is
+   named in the kit's changelog.
 5. **Chain any new gate into your lint target.** If you keep your own
    Makefile, its `lint:` line must name every gate the kit installed —
    `registry-drift registry-ids kb-shape graph-links ci-lint-coverage`. The
@@ -273,7 +277,7 @@ workspace — and, where you keep one, a line in the workspace changelog.
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
 | `… is named by date, and this registry numbers its records` | A fragment was named `YYYY-MM-DD-<slug>.md` where `registries.json` declares `"id_scheme": "numeric"`. At width 4 it would be read as record number `<year>` | Rename it to the numbered form the message shows; `registry_tool.py new --registry <name> --title "…"` allocates the number. If the records really are date-named and the declaration is wrong — an install made before this was fixed — set `"id_scheme": "slug"` for that registry |
 | `duplicate identifier … claimed by 2 fragments` | Two branches took the same number | Rename the fragment that has not been merged yet. Never renumber one that has |
-| `python3: command not found`, `Python was not found`, or `no Python 3.9 or newer found` | Python has another name on this machine, or is older than 3.9 | Nothing the kit runs names `python3` — if a command you typed did, run it as `./scripts/python.sh scripts/…`. `./scripts/python.sh --which` prints the interpreter it found; `PYTHON=/path/to/python` names one |
+| `python3: command not found`, `Python was not found`, or `no Python 3.9 or newer found` | Python has another name on this machine, or is older than 3.9 | Nothing the kit runs or tells you to type names `python3`. A rule, skill or README installed from an older kit still may: run that command as `./scripts/python.sh scripts/…`, and take the newer file (upgrade steps 2 and 3). `./scripts/python.sh --which` prints the interpreter it found; `PYTHON=/path/to/python` names one |
 | `these 'lint' sub-targets run in no workflow` | A check is in the Makefile and in no CI step the gate can read: only a `run:` step of a workflow that a push, pull request or merge queue triggers — or of a reusable workflow one of those calls by a local path — counts, in the repository root | Have that workflow run `make lint`, the aggregate target. The lines under "Read and not counted" say what was seen and why it did not count |
 
 ## The constitution check
@@ -342,7 +346,7 @@ nothing. A submodule that carries the kit keeps its own `make lint` as the gate.
 Claude Code asks you to approve an edit to a file under `.claude/` — a rule,
 for instance — before it happens; the hook runs after the edit, so it runs
 after your approval. The other three tools get the same answer on demand, from
-`python3 scripts/graph_tool.py note <file>`; a hook for them waits until their
+`./scripts/python.sh scripts/graph_tool.py note <file>`; a hook for them waits until their
 hook formats are verified (ADR-0006 in the kit's repository).
 
 ## Adopting the comments-and-annotations rule
@@ -378,7 +382,7 @@ can fill. Two things to do once, right after bootstrap:
 
    | Placeholder | Fill with |
    |---|---|
-   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `python3 scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
+   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `./scripts/python.sh scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
    | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
    | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
    | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence. None of your own yet: `make lint`, which runs the kit's gates |

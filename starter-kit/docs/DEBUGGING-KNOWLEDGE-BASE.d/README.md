@@ -16,7 +16,7 @@ Create one with the tool rather than by hand — it derives the slug, applies th
 project's identifier scheme, and fills in the required fields:
 
 ```bash
-python3 scripts/registry_tool.py new --registry debugging-kb \
+./scripts/python.sh scripts/registry_tool.py new --registry debugging-kb \
   --title "Retry loop swallows the timeout error"
 ```
 

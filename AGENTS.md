@@ -55,7 +55,8 @@ usually starts, so a command that leaves the path out writes here.
      out what does not exist;
    - the project rows of the comments-and-annotations rule —
      [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
-     `python3 scripts/registry_tool.py list` prints the identifier shapes.
+     In the target, `./scripts/python.sh scripts/registry_tool.py list` prints
+     the identifier shapes.
 7. **Do what the installer said it left to you.** If the project already had a
    Makefile, add the two lines it printed (`registry-test` on that line is
    optional). If it kept an existing changelog or knowledge base, run the
@@ -110,7 +111,7 @@ scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one comma
 | **Git** | Never commit to `main`. Branch prefixes: `feat/`, `fix/`, `docs/`, `chore/` |
 | **Test first** | A failing case in the acceptance suite before the change, with a control case where it closes a defect |
 | **The installer** | Never overwrites a file; safe to re-run; every artifact lands for all four tools, or the installer says why not |
-| **Dependencies** | Bash and the Python standard library. No packages, no network. Anything the kit runs starts Python through `scripts/python.sh`, never as `python3 …` |
+| **Dependencies** | Bash and the Python standard library. No packages, no network. Anything the kit runs, and any command it writes down for someone to type, starts Python through `scripts/python.sh`, never as `python3 …` |
 | **What the installer copies stands alone** | An installed file is read in a repository that does not contain this one: no path into the kit, or into the rest of this repository. `starter-kit/README.md` and `bootstrap.sh` stay in the kit and may link to the guide |
 | **Templates** | A template embedded in the guide is byte-identical to its kit file; change both together |
 | **Links** | `Related:`, `Enforces:` and `Hands off to:` lines name artifacts that exist. Run `make graph-impact` before a rename |

@@ -6,7 +6,7 @@ Keep a Changelog category it touches. `make registry-generate` merges every
 fragment into the `[Unreleased]` section of `../CHANGELOG.md`.
 
 ```bash
-python3 scripts/registry_tool.py new --registry changelog \
+./scripts/python.sh scripts/registry_tool.py new --registry changelog \
   --title "Ledger export"
 ```
 
@@ -65,7 +65,7 @@ disjoint — while each file is a thing you can read: *what this change did*.
 ## Releasing
 
 ```bash
-python3 scripts/registry_tool.py release --registry changelog --version 1.5.0
+./scripts/python.sh scripts/registry_tool.py release --registry changelog --version 1.5.0
 ```
 
 Renders the current fragments as a dated version section, inserts it below

@@ -9,7 +9,7 @@ file in `changelog.d/` — with a `## <category>` section for each category the
 change touches — then run `make registry-generate`:
 
 ```bash
-python3 scripts/registry_tool.py new --registry changelog --title "Ledger export"
+./scripts/python.sh scripts/registry_tool.py new --registry changelog --title "Ledger export"
 ```
 
 Released sections below are written once by `registry_tool.py release` and are

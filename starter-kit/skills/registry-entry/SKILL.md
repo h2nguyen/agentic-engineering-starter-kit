@@ -40,9 +40,9 @@ than an unrecorded behaviour shift.
 ## Phase 2 — Create the fragment with the tool
 
 ```bash
-python3 scripts/registry_tool.py new --registry changelog --title "Ledger export"
+./scripts/python.sh scripts/registry_tool.py new --registry changelog --title "Ledger export"
 
-python3 scripts/registry_tool.py new --registry debugging-kb \
+./scripts/python.sh scripts/registry_tool.py new --registry debugging-kb \
   --title "Cache warms before the config is loaded"
 ```
 
