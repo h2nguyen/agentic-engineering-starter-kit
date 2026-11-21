@@ -3,6 +3,8 @@
 Semantic Versioning 2.0.0 + Keep a Changelog. Project-agnostic defaults; adapt
 component names and file locations to the project.
 
+**Related:** RULE:shared-registries
+
 ## Versioning (SemVer 2.0.0)
 
 | Level | Triggered by | Reset |

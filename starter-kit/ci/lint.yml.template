@@ -1,6 +1,7 @@
-# Copy to .github/workflows/lint.yml (or fold these steps into the workflow
-# you already have). Adapt the runner, the checkout action version and the
-# language setup to the project; the load-bearing part is the last step.
+# Installed as .github/workflows/lint.yml where there was no such file; with a
+# workflow of your own, fold these steps into that one instead. Adapt the
+# runner, the checkout action version and the language setup to the project;
+# the load-bearing part is the last step.
 #
 # It invokes the AGGREGATE target. That is deliberate and it is the entire
 # design: a workflow that lists sub-targets individually starts correct and

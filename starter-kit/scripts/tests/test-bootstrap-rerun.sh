@@ -212,6 +212,24 @@ for tool in claude agents cursor copilot; do
   else
     bad "$tool: an installed typed link does not resolve:"; grep -E '^FAIL' "$WORK/links-$tool.log" | head -5 | sed 's/^/         /'
   fi
+  # Resolving is half of it. A rule that no typed link names can be renamed or
+  # deleted with the gate green and the hook silent, and three of the five
+  # shipped rules were cited only in prose. Asked of each layout, because a
+  # citer that is a Claude Code skill is not installed on the other three.
+  uncited=""
+  for rule in $expected_rules; do
+    ( cd "$R" && "$PY" -B scripts/graph_tool.py impact "RULE:${rule%.md}" 2>&1 ) | grep -q '^Cited by (0)' \
+      && uncited="$uncited ${rule%.md}"
+  done
+  [ -z "$uncited" ] && ok "$tool: every shipped rule is named by a typed link of another installed artifact" \
+    || bad "$tool: no typed link names:$uncited"
+  # A file the installer has put in place is at its destination. A header that
+  # still says to copy it there is an instruction with nothing left to do —
+  # read, in the installed Makefile and workflow, by every later session. The
+  # templates in docs/agent-templates/ are the exception: they are for copying.
+  stale="$(grep -rl 'Copy to' "$R" --exclude-dir=.git --exclude-dir=agent-templates 2>/dev/null | sed "s|^$R/||" | tr '\n' ' ')"
+  [ -z "$stale" ] && ok "$tool: no installed file tells its reader to copy it to where it already is" \
+    || bad "$tool: installed and still saying 'Copy to': $stale"
   # Installed is not onboarded. The link gate above is green on a constitution
   # that still has every template placeholder and two links to example rules
   # nobody wrote — which is how one was committed that way. The constitution

@@ -151,6 +151,6 @@ After any resolution beyond Phase 2's mechanical regeneration:
 
 ## Links
 
-**Related:** RULE:shared-registries, SCRIPT:registry_tool.py
+**Related:** RULE:shared-registries, RULE:versioning-and-changelog, SCRIPT:registry_tool.py
 
 **Hands off to:** HUMAN — when a resolution would mean renumbering something already merged, or two edits of one fragment contradict

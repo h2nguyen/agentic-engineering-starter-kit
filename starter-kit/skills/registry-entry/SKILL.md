@@ -106,4 +106,4 @@ without its fragment fails it the other way.
 
 ## Links
 
-**Related:** RULE:shared-registries, SCRIPT:registry_tool.py
+**Related:** RULE:shared-registries, RULE:versioning-and-changelog, SCRIPT:registry_tool.py

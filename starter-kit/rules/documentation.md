@@ -5,6 +5,8 @@ architectural decision updates its documentation in the same PR — not "later".
 These rules are project-agnostic defaults; add project-specific doc locations
 as the project grows.
 
+**Related:** RULE:comments-and-annotations, RULE:shared-registries, RULE:versioning-and-changelog
+
 ## What to update when
 
 | Change | Update, in the same PR |

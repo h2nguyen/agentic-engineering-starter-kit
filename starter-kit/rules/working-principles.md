@@ -5,6 +5,8 @@ the domain rules in the sibling files. These principles describe **process**; th
 domain rule files describe **content**. When the two conflict, the domain rule wins —
 but the principles below shape every prompt-to-PR loop.
 
+**Related:** RULE:comments-and-annotations
+
 ## 1. Think Before Coding
 
 > Don't assume. Don't hide confusion. Surface tradeoffs.

@@ -1,9 +1,9 @@
 # Merge behaviour for shared append-only registries.
 #
-# Copy to the repository root as `.gitattributes`. Everything here is built
-# into git — no `git config` in any clone, no hook installation, nothing that
-# can be silently missing on someone else's machine. That property is the whole
-# reason these entries are here rather than in a setup script.
+# Installed at the repository root as `.gitattributes`. Everything here is
+# built into git — no `git config` in any clone, no hook installation, nothing
+# that can be silently missing on someone else's machine. That property is the
+# whole reason these entries are here rather than in a setup script.
 #
 # ---------------------------------------------------------------------------
 # What `merge=union` does, and the two ways it bites
