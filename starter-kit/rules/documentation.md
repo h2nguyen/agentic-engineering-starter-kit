@@ -40,14 +40,20 @@ Agent-Feedback: SKILL:registry-entry — typed the date by hand; the tool derive
 - When a person corrects your output and the correction would hold next time,
   offer to put the line in the commit message of the fix. Write what they
   said, not your reading of it, and let them change it.
-- Quoted lines (`> …`) and fenced examples are not feedback.
+- Quoted lines (`> …`), fenced and indented examples are not feedback, and
+  neither is the body of a merge commit: it is the pull request's text, under
+  the identity of whoever merged it.
+- The line counts under its commit's author. Where you commit as a bot, put
+  it in the person's own review comment instead; never list a bot identity,
+  which would make every session — a misled one too — a trusted author.
 
 `make agent-feedback` collects the lines from the commit history — and, with
 `FROM=<file>`, from a JSON export of comments — into one report grouped by
-artifact. Only identities listed in `.agent-feedback-authors` count: the
-report names everyone else's lines and leaves their text out, because what
-reaches it can become an instruction every later session follows. Run it on
-the default branch, where every commit has been reviewed. The report is input
+artifact. Only identities listed in `.agent-feedback-authors` count: of
+anyone else's line the report keeps a count, an identity-shaped author and a
+resolved target, never the text, because what reaches it can become an
+instruction every later session follows. A commit's author is only as
+trustworthy as the review its metadata got; run it on the default branch. The report is input
 for a proposed change, reviewed like any other; it never edits anything.
 
 **Litmus test:** does `make agent-feedback` list this artifact under

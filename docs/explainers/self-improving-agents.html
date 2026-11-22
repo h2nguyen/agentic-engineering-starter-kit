@@ -116,8 +116,8 @@
     <span lang="en">Agents that get better with every piece of feedback</span>
   </h1>
   <p class="lead">
-    <span lang="de">Die Kernidee: <strong>Jede Korrektur wird zu einer kleinen, geprüften Änderung an den Anweisungen des Agenten</strong>, statt am Ende der Sitzung verloren zu gehen. Sammeln und Vorschlagen läuft automatisch, die Entscheidung trifft ein Mensch.</span>
-    <span lang="en">The core idea: <strong>every correction becomes a small, reviewed change to the agent's instructions</strong> instead of being lost when the session ends. Collecting and proposing run on their own; a person makes the decision.</span>
+    <span lang="de">Die Kernidee: <strong>Jede Korrektur wird zu einer kleinen, geprüften Änderung an den Anweisungen des Agenten</strong>, statt am Ende der Sitzung verloren zu gehen. Gesammelt wird mit einem Befehl statt durch Suchen, vorgeschlagen wird mit Beleg, und die Entscheidung trifft ein Mensch.</span>
+    <span lang="en">The core idea: <strong>every correction becomes a small, reviewed change to the agent's instructions</strong> instead of being lost when the session ends. Collecting takes one command instead of a search, every proposal carries its evidence, and a person makes the decision.</span>
   </p>
 
   <!-- 1. the loop -->
@@ -190,7 +190,7 @@ octocat</textarea>
     </div>
     <div class="card">
       <h3><span lang="de">Git-Identität ist nicht geprüft</span><span lang="en">Git identity is not verified</span></h3>
-      <p><span lang="de">Jeder kann unter jeder E-Mail committen. Was zählt, ist, was auf den Hauptzweig gemergt wurde. Darum: <code>make agent-feedback</code> auf dem Default-Branch ausführen.</span><span lang="en">Anyone can commit under any email. What counts is what was merged to the default branch, so run <code>make agent-feedback</code> there.</span></p>
+      <p><span lang="de">Jeder kann unter jeder E-Mail committen. Die Autorenliste ist darum nur so stark wie das Review dessen, was auf den Default-Branch kommt. Merge-Commits werden übersprungen, denn ihr Text stammt aus dem PR, nicht von dem, der gemergt hat.</span><span lang="en">Anyone can commit under any email, so the authors list is only as strong as the review of what reaches the default branch. Merge commits are skipped: their text comes from the pull request, not from whoever merged it.</span></p>
     </div>
   </div>
 
@@ -299,7 +299,7 @@ octocat</textarea>
       title: { de: "Vorher: Gates laufen passiv, Lernen nur von Hand", en: "Before: gates run passively, learning only by hand" },
       more: { de: "CI-Lint und der Graph-Hook liefen schon automatisch. Feedback ging aber verloren, wenn es nicht jemand von sich aus in eine Regel schrieb.", en: "CI lint and the graph hook already ran on their own. But feedback was lost unless someone chose to write it into a rule." } },
     { lvl: { de: "Stufe 1", en: "Level 1" }, state: "new", here: true,
-      title: { de: "Jetzt: Feedback wird festgehalten und automatisch gesammelt", en: "Now: feedback is written down and collected automatically" },
+      title: { de: "Jetzt: Feedback wird festgehalten und mit einem Befehl gesammelt", en: "Now: feedback is written down and collected with one command" },
       more: { de: "<code>Agent-Feedback:</code>-Zeilen ab dem ersten Commit, <code>make agent-feedback</code> gruppiert und filtert. Der Mensch startet den Coach und entscheidet.", en: "<code>Agent-Feedback:</code> lines from the first commit; <code>make agent-feedback</code> groups and filters them. A person starts the coach and decides." } },
     { lvl: { de: "Stufe 2", en: "Level 2" }, state: "plan",
       title: { de: "Coach läuft nach Zeitplan und öffnet selbst einen PR", en: "The coach runs on a schedule and opens its own PR" },
@@ -425,10 +425,11 @@ octocat</textarea>
   // ---------------------------------------------------------------- simulator (mirrors feedback_tool.py)
   var KNOWN = ["RULE:documentation", "RULE:working-principles", "RULE:shared-registries", "RULE:testing",
                "SKILL:registry-entry", "SKILL:semver", "AGENT:agent-coach", "SCRIPT:feedback_tool.py", "ADR-0016"];
-  var KEY = /^Agent-Feedback:[ \t]*(.*)$/i;
-  var FENCE = /^\s{0,3}(`{3,}|~{3,})/;
+  var KEY = /^Agent-Feedback:(.*)$/i;
+  var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+  var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
   var SEP = /^(?:—|–|--|-|:)\s*/;
-  var SAFE = /^[A-Za-z0-9_:./@+-]{1,120}$/;
+  var SAFE = /^(?:[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}|[A-Za-z0-9][A-Za-z0-9-]{0,38})$/;
   var EXAMPLES = [
     { label: { de: "Gutes Feedback", en: "Good feedback" }, author: "maintainer@example.com",
       body: { de: "fix: Datum aus dem Dateinamen ableiten\n\nAgent-Feedback: SKILL:registry-entry — hat das Datum von Hand getippt, weil es nicht wusste, dass das Tool es ableitet",
@@ -442,19 +443,27 @@ octocat</textarea>
       body: { de: "> Agent-Feedback: RULE:testing — von jemand anderem zitiert\n```\nAgent-Feedback: RULE:testing — nur ein Beispiel\n```\nAgent-Feedback: RULE:testing — das echte Feedback",
               en: "> Agent-Feedback: RULE:testing — quoted from someone else\n```\nAgent-Feedback: RULE:testing — only an example\n```\nAgent-Feedback: RULE:testing — the real feedback" } }
   ];
-  var exampleIndex = 0;
+  var exampleIndex = 0, edited = false;
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function parse(body) {
+    // Same rules as feedback_tool.py: only a newline ends a line, a fence closes
+    // only on the same character at least as long, and quotes are not feedback.
     var out = [], fence = null;
-    body.split(/\r?\n/).forEach(function (line) {
-      var m = FENCE.exec(line);
-      if (m) { var ch = m[1][0]; if (fence === null) fence = ch; else if (ch === fence) fence = null; return; }
-      if (fence !== null || /^\s*>/.test(line)) return;
+    body.split("\n").forEach(function (line) {
+      line = line.replace(/\r$/, "");
+      if (fence !== null) {
+        var c = FENCE_CLOSE.exec(line);
+        if (c && c[1][0] === fence.ch && c[1].length >= fence.len) fence = null;
+        return;
+      }
+      var o = FENCE_OPEN.exec(line);
+      if (o && !(o[1][0] === "`" && o[2].indexOf("`") >= 0)) { fence = { ch: o[1][0], len: o[1].length }; return; }
+      if (/^\s*>/.test(line)) return;
       var k = KEY.exec(line);
       if (!k) return;
-      var value = k[1].trim(), sp = value.indexOf(" ");
-      var target = (sp < 0 ? value : value.slice(0, sp)).replace(/[,;:.]+$/, "");
-      var text = (sp < 0 ? "" : value.slice(sp + 1)).trim().replace(SEP, "").trim();
+      var value = k[1].trim(), m = /^(\S+)(?:\s+([\s\S]*))?$/.exec(value) || ["", "", ""];
+      var target = (m[1] || "").replace(/^`+|`+$/g, "").replace(/[,;:.]+$/, "").replace(/^`+|`+$/g, "");
+      var text = (m[2] || "").trim().replace(SEP, "").trim();
       out.push({ target: target, text: text });
     });
     return out;
@@ -469,7 +478,7 @@ octocat</textarea>
     items.forEach(function (it) {
       if (!trusted) {
         html += '<div class="result excluded"><b>' + t("excluded") + '</b>' + esc(SAFE.test(author) ? author : "(not shown)") +
-                ' · ' + esc(SAFE.test(it.target) ? it.target : "(not shown)") + ' · <em>' + t("textWithheld") + '</em></div>';
+                ' · ' + esc(KNOWN.indexOf(it.target) >= 0 ? it.target : "(unresolved)") + ' · <em>' + t("textWithheld") + '</em></div>';
         return;
       }
       var reason = null;
@@ -488,7 +497,7 @@ octocat</textarea>
     EXAMPLES.forEach(function (ex, i) {
       var b = document.createElement("button");
       b.type = "button"; b.className = "btn"; b.textContent = L(ex.label);
-      b.onclick = function () { exampleIndex = i; loadExample(); };
+      b.onclick = function () { exampleIndex = i; edited = false; loadExample(); };
       box.appendChild(b);
     });
     document.getElementById("sim-known").innerHTML = KNOWN.map(function (k) { return "<code>" + k + "</code>"; }).join(" ");
@@ -500,7 +509,7 @@ octocat</textarea>
     simulate();
   }
   ["sim-author", "sim-body", "sim-authors"].forEach(function (id) {
-    document.getElementById(id).addEventListener("input", simulate);
+    document.getElementById(id).addEventListener("input", function () { edited = true; simulate(); });
   });
 
   // ---------------------------------------------------------------- language
@@ -512,7 +521,9 @@ octocat</textarea>
       b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === next));
     });
     document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = t(el.getAttribute("data-i18n")); });
-    show(current); drawCompare(); drawLadder(); drawHowto(); drawExamples(); loadExample();
+    // An example is shown in the new language; what the reader typed is kept.
+    show(current); drawCompare(); drawLadder(); drawHowto(); drawExamples();
+    if (edited) simulate(); else loadExample();
     try { localStorage.setItem("explainer-lang", next); } catch (e) { /* file:// may refuse storage */ }
   }
   document.querySelectorAll(".lang-switch button").forEach(function (b) {

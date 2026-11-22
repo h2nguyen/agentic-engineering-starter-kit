@@ -60,14 +60,20 @@ We will ship `scripts/feedback_tool.py collect` (`make agent-feedback`) on day 1
 for all four tools. It reads the messages of the commits a revision reaches,
 plus any JSON comment export the project's own tooling produced (`--from`),
 resolves each token with the link gate's graph, and prints one JSON report
-grouped by artifact. Tokens that name nothing are reported, not guessed.
-Quoted and fenced lines are ignored, so a listed reviewer quoting a stranger
-does not pass the stranger's words on. It is a report, not a gate.
+grouped by artifact. Tokens that name nothing are reported, not guessed. A
+line is a line as a Markdown renderer sees one: quoted, fenced and indented
+lines are ignored, so a listed reviewer quoting a stranger does not pass the
+stranger's words on. Commits are read as length-prefixed objects, so no
+message can forge a second record, and merge commits are skipped, because
+their body is the pull request's text under the merger's identity. A point
+made again keeps every place it was made: recurrence is the signal. It is a
+report, not a gate.
 
 We will ship `.agent-feedback-authors` naming nobody. Only the identities it
 lists count, an email for commits and a login for exports. For every other
-line the report gives the author and the target, in a shape that cannot carry
-a sentence, and never the text.
+line the report keeps a count, the author only if it is shaped like an email
+or a login, the target only if it resolves to an artifact, and a ref the tool
+made itself — never the text, and never a URL the author supplied.
 
 The `agent-coach` reads the report in OBSERVE, cites the feedback items behind
 each proposal, and lists feedback about artifacts other than agents for the
@@ -101,4 +107,9 @@ then, only feedback that made it into a commit message is read.
 
 **Not prevented.** A listed author's wrong feedback reaches the report. The
 human review of the proposal is still the safeguard against that. The
-allowlist decides whose text is read, not whether it is right.
+allowlist decides whose text is read, not whether it is right. Git authorship
+is not authenticated: a commit merged with a forged author email passes as
+that author, so the list is only as strong as the review of what reaches the
+default branch. An identity-shaped author of an excluded line is still a word
+the coach reads. And feedback an agent commits under a bot identity is
+excluded, unless the bot is listed, which would make every session trusted.

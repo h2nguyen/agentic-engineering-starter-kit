@@ -17,21 +17,26 @@ person). It reports; it changes nothing, and it is not a gate.
 
 Whose lines count is the adopter's list, `.agent-feedback-authors` at the
 repository root: a commit author's email, or a login as a comment export names
-it. Text from anyone else is left out of the report entirely — only its author
-and target are listed — because whatever reaches the report may become an
-instruction that every later agent session follows. With no list, nobody's
-text is read.
+it. Text from anyone else is left out of the report entirely, because whatever
+reaches the report may become an instruction that every later agent session
+follows. Of such a line the report keeps a count, the author if it is shaped
+like an email or a login, the target only if it resolves, and a ref the tool
+made itself. With no list, nobody's text is read.
 
 Sources:
-  git      the messages of the commits `--rev` reaches (default HEAD). Run it on
-           the default branch: a commit there has been through review.
+  git      the messages of the commits `--rev` reaches (default HEAD), merge
+           commits excepted: a merge carries the pull request's title or
+           description, written by whoever opened it, under the identity of
+           whoever merged it. A commit's author is only as trustworthy as the
+           review its metadata got; run it on the default branch.
   --from   a JSON file of comments your own tooling exported from the code
            host: a list of {"author", "body"} objects, each optionally with
            "url" (or "ref") and "date". The kit has no network access, so it
            does not fetch them itself.
 
-Lines inside fenced code blocks, and quoted lines (`> …`), are not feedback: a
-quote is someone else's words, and an example is not a point.
+A line is a line as a Markdown renderer sees one: only a newline ends it.
+Lines inside fenced code blocks, indented code and quoted lines (`> …`) are
+not feedback: a quote is someone else's words, and an example is not a point.
 
 Stdlib only.
 
@@ -42,6 +47,8 @@ Stdlib only.
 from __future__ import annotations
 
 import argparse
+import codecs
+import datetime
 import json
 import os
 import re
@@ -64,17 +71,16 @@ except ImportError:  # pragma: no cover - reported by main()
 AUTHORS_FILE = ".agent-feedback-authors"
 SCHEMA = "agent-feedback/1"
 # At the very start of the line: indented four spaces, Markdown reads it as code.
-KEY_LINE = re.compile(r"^Agent-Feedback:[ \t]*(.*)$", re.IGNORECASE)
-FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+KEY_LINE = re.compile(r"^Agent-Feedback:(.*)$", re.IGNORECASE)
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
 SEPARATOR = re.compile(r"^(?:—|–|--|-|:)\s*")
-# What an excluded entry may still show. Its text is withheld; its target and
-# author are shown only in a shape that cannot carry a sentence.
-SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_:./@+-]{1,120}$")
-# An export's url comes from the same author as the body, so an excluded
-# entry's ref is held to the shape of a URL or a file#index: no spaces.
-SAFE_REF = re.compile(r"^[A-Za-z0-9_:./@+#?=&%~-]{1,300}$")
+# What an excluded entry may still show of its author: an email or a login,
+# no longer than either can be — an identifier, never a sentence.
+IDENTITY = re.compile(r"^(?:[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}|[A-Za-z0-9][A-Za-z0-9-]{0,38})$")
+COMMIT_PERSON = re.compile(rb"^(author|committer) [^<>]*<([^<>]*)> (\d+) ([+-])(\d\d)(\d\d)$")
 MAX_TEXT = 2000
-RECORD, FIELD = "\x1e", "\x1f"
+NOT_SHOWN = "(not shown)"
 
 
 class FeedbackError(Exception):
@@ -85,63 +91,109 @@ class FeedbackError(Exception):
 # parsing
 # --------------------------------------------------------------------------
 
+def _lines(body: str):
+    # str.splitlines() also breaks at U+2028, form feed and other characters a
+    # renderer shows inside one line — and a quote or a fence ends with its line.
+    for line in body.split("\n"):
+        yield line[:-1] if line.endswith("\r") else line
+
+
 def feedback_lines(body: str):
     """(target, text) for every Agent-Feedback line in a message or comment."""
-    fence = None
-    for line in body.splitlines():
-        marker = FENCE.match(line)
-        if marker:
-            ticks = marker.group(1)
-            if fence is None:
-                fence = ticks[0]
-            elif ticks[0] == fence:
+    fence = None  # (character, length) of the open fence, as CommonMark closes it
+    for line in _lines(body):
+        if fence is not None:
+            close = FENCE_CLOSE.match(line)
+            if close and close.group(1)[0] == fence[0] and len(close.group(1)) >= fence[1]:
                 fence = None
             continue
-        if fence is not None or line.lstrip().startswith(">"):
+        opened = FENCE_OPEN.match(line)
+        if opened and not (opened.group(1)[0] == "`" and "`" in opened.group(2)):
+            fence = (opened.group(1)[0], len(opened.group(1)))
+            continue
+        if line.lstrip().startswith(">"):
             continue
         hit = KEY_LINE.match(line)
         if not hit:
             continue
-        value = hit.group(1).strip()
-        target, _, rest = value.partition(" ")
-        target = target.rstrip(",;:.")
+        parts = hit.group(1).split(None, 1)
+        target = parts[0].strip("`").rstrip(",;:.").strip("`") if parts else ""
+        rest = parts[1] if len(parts) > 1 else ""
         text = SEPARATOR.sub("", rest.strip()).strip()
         yield target, text[:MAX_TEXT]
 
 
-def _safe(value: str, shape=SAFE_TOKEN) -> str:
+def _identity(value: str) -> str:
     value = (value or "").strip()
-    return value if shape.match(value) else "(not shown)"
+    return value if IDENTITY.match(value) else NOT_SHOWN
 
 
 # --------------------------------------------------------------------------
 # sources
 # --------------------------------------------------------------------------
 
-def _git(root: str, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", root, *args], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
+def _git(root: str, *args: str, data: bytes | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", root, *args], input=data, capture_output=True)
+
+
+def _parse_commit(raw: bytes):
+    """(author email, commit date, message) of a raw commit object."""
+    head, _, message = raw.partition(b"\n\n")
+    email, date, encoding = "", "", "utf-8"
+    for line in head.split(b"\n"):
+        person = COMMIT_PERSON.match(line)
+        if person:
+            if person.group(1) == b"author":
+                email = person.group(2).decode("utf-8", "replace")
+            else:
+                sign = 1 if person.group(4) == b"+" else -1
+                zone = datetime.timezone(sign * datetime.timedelta(
+                    hours=int(person.group(5)), minutes=int(person.group(6))))
+                date = datetime.datetime.fromtimestamp(int(person.group(3)), zone).isoformat()
+        elif line.startswith(b"encoding "):
+            encoding = line[len(b"encoding "):].decode("ascii", "replace").strip()
+    try:
+        codecs.lookup(encoding)
+    except LookupError:
+        encoding = "utf-8"
+    return email, date, message.decode(encoding, "replace")
 
 
 def from_git(root: str, rev: str, since: str | None):
-    """One message per commit `rev` reaches, newest first."""
+    """One message per non-merge commit `rev` reaches, newest first.
+
+    Commits are read as objects, each length-prefixed by `git cat-file --batch`,
+    never by splitting formatted output on a separator: a commit message can
+    contain any separator byte, and with it a whole forged record.
+    """
+    for name, value in (("--rev", rev), ("--since", since or "")):
+        if value.startswith("-"):
+            raise FeedbackError(f"{name} {value!r} looks like an option; give a revision or a date")
     if _git(root, "rev-parse", "--is-inside-work-tree").returncode != 0:
         raise FeedbackError(f"{root} is not a git repository; pass --no-git to read only --from files")
     if rev == "HEAD" and _git(root, "rev-parse", "--verify", "-q", "HEAD").returncode != 0:
         return  # no commits yet: nothing anyone could have written
-    args = ["log", f"--format=%H{FIELD}%ae{FIELD}%cI{FIELD}%B{RECORD}"]
-    if since:
-        args.append(f"--since={since}")
-    args += [rev, "--"]
-    done = _git(root, *args)
-    if done.returncode != 0:
-        raise FeedbackError(f"git log {rev} failed: {done.stderr.strip()}")
-    for record in done.stdout.split(RECORD):
-        record = record.lstrip("\n")
-        if not record:
-            continue
-        sha, email, date, body = (record.split(FIELD, 3) + ["", "", ""])[:4]
-        yield {"ref": f"git:{sha[:12]}", "author": email, "date": date, "body": body}
+    args = ["rev-list", "--no-merges"] + ([f"--since={since}"] if since else []) + [rev, "--"]
+    listed = _git(root, *args)
+    if listed.returncode != 0:
+        raise FeedbackError(f"git rev-list {rev} failed: {listed.stderr.decode('utf-8', 'replace').strip()}")
+    shas = listed.stdout.decode("ascii", "replace").split()
+    if not shas:
+        return
+    batch = _git(root, "cat-file", "--batch", data=("\n".join(shas) + "\n").encode("ascii"))
+    if batch.returncode != 0:
+        raise FeedbackError(f"git cat-file failed: {batch.stderr.decode('utf-8', 'replace').strip()}")
+    out, pos = batch.stdout, 0
+    for sha in shas:
+        newline = out.index(b"\n", pos)
+        header = out[pos:newline].split()
+        if len(header) != 3 or header[0].decode("ascii", "replace") != sha or header[1] != b"commit":
+            raise FeedbackError(f"git cat-file returned an unexpected object for {sha}")
+        size = int(header[2])
+        email, date, message = _parse_commit(out[newline + 1:newline + 1 + size])
+        pos = newline + 1 + size + 1
+        yield {"ref": f"git:{sha[:12]}", "excluded_ref": f"git:{sha[:12]}",
+               "author": email, "date": date, "body": message}
 
 
 def from_export(path: str):
@@ -158,9 +210,12 @@ def from_export(path: str):
         if not isinstance(item, dict) or not isinstance(item.get("author"), str) \
                 or not isinstance(item.get("body"), str):
             raise FeedbackError(f'{path}: item {index} needs a string "author" and a string "body"')
-        ref = item.get("url") or item.get("ref") or f"{name}#{index}"
-        yield {"ref": str(ref), "author": item["author"], "date": str(item.get("date") or ""),
-               "body": item["body"]}
+        own = f"{name}#{index}"
+        link = next((v for v in (item.get("url"), item.get("ref")) if isinstance(v, str) and v.strip()), own)
+        date = item.get("date") if isinstance(item.get("date"), str) else ""
+        # The url is the comment's author's too: it is shown for a listed
+        # author, and an excluded entry gets the ref this tool made itself.
+        yield {"ref": link, "excluded_ref": own, "author": item["author"], "date": date, "body": item["body"]}
 
 
 def load_authors(path: str) -> set[str] | None:
@@ -168,11 +223,14 @@ def load_authors(path: str) -> set[str] | None:
     if not os.path.isfile(path):
         return None
     listed = set()
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            identity = line.split("#", 1)[0].strip().lower()
-            if identity:
-                listed.add(identity)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                identity = line.split("#", 1)[0].strip().lower()
+                if identity:
+                    listed.add(identity)
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FeedbackError(f"{path}: cannot read it as UTF-8 text ({exc})")
     return listed
 
 
@@ -196,25 +254,30 @@ def resolve(graph, target: str):
 
 def collect(graph, messages, authors: set[str] | None) -> dict:
     groups: dict[str, dict] = {}
-    unresolved, excluded, seen = [], [], set()
+    unresolved, excluded, seen = [], [], {}
     for message in messages:
         author = message["author"].strip()
         trusted = authors is not None and author.lower() in authors
         for target, text in feedback_lines(message["body"]):
             if not trusted:
-                excluded.append({"ref": _safe(message["ref"], SAFE_REF), "author": _safe(author),
-                                 "target": _safe(target)})
+                token, _, problem = resolve(graph, target)
+                excluded.append({"ref": message["excluded_ref"], "author": _identity(author),
+                                 "target": token if problem is None else "(unresolved)"})
                 continue
             key = (author.lower(), target, text)
             if key in seen:
+                # One point, made again: the recurrence is the signal, so keep where.
+                if message["ref"] not in seen[key]["refs"]:
+                    seen[key]["refs"].append(message["ref"])
                 continue
-            seen.add(key)
-            item = {"ref": message["ref"], "author": author, "date": message["date"], "text": text}
+            item = {"refs": [message["ref"]], "author": author, "date": message["date"], "text": text}
+            seen[key] = item
             token, path, problem = resolve(graph, target)
             if problem is None and not text:
                 problem = "no text: say what went wrong, and why"
             if problem:
-                unresolved.append(dict(item, target=target, reason=problem))
+                item.update(target=target, reason=problem)
+                unresolved.append(item)
                 continue
             group = groups.setdefault(token, {"target": token, "path": path, "count": 0, "items": []})
             group["items"].append(item)
@@ -250,8 +313,11 @@ def cmd_collect(args) -> int:
 
     text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.out:
-        with open(args.out, "w", encoding="utf-8") as fh:
-            fh.write(text)
+        try:
+            with open(args.out, "w", encoding="utf-8") as fh:
+                fh.write(text)
+        except OSError as exc:
+            raise FeedbackError(f"cannot write {args.out}: {exc}")
     else:
         sys.stdout.write(text)
 

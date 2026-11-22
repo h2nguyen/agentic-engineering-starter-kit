@@ -54,6 +54,8 @@ usually starts, so a command that leaves the path out writes here.
    - the constitution's `<placeholders>` — the project in one paragraph, its
      stack, and its commands. Run a command before you write it down; leave
      out what does not exist;
+   - whose feedback counts, in `.agent-feedback-authors` — ask the user for
+     the commit emails and logins; never infer them from the history;
    - the project rows of the comments-and-annotations rule —
      [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
      In the target, `./scripts/python.sh scripts/registry_tool.py list` prints

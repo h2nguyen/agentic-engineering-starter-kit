@@ -537,6 +537,15 @@ for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
     echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi
 done
+# An authors list with no entry makes the feedback channel inert, on a first
+# install and on the re-run that brought the list in. Said while it is empty.
+if [ -f "$TARGET/.agent-feedback-authors" ] \
+   && ! grep -qv '^[[:space:]]*\(#.*\)\{0,1\}$' "$TARGET/.agent-feedback-authors"; then
+  echo "     .agent-feedback-authors names nobody yet, so 'make agent-feedback' reads no one's"
+  echo "     Agent-Feedback lines. List the commit emails and comment logins of the people whose"
+  echo "     review you would accept for a rule change, one per line — ask, never infer them from"
+  echo "     the history (the documentation rule, section 'Feedback to an agent')."
+fi
 if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
   echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"

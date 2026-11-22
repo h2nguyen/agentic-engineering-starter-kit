@@ -10,8 +10,9 @@
 #
 # A line that reaches the report can become an instruction every later agent
 # session follows, so list the people whose review you would accept for a
-# change to a rule. Feedback from anyone else is counted, and its author and
-# target are shown, but its text is left out of the report.
+# change to a rule. Feedback from anyone else is counted, but its text is
+# left out of the report. Do not list a bot identity an agent commits as:
+# that would make every agent session a trusted author.
 #
 # As installed, the list names nobody, and nobody's feedback is read.
 #

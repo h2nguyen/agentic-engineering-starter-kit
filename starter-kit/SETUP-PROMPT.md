@@ -122,7 +122,9 @@ Create, at the locations your detected tool expects (Appendix A.1):
    found in Phase 1, and resolve its `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`,
    `<TICKET-ID>` and `<tool-or-gate>` pointers to the identifier shapes and
    gates this repo actually uses (`<EVAL-RECORD-ID>` too, if the repo keeps
-   prompt-evaluation evidence).
+   prompt-evaluation evidence). The documentation rule's "Feedback to an
+   agent" section reads `.agent-feedback-authors`, which starts naming nobody:
+   ask the user whose feedback counts, and never infer it from the history.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for
