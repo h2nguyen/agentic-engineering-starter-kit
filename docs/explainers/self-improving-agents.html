@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Self-improving agents — what the starter kit learns from Warp</title>
+<title>Self-improving agents — how the starter kit closes the feedback loop</title>
 <style>
   :root {
     --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5f5e58; --line: #e3e0d8; --card: #ffffff;
@@ -116,8 +116,8 @@
     <span lang="en">Agents that get better with every piece of feedback</span>
   </h1>
   <p class="lead">
-    <span lang="de">Die Kernidee aus Warps Bericht: <strong>Jede Korrektur wird zu einer kleinen, geprüften Änderung an den Anweisungen des Agenten</strong>, statt am Ende der Sitzung verloren zu gehen. Sammeln und Vorschlagen läuft automatisch, die Entscheidung trifft ein Mensch.</span>
-    <span lang="en">The core idea of Warp's account: <strong>every correction becomes a small, reviewed change to the agent's instructions</strong> instead of being lost when the session ends. Collecting and proposing run on their own; a person makes the decision.</span>
+    <span lang="de">Die Kernidee: <strong>Jede Korrektur wird zu einer kleinen, geprüften Änderung an den Anweisungen des Agenten</strong>, statt am Ende der Sitzung verloren zu gehen. Sammeln und Vorschlagen läuft automatisch, die Entscheidung trifft ein Mensch.</span>
+    <span lang="en">The core idea: <strong>every correction becomes a small, reviewed change to the agent's instructions</strong> instead of being lost when the session ends. Collecting and proposing run on their own; a person makes the decision.</span>
   </p>
 
   <!-- 1. the loop -->
@@ -182,7 +182,7 @@ octocat</textarea>
   <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
     <div class="card">
       <h3><span lang="de">Feedback kann falsch sein</span><span lang="en">Feedback can be wrong</span></h3>
-      <p><span lang="de">Warp sagt es selbst: Geh davon aus, dass manches Feedback falsch ist. Ein Mensch, der den Vorschlag prüft, fängt das ab.</span><span lang="en">Warp says it outright: assume some feedback is wrong. A person reviewing the proposal catches it.</span></p>
+      <p><span lang="de">Geh davon aus, dass manches Feedback falsch ist. Ein Mensch, der den Vorschlag prüft, fängt das ab.</span><span lang="en">Assume some feedback is wrong. A person reviewing the proposal catches it.</span></p>
     </div>
     <div class="card">
       <h3><span lang="de">Prompt-Injection</span><span lang="en">Prompt injection</span></h3>
@@ -200,8 +200,8 @@ octocat</textarea>
 
   <footer>
     <p>
-      <span lang="de">Quelle: „How Warp builds self-improving agents on Claude“, Michael Segner, claude.com, 26. August 2026. Ein Anbieter-Fallbericht: Er beschreibt das Vorgehen, nennt aber keine gemessenen Vorher/Nachher-Ergebnisse. Die Entscheidung des Kits und was bewusst zurückgestellt ist, steht in <code>docs/adr/adr-0016-…</code>.</span>
-      <span lang="en">Source: "How Warp builds self-improving agents on Claude", Michael Segner, claude.com, 26 August 2026. A vendor case study: it describes the practice but reports no measured before/after results. The kit's decision, and what it deliberately defers, is in <code>docs/adr/adr-0016-…</code>.</span>
+      <span lang="de">Die Grundidee steht im Leitfaden (<code>AGENTIC-ENGINEERING-GUIDE.md</code>, Prinzipien P6 und P7, § 5.1 und § 5.3). Die Entscheidung zum Feedback-Kanal und was bewusst zurückgestellt ist, steht in <code>docs/adr/adr-0016-…</code>.</span>
+      <span lang="en">The underlying idea is in the guide (<code>AGENTIC-ENGINEERING-GUIDE.md</code>, principles P6 and P7, § 5.1 and § 5.3). The decision on the feedback channel, and what it deliberately defers, is in <code>docs/adr/adr-0016-…</code>.</span>
     </p>
   </footer>
 </main>
@@ -219,8 +219,8 @@ octocat</textarea>
     prev: { de: "← Zurück", en: "← Back" },
     next: { de: "Weiter →", en: "Next →" },
     where:{ de: "Bei uns:", en: "In the kit:" },
-    warp: { de: "Bei Warp:", en: "At Warp:" },
-    colWarp: { de: "Warp", en: "Warp" },
+    idea: { de: "Das Prinzip:", en: "The principle:" },
+    colPart: { de: "Baustein", en: "Building block" },
     colKit: { de: "Starter Kit", en: "Starter kit" },
     colState: { de: "Stand", en: "State" },
     targets: { de: "→ targets (geht an den Coach)", en: "→ targets (goes to the coach)" },
@@ -243,54 +243,54 @@ octocat</textarea>
       title: { de: "1. Der Agent arbeitet nach seinen Anweisungen", en: "1. The agent works from its instructions" },
       body: { de: "Regeln, Skills, Agenten und Commands sind Dateien im Repository. Jede Sitzung startet mit dem gesammelten Wissen aller vorherigen.",
               en: "Rules, skills, agents and commands are files in the repository. Every session starts with what every earlier one learned." },
-      warp: { de: "Ein „inner skill“ pro Agent, z. B. für Code-Review oder Issue-Triage.", en: "One \"inner skill\" per agent, e.g. for code review or issue triage." },
+      idea: { de: "Wissen gehört in versionierte Dateien, nicht in den Prompt einer einzelnen Sitzung.", en: "Knowledge belongs in versioned files, not in the prompt of a single session." },
       kit: { de: "Constitution, <code>rules/</code>, <code>skills/</code>, <code>agents/</code>, Knowledge-Base — seit jeher im Kit.", en: "Constitution, <code>rules/</code>, <code>skills/</code>, <code>agents/</code>, knowledge base — in the kit from the start." } },
     { short: { de: "Feedback", en: "Feedback" }, state: "new",
       title: { de: "2. Ein Mensch schreibt Feedback auf — dort, wo er sowieso arbeitet", en: "2. A person writes feedback down — where they already work" },
       body: { de: "Eine Zeile in der Commit-Nachricht oder im PR-Kommentar, die das Artefakt per Token nennt und sagt, <strong>was</strong> falsch war und <strong>warum</strong>. Wird der Agent im Chat korrigiert, bietet er an, die Zeile selbst in den Commit zu schreiben.",
               en: "One line in the commit message or PR comment that names the artifact by its token and says <strong>what</strong> went wrong and <strong>why</strong>. When a person corrects the agent in chat, it offers to write the line into the commit itself." },
-      warp: { de: "„Low friction is what keeps signal flowing.“ Kommentare am PR oder Issue, kein extra Formular.", en: "\"Low friction is what keeps signal flowing.\" Comments on the PR or issue, no extra form." },
+      idea: { de: "Feedback muss mühelos sein, sonst kommt keins: dort, wo das Review ohnehin stattfindet, ohne extra Formular.", en: "Feedback has to be effortless or it does not come: where review happens anyway, with no extra form." },
       kit: { de: "<code>Agent-Feedback: SKILL:registry-entry — …, weil …</code> — beschrieben in der Documentation-Regel, § Feedback to an agent.", en: "<code>Agent-Feedback: SKILL:registry-entry — …, because …</code> — described in the documentation rule, § Feedback to an agent." } },
     { short: { de: "Sammeln", en: "Collect" }, state: "new",
       title: { de: "3. Ein Skript sammelt und filtert", en: "3. A script collects and filters" },
       body: { de: "Liest die Zeilen aus der Git-Historie (und optional aus einem JSON-Export von Kommentaren), prüft jedes Token gegen den Link-Graphen und gruppiert nach Artefakt. Nur Autoren aus <code>.agent-feedback-authors</code> zählen, von allen anderen erscheint kein Text.",
               en: "Reads the lines from the git history (and optionally from a JSON export of comments), checks every token against the link graph, and groups by artifact. Only authors in <code>.agent-feedback-authors</code> count; nobody else's text appears." },
-      warp: { de: "Ein Python-Skript im Improver-Skill zieht Issues mit Feedback in eine JSON-Datei.", en: "A Python script bundled with the improver skill pulls issues with feedback into a JSON file." },
+      idea: { de: "Ein Werkzeug sammelt deterministisch, der Agent liest nur das Ergebnis und muss nicht suchen.", en: "A tool collects deterministically; the agent reads the result instead of searching for it." },
       kit: { de: "<code>make agent-feedback</code> → <code>scripts/feedback_tool.py</code>. Offline, nur Python-Standardbibliothek, alle vier Tools.", en: "<code>make agent-feedback</code> → <code>scripts/feedback_tool.py</code>. Offline, Python standard library only, all four tools." } },
     { short: { de: "Vorschlag", en: "Propose" }, state: "have",
       title: { de: "4. Der Verbesserer schlägt die kleinste Änderung vor", en: "4. The improver proposes the smallest edit" },
       body: { de: "Der <code>agent-coach</code> liest den Bericht beim Beobachten, schlägt pro Schwäche genau eine minimale Änderung vor und nennt das Feedback, das sie ausgelöst hat. Ein Zeitplan, der ihn automatisch startet, ist der nächste Schritt (geplant).",
               en: "The <code>agent-coach</code> reads the report when it observes, proposes exactly one minimal edit per weakness, and cites the feedback behind it. A schedule that starts it automatically is the next step (deferred)." },
-      warp: { de: "Ein „outer skill“ läuft nach Zeitplan und öffnet einen PR, der die Signale benennt.", en: "An \"outer skill\" runs on a schedule and opens a PR that names its signals." },
+      idea: { de: "Eine Schwäche, eine minimale Änderung, mit Beleg. Keine „könnte schöner sein“-Änderungen.", en: "One weakness, one minimal edit, with evidence. No \"could be nicer\" edits." },
       kit: { de: "<code>agent-coach</code> (mit <code>--with-meta</code>, Claude Code): OBSERVE → DIAGNOSE → PROPOSE. Liest jetzt den Feedback-Bericht.", en: "<code>agent-coach</code> (with <code>--with-meta</code>, Claude Code): OBSERVE → DIAGNOSE → PROPOSE. Now reads the feedback report." } },
     { short: { de: "Merge", en: "Merge" }, state: "have",
       title: { de: "5. Ein Mensch prüft, merged und es wird protokolliert", en: "5. A person reviews, merges, and it is logged" },
       body: { de: "Nur nach Freigabe wird geändert, als normaler PR. Das <code>WORKSPACE_CHANGELOG.md</code> hält fest, was angenommen, abgelehnt und bewusst nicht geändert wurde. Der nächste Lauf misst, ob es geholfen hat.",
               en: "Nothing changes without approval, and the change is an ordinary PR. <code>WORKSPACE_CHANGELOG.md</code> records what was accepted, rejected and deliberately left alone. The next cycle measures whether it helped." },
-      warp: { de: "„closes the loop and keeps a person in control“.", en: "\"closes the loop and keeps a person in control\"." },
+      idea: { de: "Ein Mensch schließt die Schleife und behält die Kontrolle.", en: "A person closes the loop and stays in control." },
       kit: { de: "„Propose, never silently change“ (Prinzip P7) + Workspace-Changelog als Tagebuch.", en: "\"Propose, never silently change\" (principle P7) + the workspace changelog as the log." } }
   ];
 
   var COMPARE = [
-    { warp: { de: "Wissen in Skill-Dateien", en: "Knowledge in skill files" },
+    { part: { de: "Wissen in Skill-Dateien", en: "Knowledge in skill files" },
       kit: { de: "Constitution, Regeln, Skills, Debugging-Knowledge-Base", en: "Constitution, rules, skills, debugging knowledge base" }, state: "have" },
-    { warp: { de: "Feedback, wo man arbeitet", en: "Feedback where people work" },
+    { part: { de: "Feedback, wo man arbeitet", en: "Feedback where people work" },
       kit: { de: "<code>Agent-Feedback:</code>-Zeile in Commit oder Kommentar", en: "<code>Agent-Feedback:</code> line in a commit or comment" }, state: "new" },
-    { warp: { de: "Skript sammelt Feedback als JSON", en: "Script collects feedback as JSON" },
+    { part: { de: "Skript sammelt Feedback als JSON", en: "Script collects feedback as JSON" },
       kit: { de: "<code>make agent-feedback</code>", en: "<code>make agent-feedback</code>" }, state: "new" },
-    { warp: { de: "Filtern, wessen Feedback zählt", en: "Filter whose feedback counts" },
+    { part: { de: "Filtern, wessen Feedback zählt", en: "Filter whose feedback counts" },
       kit: { de: "<code>.agent-feedback-authors</code>, startet leer", en: "<code>.agent-feedback-authors</code>, ships empty" }, state: "new" },
-    { warp: { de: "Verbesserer schlägt kleinste Änderung vor", en: "Improver proposes the smallest edit" },
+    { part: { de: "Verbesserer schlägt kleinste Änderung vor", en: "Improver proposes the smallest edit" },
       kit: { de: "<code>agent-coach</code>, liest jetzt den Bericht", en: "<code>agent-coach</code>, now reads the report" }, state: "have" },
-    { warp: { de: "Mensch merged per PR", en: "A person merges the PR" },
+    { part: { de: "Mensch merged per PR", en: "A person merges the PR" },
       kit: { de: "PR-only, Prinzip P7", en: "PR-only, principle P7" }, state: "have" },
-    { warp: { de: "Protokoll der Verbesserungen", en: "A log of improvements" },
+    { part: { de: "Protokoll der Verbesserungen", en: "A log of improvements" },
       kit: { de: "<code>WORKSPACE_CHANGELOG.md</code>", en: "<code>WORKSPACE_CHANGELOG.md</code>" }, state: "have" },
-    { warp: { de: "Verbesserer läuft nach Zeitplan", en: "Improver runs on a schedule" },
+    { part: { de: "Verbesserer läuft nach Zeitplan", en: "Improver runs on a schedule" },
       kit: { de: "Braucht Zugangsdaten und einen neuen ADR, der ADR-0006 ablöst", en: "Needs credentials and a new record superseding ADR-0006" }, state: "plan" },
-    { warp: { de: "Ein Verbesserer für viele Agenten", en: "One improver shared by many agents" },
+    { part: { de: "Ein Verbesserer für viele Agenten", en: "One improver shared by many agents" },
       kit: { de: "Coach verbessert bisher nur Agenten, nur auf Claude Code", en: "The coach improves only agents so far, on Claude Code only" }, state: "plan" },
-    { warp: { de: "Verifikation zuerst, Golden-Outputs", en: "Verification first, golden outputs" },
+    { part: { de: "Verifikation zuerst, Golden-Outputs", en: "Verification first, golden outputs" },
       kit: { de: "Golden-Fälle pro Skill — wenn ein Merge etwas verschlechtert hat", en: "Golden cases per skill — once a merge made something worse" }, state: "plan" }
   ];
 
@@ -382,7 +382,7 @@ octocat</textarea>
       '<span class="chip ' + s.state + '">' + t(s.state) + '</span>' +
       '<h3 style="margin-top:8px">' + L(s.title) + '</h3>' +
       '<p>' + L(s.body) + '</p>' +
-      '<p class="where"><strong>' + t("warp") + '</strong> ' + L(s.warp) + '</p>' +
+      '<p class="where"><strong>' + t("idea") + '</strong> ' + L(s.idea) + '</p>' +
       '<p class="where"><strong>' + t("where") + '</strong> ' + L(s.kit) + '</p>' +
       '<div class="step-nav"><button type="button" id="prev">' + t("prev") + '</button>' +
       '<button type="button" class="btn primary" id="next">' + t("next") + '</button></div>';
@@ -394,9 +394,9 @@ octocat</textarea>
 
   // ---------------------------------------------------------------- table, ladder, how-to
   function drawCompare() {
-    var rows = '<thead><tr><th>' + t("colWarp") + '</th><th>' + t("colKit") + '</th><th>' + t("colState") + '</th></tr></thead><tbody>';
+    var rows = '<thead><tr><th>' + t("colPart") + '</th><th>' + t("colKit") + '</th><th>' + t("colState") + '</th></tr></thead><tbody>';
     COMPARE.forEach(function (r) {
-      rows += '<tr><td>' + L(r.warp) + '</td><td>' + L(r.kit) + '</td><td><span class="chip ' + r.state + '">' + t(r.state) + '</span></td></tr>';
+      rows += '<tr><td>' + L(r.part) + '</td><td>' + L(r.kit) + '</td><td><span class="chip ' + r.state + '">' + t(r.state) + '</span></td></tr>';
     });
     document.getElementById("compare").innerHTML = rows + '</tbody>';
   }

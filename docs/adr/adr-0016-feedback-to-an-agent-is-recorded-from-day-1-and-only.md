@@ -16,14 +16,11 @@ reviewers happened to use. Nothing marks a sentence as feedback to an agent,
 nothing says which artifact it is about, and the correction people make most
 often, in a chat session, is gone when the session ends.
 
-Warp's account of its self-improving agents ("How Warp builds self-improving
-agents on Claude", claude.com, 26 August 2026) describes the missing half:
-feedback written where people already work, a script bundled with the improver
-that collects it into JSON, and an improver that proposes the smallest edit as
-a pull request that a person merges. Its own advice adds three things: low
-friction keeps the signal coming, feedback is sometimes wrong, and whose input
-counts must be filtered. The article reports no measured result. It is a
-pattern, not evidence.
+The missing half is three things. Feedback has to be written where people
+already work, or it is not written at all. Something deterministic has to
+collect it, so that the improver reads evidence rather than searching for it.
+And because feedback is sometimes wrong, and anyone can write it, the loop has
+to say whose input counts before any of it is read.
 
 The kit's "nothing speculative" test asks whether waiting for a signal means
 waiting for one that never comes. Here it does: a correction that nobody wrote
@@ -41,8 +38,8 @@ Options weighed:
 
 - **A new registry of feedback fragments** (`feedback.d/`). It has an identifier
   and a review step, but it is one more file per point, outside the review
-  the point was made in. That is the friction Warp names as the thing that
-  stops the signal.
+  the point was made in. Friction like that is what stops feedback from being
+  given.
 - **Fetching pull-request comments from the code host.** That is where most
   review happens, but it needs the network and credentials, and the kit runs
   on Bash and the Python standard library only.
