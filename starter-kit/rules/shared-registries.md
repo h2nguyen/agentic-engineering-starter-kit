@@ -24,7 +24,7 @@ Entries live in a fragment directory beside the artifact; a generator assembles
 them; CI checks that the committed artifact still matches its fragments.
 
 ```bash
-python3 scripts/registry_tool.py new --registry <name> --title "..."
+./scripts/python.sh scripts/registry_tool.py new --registry <name> --title "..."
 make registry-generate
 ```
 

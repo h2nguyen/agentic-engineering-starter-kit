@@ -50,7 +50,7 @@ feat: add /api/export endpoint        → v1.5.0
   file-shape problem rather than a git-skill problem.
 
   ```bash
-  python3 scripts/registry_tool.py new --registry changelog \
+  ./scripts/python.sh scripts/registry_tool.py new --registry changelog \
     --title "Ledger export"
   ```
 

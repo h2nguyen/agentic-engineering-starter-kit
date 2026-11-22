@@ -36,8 +36,8 @@ that is the signal to stop and hand it back, not to proceed carefully.
 
 ```bash
 git status --short                       # which files, and how they conflicted
-python3 scripts/registry_tool.py check   # which identifiers are duplicated
-python3 scripts/registry_tool.py generate --check   # what drifted, and how
+./scripts/python.sh scripts/registry_tool.py check   # which identifiers are duplicated
+./scripts/python.sh scripts/registry_tool.py generate --check   # what drifted, and how
 ```
 
 | What you see | What it means | Where to go |
@@ -105,7 +105,7 @@ under `[Unreleased]`, the mechanism the versioning rule prescribes:
 
 ```bash
 git rm changelog.d/2026-08-20-the-feature.md
-python3 scripts/registry_tool.py new --registry changelog --title "Erratum for 1.5.0"
+./scripts/python.sh scripts/registry_tool.py new --registry changelog --title "Erratum for 1.5.0"
 ```
 
 **Same fragment path from both branches.** Two independent write-ups of one

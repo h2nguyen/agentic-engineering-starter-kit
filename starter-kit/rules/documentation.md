@@ -45,8 +45,8 @@ convention declared in `registries.json` — the tool derives the name, and a
 hand-typed one is how a file ends up outside the grammar the gate enforces.
 
 Two naming conventions ship, and `registries.json` says which one this
-repository uses — `python3 scripts/registry_tool.py list` prints the exact
-shape. The **date-slug** style is what a fresh install declares:
+repository uses — `make registry-list` prints the exact shape. The
+**date-slug** style is what a fresh install declares:
 `adr-<date>-<slug>.md`, publishing as `ADR-<date>-<slug>`; it needs no
 allocator and therefore cannot collide. The **MADR** style is
 `adr-NNNN-short-title.md` (`"id_scheme": "numeric"`, `id_width: 4`),

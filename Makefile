@@ -11,18 +11,19 @@
 #
 # The top-level scripts/ directory holds gates that check this repository's
 # own documents and are not part of the kit: check-guide-templates.sh keeps
-# the guide's embedded templates identical to the kit files they name, and
+# the guide's embedded templates identical to the kit files they name,
 # check-rule-budget.sh keeps the rule files the kit ships short enough to be
-# loaded into every session.
+# loaded into every session, and check-documented-commands.sh keeps a fixed
+# interpreter name out of the commands the kit tells its readers to type.
 
 KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        guide-templates rule-budget kit-smoke
+        guide-templates rule-budget documented-commands kit-smoke
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget test
+lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
@@ -90,6 +91,11 @@ guide-templates:
 ## for an always-loaded file; worked examples live in rules/reference/.
 rule-budget:
 	scripts/check-rule-budget.sh
+
+## documented-commands — a command the kit writes down for someone to type
+## starts Python through scripts/python.sh, as everything it runs does.
+documented-commands:
+	scripts/check-documented-commands.sh
 
 ## kit-smoke — bootstrap into a throwaway repo and run its gates there.
 kit-smoke:

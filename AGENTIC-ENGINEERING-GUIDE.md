@@ -323,13 +323,13 @@ After resolving a non-obvious bug (>30 min), add an entry — as a new file, not
 an appended line:
 
 ```bash
-python3 scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
+./scripts/python.sh scripts/registry_tool.py new --registry debugging-kb --title "<symptom>"
 make registry-generate
 ```
 
-Where Python has another name than `python3` (Windows: `python`, `py`), write
-`./scripts/python.sh` in its place, here and in every rule: it finds the
-interpreter this machine has.
+`scripts/python.sh` finds Python under whatever name this machine gives it
+(`python3`, `python`, `py`). The rules write every command that way; a command
+added here does too.
 
 Fields: Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug
 Shortcut, and a `Related:` line naming the rule or check that now prevents it

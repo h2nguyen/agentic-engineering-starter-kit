@@ -54,13 +54,13 @@ name your machine gives it — the make targets find it through
 4. **Add a changelog fragment**, written for the adopter — what they will
    observe after upgrading, not what you did:
    ```bash
-   python3 starter-kit/scripts/registry_tool.py new --registry changelog --title "<the change>"
+   starter-kit/scripts/python.sh starter-kit/scripts/registry_tool.py new --registry changelog --title "<the change>"
    make registry-generate
    ```
 5. **Record a decision** when the change is one — a new day-1 default, a rule
    deliberately left ungated, a rejected alternative worth remembering:
    ```bash
-   python3 starter-kit/scripts/registry_tool.py new --registry adr --title "<the decision>"
+   starter-kit/scripts/python.sh starter-kit/scripts/registry_tool.py new --registry adr --title "<the decision>"
    ```
 6. **Run `make lint` and `make kit-smoke`.** Commit with a Conventional Commits
    subject that says what is now true, and a body that says why.
@@ -75,6 +75,7 @@ cause; none of these has a quiet override.
 | `guide-templates` | Every template the guide embeds is byte-identical to its kit file. Change the kit file, then paste it into the guide |
 | `graph-links` | Every `Related:`, `Enforces:` and `Hands off to:` line names an artifact that exists |
 | `rule-budget` | Every rule file the kit ships stays under 250 lines; worked examples go to `starter-kit/rules/reference/` |
+| `documented-commands` | No command the kit or this repository writes down for someone to type starts Python as `python3 …`; each goes through `scripts/python.sh` or a make target (ADR-0013) |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
 | `ci-lint-coverage` | Every check in `make lint` really runs in CI |
 | `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
@@ -96,7 +97,8 @@ Four invariants every such change keeps, each with a test behind it:
 - **Every artifact lands for all four tools**, or the installer says why not.
 - **Bash and the Python standard library only.** No packages, no network.
 - **Python is never started by a fixed name.** A make target, a gate, a test,
-  a hook command: each goes through `scripts/python.sh`. `python3` is not
+  a hook command, and a command written down in a rule, a skill or a README
+  for someone to type: each goes through `scripts/python.sh`. `python3` is not
   Python on every machine, and `test-bootstrap-rerun.sh` runs a whole fresh
   install on a machine where it is not.
 - **Nothing speculative.** An artifact ships on day 1 only when waiting for a
@@ -184,7 +186,7 @@ give the release commit a `BREAKING CHANGE:` footer.
 
 ```bash
 git checkout -b release/<X.Y.Z>
-python3 starter-kit/scripts/registry_tool.py release --registry changelog --version <X.Y.Z>
+starter-kit/scripts/python.sh starter-kit/scripts/registry_tool.py release --registry changelog --version <X.Y.Z>
 make lint
 ```
 

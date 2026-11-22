@@ -18,7 +18,7 @@ and code comments cite. One file per entry removes both.
 Add an entry:
 
 ```bash
-python3 scripts/registry_tool.py new --registry debugging-kb \
+./scripts/python.sh scripts/registry_tool.py new --registry debugging-kb \
   --title "Cache warms before the config is loaded"
 # → docs/DEBUGGING-KNOWLEDGE-BASE.d/2026-08-29-cache-warms-before-the-config.md
 make registry-generate
