@@ -63,12 +63,16 @@ except ImportError:  # pragma: no cover - reported by main()
 
 AUTHORS_FILE = ".agent-feedback-authors"
 SCHEMA = "agent-feedback/1"
-KEY_LINE = re.compile(r"^[ \t]*Agent-Feedback:[ \t]*(.*)$", re.IGNORECASE)
+# At the very start of the line: indented four spaces, Markdown reads it as code.
+KEY_LINE = re.compile(r"^Agent-Feedback:[ \t]*(.*)$", re.IGNORECASE)
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 SEPARATOR = re.compile(r"^(?:—|–|--|-|:)\s*")
 # What an excluded entry may still show. Its text is withheld; its target and
 # author are shown only in a shape that cannot carry a sentence.
 SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_:./@+-]{1,120}$")
+# An export's url comes from the same author as the body, so an excluded
+# entry's ref is held to the shape of a URL or a file#index: no spaces.
+SAFE_REF = re.compile(r"^[A-Za-z0-9_:./@+#?=&%~-]{1,300}$")
 MAX_TEXT = 2000
 RECORD, FIELD = "\x1e", "\x1f"
 
@@ -105,9 +109,9 @@ def feedback_lines(body: str):
         yield target, text[:MAX_TEXT]
 
 
-def _safe(value: str) -> str:
+def _safe(value: str, shape=SAFE_TOKEN) -> str:
     value = (value or "").strip()
-    return value if SAFE_TOKEN.match(value) else "(not shown)"
+    return value if shape.match(value) else "(not shown)"
 
 
 # --------------------------------------------------------------------------
@@ -198,7 +202,8 @@ def collect(graph, messages, authors: set[str] | None) -> dict:
         trusted = authors is not None and author.lower() in authors
         for target, text in feedback_lines(message["body"]):
             if not trusted:
-                excluded.append({"ref": message["ref"], "author": _safe(author), "target": _safe(target)})
+                excluded.append({"ref": _safe(message["ref"], SAFE_REF), "author": _safe(author),
+                                 "target": _safe(target)})
                 continue
             key = (author.lower(), target, text)
             if key in seen:
