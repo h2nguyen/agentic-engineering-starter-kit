@@ -23,7 +23,7 @@
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
 #             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
 #             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh,
-#             check-constitution.sh)
+#             check-constitution.sh, feedback_tool.py), .agent-feedback-authors
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
@@ -341,6 +341,13 @@ install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
 # (`make constitution`), not a prerequisite of `lint`: it would fail a
 # constitution that passed before, and that is the adopter's call to make.
 install_file scripts/check-constitution.sh scripts/check-constitution.sh x || true
+# Feedback to an agent, written where the work is reviewed and naming the
+# artifact by its token, and the collector that groups it for the next change
+# to that artifact. Day 1, every tool: a correction nobody wrote down cannot
+# be recovered later, so waiting for the signal means never seeing it. The
+# authors list ships naming nobody — the adopter says whose feedback counts.
+install_file scripts/feedback_tool.py scripts/feedback_tool.py x || true
+install_file agent-feedback-authors.template .agent-feedback-authors || true
 install_tree scripts/tests scripts/tests || true
 
 # The templates a workspace grows from. They used to stay in the kit, and a

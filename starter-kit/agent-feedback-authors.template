@@ -1,0 +1,19 @@
+# Whose Agent-Feedback lines reach the agents — one identity per line.
+#
+# Installed by the starter kit as .agent-feedback-authors at the repository
+# root, and read by scripts/feedback_tool.py (`make agent-feedback`).
+#
+# An identity is a commit author's email, for feedback written in commit
+# messages, or a login as your code host's comment export names it, for
+# feedback written in pull-request or issue comments. Case does not matter.
+# Everything after '#' is a comment.
+#
+# A line that reaches the report can become an instruction every later agent
+# session follows, so list the people whose review you would accept for a
+# change to a rule. Feedback from anyone else is counted, and its author and
+# target are shown, but its text is left out of the report.
+#
+# As installed, the list names nobody, and nobody's feedback is read.
+#
+#   maintainer@example.com
+#   octocat

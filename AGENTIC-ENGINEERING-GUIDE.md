@@ -100,6 +100,7 @@ The setup's long-term value comes from a conversion discipline — every recurri
 | Workflow you've walked an agent through twice | A skill |
 | Review comment made on two different PRs | A rule + a subagent check |
 | Rule violated despite being documented | An enforcement script (layer 3) |
+| A person corrects what an artifact made the agent do | An `Agent-Feedback:` line naming that artifact, in the commit or the review — the raw material of the next proposal |
 
 *Reference project:* its debugging knowledge base holds 160 ISSUE entries. Rules cite them (`see ISSUE-019`), agents check for them, and the constitution mandates: *"Before investigating any bug, search the KB first."* A repeated bug class costs the team once.
 
@@ -226,6 +227,7 @@ your-repo/
 │   │   └── workspace-graph.py       # hands the typed links to the agent (§3.12)
 │   └── WORKSPACE_CHANGELOG.md       # audit history of this configuration
 ├── registries.json                  # declares the shared append-only registries (§3.11)
+├── .agent-feedback-authors          # whose Agent-Feedback lines count (§5.1) — ships naming nobody
 ├── .gitattributes                   # merge behaviour for those registries (§3.11)
 ├── CHANGELOG.md                     # generated from changelog.d/
 ├── changelog.d/                     # one file per change
@@ -238,6 +240,7 @@ your-repo/
 └── scripts/
     ├── registry_tool.py             # fragment generator + identifier gate
     ├── graph_tool.py                # typed-link gate + impact and coverage queries (§3.12)
+    ├── feedback_tool.py             # Agent-Feedback lines, grouped by the artifact they name (§5.1)
     └── check-<convention>.sh        # CI-wired enforcement checks
 ```
 
@@ -712,6 +715,7 @@ Concrete file locations for widely-used tools (conventions move fast — treat y
 | Knowledge base | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | same — plain doc, tool-independent | same | same |
 | Enforcement scripts | `scripts/check-*` + lint target | same — plain CI, tool-independent | same | same |
 | Typed links + link gate | `Related:` / `Enforces:` / `Hands off to:` lines, `scripts/graph_tool.py` | same — plain text and plain CI; a token names a file, not a path, so it resolves in every layout | same | same |
+| Feedback to an agent | `Agent-Feedback:` lines, `scripts/feedback_tool.py`, `.agent-feedback-authors` | same — a line in a commit message or comment, read offline | same | same |
 
 The starter kit's **`bootstrap.sh`** encodes this mapping: it detects which tool your repo uses, is told via `--tool`, or asks — when it finds none, and when it finds the files of several, which it never chooses between; with nobody to ask it stops before writing — then installs the constitution, the universal working-principles rule, and the knowledge-base skeleton to the right locations. Artifacts with no equivalent in the target tool (native skills, subagents, hooks) are skipped with a note naming the nearest substitute from the table above.
 
@@ -913,6 +917,7 @@ The single habit that separates a living setup from a decorative one — run the
 | Same review comment on a second PR | Rule + agent violations-list entry |
 | Documented rule violated anyway | Enforcement script wired into lint, its header naming the rule (`# Enforces: RULE:<name>`) |
 | Rule file contradicted by current code reality | Fix the rule file — a stale rule is worse than no rule |
+| A person corrects what a rule, skill, agent or command made the agent do | `Agent-Feedback: <token> — <what went wrong and why>` in the commit message of the fix or the review comment. `make agent-feedback` groups the lines by artifact, from the authors `.agent-feedback-authors` lists only — a stranger's text never reaches it, because what reaches it may become every later session's instruction (ADR-0016) |
 | Two pull requests conflicted in the same shared file, or two branches claimed one identifier | Move that file to the fragment layout (§3.11) — the second occurrence is the signal, and the cost of moving rises with every entry already cited |
 | About to rename, delete or rewrite a rule, skill, agent, command or script | `make graph-impact NODE=<token>` first — its "Cited by" list is the change set, edited in the same PR (§3.12) |
 | Agents mis-retrieve from a grown KB/rules corpus | Graph-driven retrieval (§5.6) — load a node's neighbourhood instead of whole files; the links are already typed, resolved and queryable |
@@ -936,7 +941,7 @@ Once you run multiple specialist agents, add a periodic meta-review — the `age
 OBSERVE → DIAGNOSE → PROPOSE → [HUMAN APPROVES] → APPLY → MEASURE → repeat
 ```
 
-- **Observe:** per agent, collect rule-drift (instructions vs. current rule files), escaped violations (bugs its domain should have caught), false-positive patterns, and coverage holes (rules/gates no agent owns).
+- **Observe:** per agent, collect rule-drift (instructions vs. current rule files), escaped violations (bugs its domain should have caught), false-positive patterns, coverage holes (rules/gates no agent owns), and the feedback people addressed to it — `make agent-feedback SINCE=<last cycle>` hands over the `Agent-Feedback:` lines grouped by artifact, so the loop starts from what reviewers said instead of a search through history.
 - **Diagnose:** scorecard per agent → *Ready / Needs refresh / Gap*.
 - **Propose:** minimal diffs — one agent, one weakness, one edit — each citing concrete evidence. **No "could be nicer" edits.**
 - **Approve → apply → measure:** the human is the reward signal; approved edits land as ordinary PR-reviewable commits; the next cycle checks whether they helped.
