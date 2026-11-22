@@ -116,9 +116,9 @@ until it stops naming placeholders and links to files that do not exist, run
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
 | `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
 | `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
-| `settings.json.template` | `.claude/settings.json` | Registers the two hooks below. Keep the SessionStart entry while its hook file exists; delete both together if sessions need no setup |
+| `settings.json.template` | `.claude/settings.json` | Registers the workspace-graph hook for its two events ([below](#the-workspace-graph-hook-claude-code)) |
 | `hooks/workspace-graph.py` | `.claude/hooks/workspace-graph.py` | Ready to use — after an edit it tells the agent who cites the file; at the end of a turn it holds the turn once if a typed link broke. See [The workspace-graph hook](#the-workspace-graph-hook-claude-code) |
-| `hooks/session-start.sh.template` | `.claude/hooks/session-start.sh` | Installed executable (`chmod +x` after a manual copy). A skeleton that does nothing until you fill in the toolchain steps a session needs |
+| `hooks/session-start.sh.template` | `docs/agent-templates/session-start.sh.template` | Template (Claude Code) — nothing runs it. Copy it to `.claude/hooks/session-start.sh` when sessions need environment setup; its header has the steps and the `settings.json` entry |
 | `scripts/check-kb-shape.sh` | `scripts/check-kb-shape.sh` | Ready to run; already chained into the installed `make lint` (guards the KB's graph-ready shape) |
 | `scripts/check-convention.sh.template` | `docs/agent-templates/check-convention.sh.template` | Template — copy to `scripts/check-<convention>.sh`, `chmod +x`, wire into your lint target |
 | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | `docs/DEBUGGING-KNOWLEDGE-BASE.md` | Generated — start empty; add the first entry at the first >30-min bug |
@@ -165,8 +165,11 @@ whichever version you started from. For why a file changed, search the kit's
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
-   Its "Installed" list is what the newer kit added. Everything under
-   "Skipped" was left as it was. If you keep your own Makefile, it also names
+   Its "Installed" list is what the newer kit added — and anything of the
+   kit's you had deleted, which the installer cannot tell from new. Delete
+   such a file again and list it in `.starter-kit-declined`
+   ([Declining what the kit installs](#declining-what-the-kit-installs)), and
+   it stays out from then on. Everything under "Skipped" was left as it was. If you keep your own Makefile, it also names
    any gate your `lint` target does not reach yet (step 5).
 
    If your repository carries the files of more than one agent tool — a
@@ -239,7 +242,11 @@ whichever version you started from. For why a file changed, search the kit's
    diff -u .claude/hooks/session-start.sh "$KIT"/starter-kit/hooks/session-start.sh.template
    diff -u .claude/settings.json "$KIT"/starter-kit/settings.json.template
    ```
-   (The last two on Claude Code only.) Three more came from a kit template:
+   (The last two on Claude Code only, and the hook only if your install has
+   one: kits up to 3.0.1 installed and registered that skeleton, and it is
+   yours to keep, fill in or remove together with its `SessionStart` entry.
+   Newer kits ship it as a template in `docs/agent-templates/` and register
+   nothing.) Three more came from a kit template:
    the constitution, and the hand-written preamble above the generated region
    of `CHANGELOG.md` and of the knowledge base. A change to one of those is
    named in the kit's changelog.
@@ -264,6 +271,31 @@ byte for byte as it went in.
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
 workspace — and, where you keep one, a line in the workspace changelog.
+
+## Declining what the kit installs
+
+The installer adds whatever is missing. That is what makes a re-run an
+upgrade step, and it is also why deleting a file of the kit's is not enough:
+the next run cannot tell "deleted on purpose" from "new in this kit", and
+puts it back. To keep something out, list its path in `.starter-kit-declined`
+at the root of your repository — before the first install, or after deleting
+the file:
+
+```text
+# one path per line, relative to the repository root; a reason after '#'
+.claude/skills/semver/                   # the organisation plugin ships it
+.claude/skills/prompt-enhancer/SKILL.md  # same
+```
+
+A listed file is not installed; a listed directory covers everything beneath
+it. The installer reports each as "declined" under "Skipped", and never
+writes to the list. The list is yours and states an intent — it is not a
+record of what is installed (the kit keeps none, ADR-0011 in its repository).
+
+Declining a file that other installed files depend on is yours to reconcile:
+a rule that a `Related:` line names makes `make graph-links` fail on that
+line, and a gate script that `registry.mk` runs makes its target fail. Both
+say which file is missing.
 
 ## Troubleshooting
 

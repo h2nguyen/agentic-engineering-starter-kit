@@ -161,7 +161,11 @@ Create, at the locations your detected tool expects (Appendix A.1):
 3. **Common generic skills** — the prompt-enhancer and semver skills ship in
    the kit itself; if `skills/common-catalog.md` is available, enable what else
    fits (architecture review, architecture docs). On tools without native
-   skills, install them as playbook docs linked from the constitution.
+   skills, install them as playbook docs linked from the constitution. Where
+   the team already has a skill from elsewhere (an organisation plugin, a
+   user-level skill), the kit's copy is a duplicate: delete it and list its
+   path in `.starter-kit-declined` at the repository root, or a later run of
+   the installer puts it back.
 
 ## Harmonize track — when Phase 0 found an existing workspace
 
@@ -201,8 +205,9 @@ Appendix A.7 — the sequence:
    losslessly (relocate → split → compress) before ever deleting; deletions
    need written justification per Appendix A.7.
 7. **Record.** Append a workspace-changelog entry (create the file if missing):
-   what changed, what was **deliberately NOT changed and why**, ladder rungs
-   used, ledger items affected. If the repo has resident improvement machinery
+   which kit was installed (the installer's `Kit:` line — nothing else records
+   it), what changed, what was **deliberately NOT changed and why**, ladder
+   rungs used, ledger items affected. If the repo has resident improvement machinery
    (Phase 0.3), run or extend it with this checklist as input — two competing
    improvement loops is itself an anti-pattern.
 
@@ -230,10 +235,10 @@ Appendix A.7 — the sequence:
 6. Write the handoff summary: what was installed; what was deliberately
    deferred (specialist reviewer agents, hooks, external tool servers, the meta
    layer) and — from Appendix A.6 — the **signal** that should trigger each
-   deferred artifact later. On Claude Code the installer leaves a SessionStart
-   hook skeleton and its settings entry: fill it in if sessions need
-   environment setup, or remove the entry if they do not — either is fine, and
-   the handoff says which. It also installs the workspace-graph hook
+   deferred artifact later. On Claude Code a SessionStart hook is one of the
+   deferred: the installer leaves a template in `docs/agent-templates/` and
+   registers nothing, and the signal is sessions that keep fighting their
+   environment. The installer does install the workspace-graph hook
    (`.claude/hooks/workspace-graph.py`, two entries in `settings.json`), which
    needs nothing filled in: leave it registered, and say in the handoff that
    the agent is now told what cites a file it edits.

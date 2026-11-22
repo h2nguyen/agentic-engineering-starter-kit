@@ -327,7 +327,7 @@ echo "=== a repository whose settings predate the hook is told what to add ==="
 import json, sys
 path = sys.argv[1]
 data = json.load(open(path))
-data["hooks"] = {"SessionStart": data["hooks"]["SessionStart"]}
+data["hooks"] = {"SessionStart": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"}]}]}
 json.dump(data, open(path, "w"), indent=2)
 PY
 before="$(cat "$R/.claude/settings.json")"

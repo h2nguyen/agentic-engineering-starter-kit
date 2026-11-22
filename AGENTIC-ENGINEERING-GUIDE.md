@@ -553,6 +553,8 @@ Duplicated procedure text between a command and a skill WILL drift.>
 
 Use a `SessionStart` hook when agent sessions need environment setup (toolchains, daemons, env vars) — agent shells are non-interactive and skip profile files. Keep hooks **idempotent** (re-runs are no-ops — `SessionStart` fires again on resume and after a compaction) and **degrading** (a blocked download warns and continues; the session still starts).
 
+Add it when sessions keep fighting their environment, not before. The kit ships the skeleton as a template (`docs/agent-templates/session-start.sh.template`) and registers nothing: a hook that sets up nothing is one more thing every session waits for, and whatever a `SessionStart` hook prints is added to the session's context, where the agent reads it as fact. Print a state only after the step that checked it (ADR-0015).
+
 A hook that cannot run is a guard that silently stops guarding: Claude Code treats its failure as a non-blocking error, and nothing turns red. Five ways that happens, each seen in a real adoption:
 
 - **An unquoted path.** Hook commands run through `sh -c`; `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` splits at a space in the project path and exits 127 — every hook at once. Write `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/x.sh"`.
@@ -571,16 +573,6 @@ All `PostToolUse` hooks matching one edit run **in parallel**. Two that rewrite 
 {
   "enabledMcpjsonServers": [],
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",

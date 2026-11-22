@@ -100,6 +100,12 @@ aged_install() { # $1 = dir
            "$R/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md"; do
     case "$f" in *.md) printf '\n<!-- as shipped by kit 1.x -->\n' >> "$f" ;; *) printf '\n# as shipped by kit 1.x\n' >> "$f" ;; esac
   done
+  # Kits before the hook became a template installed the SessionStart skeleton
+  # and registered it. An older install has both, and both are the adopter's.
+  mkdir -p "$R/.claude/hooks"
+  printf '#!/bin/bash\n# SessionStart hook (kit 1.x skeleton)\nset -uo pipefail\necho "session-start: toolchain ready"\n' > "$R/.claude/hooks/session-start.sh"
+  chmod +x "$R/.claude/hooks/session-start.sh"
+  rm -f "$R/docs/agent-templates/session-start.sh.template"
   cat > "$R/.claude/settings.json" <<'JSON'
 {
   "enabledMcpjsonServers": [],
@@ -236,6 +242,13 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   grep -q '"PostToolUse"' "$WORK/$name-step1.log" \
     && ok "$name: and prints the hook entries for the settings.json it did not edit" \
     || bad "$name: step 1 does not say how to register the hook in an existing settings.json"
+  # The SessionStart skeleton is a template in the newer kit. An install that
+  # has the hook from an older one keeps it, registered as it was; what step 1
+  # adds is the template, not a second copy of the hook and not a verdict on theirs.
+  [ -f "$R/docs/agent-templates/session-start.sh.template" ] \
+    && cmp -s "$R/.claude/hooks/session-start.sh" <(git -C "$R" show "$pre:.claude/hooks/session-start.sh") \
+    && ok "$name: step 1 adds the session-start template and leaves the hook the older kit installed alone" \
+    || bad "$name: step 1 did not add the session-start template, or touched the existing hook"
 
   # Step 2 — replace the files the kit owns.
   ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP2" ) > "$WORK/$name-step2.log" 2>&1; rc=$?
