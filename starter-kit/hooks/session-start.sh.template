@@ -1,7 +1,19 @@
 #!/bin/bash
 # SessionStart hook — make sure every agent session has a working toolchain.
 #
-# Why this exists: agent harnesses spawn NON-INTERACTIVE shells that skip
+# A template: nothing runs it until you put it in place. Use it when sessions
+# keep fighting the environment (a missing toolchain, a daemon that is down),
+# not before — a hook that sets up nothing is one more thing every session
+# waits for. To switch it on:
+#
+#   1. copy this file to .claude/hooks/session-start.sh and `chmod +x` it;
+#   2. fill in the steps below that your build needs, and delete the others;
+#   3. add this entry inside the "hooks" object of .claude/settings.json:
+#
+#        "SessionStart": [{"hooks": [{"type": "command",
+#          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"}]}]
+#
+# Why a hook: agent harnesses spawn NON-INTERACTIVE shells that skip
 # /etc/profile and ~/.bashrc, so PATH/toolchain setup from login shells is
 # absent. This hook runs once per session and persists env vars via
 # $CLAUDE_ENV_FILE so every subsequent tool call sees them.
@@ -10,6 +22,9 @@
 #   - Idempotent: each step no-ops when already satisfied.
 #   - Degrading: a blocked download warns and continues; the session still
 #     starts (docs/config work doesn't need the full toolchain).
+#   - Honest: what this script prints is added to the session's context, where
+#     the agent reads it as fact. Print a state only after the step that
+#     checked it; a skeleton that verified nothing prints nothing.
 set -uo pipefail
 
 # 1. Verify/install the pinned toolchain versions your build needs
@@ -29,5 +44,3 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "$line" >> "$CLAUDE_ENV_FILE"
   # same for e.g. export JAVA_HOME=...
 fi
-
-echo "session-start: toolchain ready"

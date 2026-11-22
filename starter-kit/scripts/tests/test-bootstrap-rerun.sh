@@ -10,8 +10,11 @@
 #   2. every tool layout gets the constitution and every shipped rule, at that
 #      tool's rule location, with the constitution's rule links retargeted — and
 #      the typed links the installed files carry resolve in that layout;
-#   3. the installed SessionStart hook runs from a project path with a space
-#      and appends its environment once, however often the session starts.
+#   3. no hook is registered that does nothing: the SessionStart skeleton is a
+#      template, and a registered hook command runs from a path with a space;
+#   4. what the adopter declined in .starter-kit-declined stays out, on a first
+#      install and on every re-run;
+#   5. the installer says which kit it is, so the install can be recorded.
 #
 # Usage: test-bootstrap-rerun.sh [-v]
 set -uo pipefail
@@ -112,23 +115,93 @@ K="$WORK/kit-root"; mkdir -p "$K"; cp -R "$KIT_DIR" "$K/starter-kit"; : > "$K/AG
 grep -q -- '--target' "$WORK/self.log" && ok "and it says to name the repository to install into" \
   || bad "the refusal does not mention --target"
 P="$WORK/copied-in"; fresh_repo "$P"; cp -R "$KIT_DIR" "$P/starter-kit"
-( cd "$P" && ./starter-kit/bootstrap.sh --tool agents >/dev/null 2>&1 ); rc=$?
+( cd "$P" && ./starter-kit/bootstrap.sh --tool agents > "$WORK/copied-in.log" 2>&1 ); rc=$?
 [ "$rc" -eq 0 ] && [ -f "$P/AGENTS.md" ] \
   && ok "a project holding a copy of starter-kit/ still installs with no --target" \
   || bad "the no-argument install into a project stopped working (exit $rc)"
 
-echo "=== the installed SessionStart hook runs, also from a path with a space ==="
-# Hook commands run through `sh -c`. Unquoted, $CLAUDE_PROJECT_DIR splits at a
-# space and the hook exits 127 — a non-blocking error, so it is silently gone.
+echo "=== the SessionStart skeleton is a template, not a registered hook that does nothing ==="
+# It used to be installed, registered and run in every session, where it
+# checked nothing and printed "toolchain ready" — and what a SessionStart hook
+# prints is added to the session's context. A project that needs environment
+# setup copies the template; every other project has no such hook.
 R="$WORK/with space"; fresh_repo "$R"
 "$BOOTSTRAP" --tool claude --target "$R" >/dev/null 2>&1 || bad "bootstrap into a path with a space exited non-zero"
-cmd="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["SessionStart"][0]["hooks"][0]["command"])' "$R/.claude/settings.json")"
+[ ! -e "$R/.claude/hooks/session-start.sh" ] && ! grep -q 'SessionStart' "$R/.claude/settings.json" \
+  && ok "a fresh install has no session-start hook and registers none" \
+  || bad "a fresh install still installs or registers the session-start skeleton"
+T="$R/docs/agent-templates/session-start.sh.template"
+[ -f "$T" ] && ok "the skeleton is in docs/agent-templates/, where a later session finds it" \
+  || bad "no session-start template in docs/agent-templates/"
+grep -q '"SessionStart"' "$T" 2>/dev/null \
+  && ok "and it carries the settings.json entry that registers it" \
+  || bad "the template does not say how to register the hook"
 env_file="$WORK/claude-env"; : > "$env_file"
-CLAUDE_PROJECT_DIR="$R" CLAUDE_ENV_FILE="$env_file" sh -c "$cmd" >/dev/null 2>&1; rc=$?
-[ "$rc" -eq 0 ] && ok "the hook command runs from a project path with a space" || bad "the hook command exited $rc from a path with a space"
-CLAUDE_PROJECT_DIR="$R" CLAUDE_ENV_FILE="$env_file" sh -c "$cmd" >/dev/null 2>&1
+out="$(CLAUDE_ENV_FILE="$env_file" bash "$T" 2>/dev/null)"; rc=$?
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "copied as it is, it runs and prints nothing: it reports no state it did not check" \
+  || bad "the unfilled skeleton exits $rc and prints: $out"
+CLAUDE_ENV_FILE="$env_file" bash "$T" >/dev/null 2>&1
 lines="$(wc -l < "$env_file" | tr -d ' ')"
 [ "$lines" -eq 1 ] && ok "a second SessionStart (resume, compaction) appends nothing new" || bad "the env file has $lines lines after two starts"
+# Hook commands run through `sh -c`. Unquoted, $CLAUDE_PROJECT_DIR splits at a
+# space and the hook exits 127 — a non-blocking error, so it is silently gone.
+cmd="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["PostToolUse"][0]["hooks"][0]["command"])' "$R/.claude/settings.json")"
+CLAUDE_PROJECT_DIR="$R" sh -c "$cmd" </dev/null >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "a registered hook command runs from a project path with a space" || bad "the hook command exited $rc from a path with a space"
+
+echo "=== what the adopter declined stays out ==="
+# The installer adds whatever is missing, so it could not tell a file the
+# adopter deleted on purpose from one that is new in this kit: a skill removed
+# because the organisation ships the same one came back with every upgrade.
+R="$WORK/declined"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" >/dev/null 2>&1
+git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "bootstrap" 2>/dev/null
+rm -rf "$R/.claude/skills/semver"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/declined-control.log" 2>&1
+[ -d "$R/.claude/skills/semver" ] && ok "control — with no decline list, a re-run puts a deleted skill back" \
+  || bad "control: a re-run did not restore a deleted skill, so the cases below prove nothing"
+grep -q '\.starter-kit-declined' "$WORK/declined-control.log" \
+  && ok "and a re-run that installed something says how to keep it out" \
+  || bad "a re-run that restored a deleted file never mentions .starter-kit-declined"
+rm -rf "$R/.claude/skills/semver" "$R/.claude/skills/prompt-enhancer" "$R/scripts/tests/test-parallel-merge.sh"
+printf '%s\n' '# the organisation plugin ships both skills' '.claude/skills/semver/' \
+  '.claude/skills/prompt-enhancer/SKILL.md   # same' '' 'scripts/tests/test-parallel-merge.sh' > "$R/.starter-kit-declined"
+list_before="$(cat "$R/.starter-kit-declined")"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/declined.log" 2>&1 || bad "a re-run with a decline list exited non-zero"
+[ ! -e "$R/.claude/skills/semver" ] && [ ! -e "$R/.claude/skills/prompt-enhancer/SKILL.md" ] \
+  && [ ! -e "$R/scripts/tests/test-parallel-merge.sh" ] \
+  && ok "listed, all three stay out: a directory, a file, and a file inside a directory the installer merges into" \
+  || bad "a declined path was installed anyway: $(cd "$R" && ls -d .claude/skills/semver .claude/skills/prompt-enhancer/SKILL.md scripts/tests/test-parallel-merge.sh 2>/dev/null | tr '\n' ' ')"
+[ "$(grep -c 'declined in \.starter-kit-declined' "$WORK/declined.log")" -eq 3 ] \
+  && ok "and each is reported as declined" \
+  || bad "the run does not report three declined paths: $(grep -c 'declined in' "$WORK/declined.log")"
+[ "$(cat "$R/.starter-kit-declined")" = "$list_before" ] && ok "the installer does not edit the list" \
+  || bad "the installer changed .starter-kit-declined"
+R="$WORK/declined-first"; fresh_repo "$R"
+printf '.claude/skills\n' > "$R/.starter-kit-declined"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/declined-first.log" 2>&1
+[ ! -e "$R/.claude/skills" ] && [ -f "$R/.claude/rules/documentation.md" ] \
+  && ok "a list written before the first install is honoured, and a directory line covers everything beneath it" \
+  || bad "a first install ignored the decline list: $(ls "$R/.claude/skills" 2>/dev/null | tr '\n' ' ')"
+( cd "$R" && make lint > "$WORK/declined-first-lint.log" 2>&1 ) \
+  && ok "and the install without the kit's skills lints green" \
+  || { bad "an install with the skills declined fails its lint:"; grep -E '^FAIL|Error' "$WORK/declined-first-lint.log" | head -3 | sed 's/^/         /'; }
+
+echo "=== the installer says which kit it is ==="
+# Nothing in the repository records the kit an install came from (ADR-0011),
+# so the one place the answer exists is the run itself: the handoff copies it.
+released="$(sed -n 's/^## \[\([0-9][^]]*\)\].*/\1/p' "$KIT_DIR/../CHANGELOG.md" 2>/dev/null | head -1)"
+if [ -n "$released" ]; then
+  grep -q "^Kit: last release $released" "$WORK/run1.log" \
+    && ok "run from a checkout of the kit, it names the last release ($released)" \
+    || bad "the run does not say 'Kit: last release $released'"
+else
+  echo "  skip — no CHANGELOG.md beside starter-kit/ in this checkout"
+fi
+grep -q '^Kit: version not recorded' "$WORK/copied-in.log" \
+  && ok "run from a bare copy of starter-kit/ inside a project, it says the version is not recorded — and does not report the project's commit as the kit's" \
+  || bad "a copied-in starter-kit/ reports: $(grep '^Kit:' "$WORK/copied-in.log")"
 
 echo "=== every tool layout receives the constitution and every shipped rule ==="
 # Templates (leading underscore) are not rules; everything else under rules/

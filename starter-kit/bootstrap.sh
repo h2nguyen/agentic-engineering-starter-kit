@@ -13,7 +13,7 @@
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
-#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (session-start, workspace-graph), .claude/skills/ (prompt-enhancer, semver)
+#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver)
 #   agents  → AGENTS.md, docs/agent-rules/          (AGENTS.md-convention tools)
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
@@ -28,8 +28,15 @@
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
 #
-# Placeholder templates (rule, check script, skill, reviewer agent, command)
-# install to docs/agent-templates/ — unloaded, and where a later session finds them.
+# Placeholder templates (rule, check script, skill, reviewer agent, command,
+# SessionStart hook) install to docs/agent-templates/ — unloaded, and where a
+# later session finds them.
+#
+# Declining something: list its path in <repo-root>/.starter-kit-declined, one
+# per line, relative to the repository root, `# reason` after it. A listed file
+# is not installed, and a listed directory covers everything beneath it — on
+# the first run and on every later one. Without the list a re-run puts back
+# whatever is missing, because it cannot tell "deleted on purpose" from "new".
 set -euo pipefail
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,7 +50,7 @@ while [ $# -gt 0 ]; do
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
-    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -131,10 +138,37 @@ INSTALLED=()
 SKIPPED=()
 MAKEFILE_KEPT=0
 
+# What the adopter declined. The installer adds whatever is missing, so a file
+# deleted on purpose — a skill the organisation already ships, a suite the
+# project does not run — would come back with every upgrade: nothing in the
+# files says "deleted" apart from "not there yet". The list is the adopter's,
+# states an intent and not a state, and is never written by the installer.
+DECLINE_LIST=.starter-kit-declined
+DECLINED=()
+if [ -f "$TARGET/$DECLINE_LIST" ]; then
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    _line="$(printf '%s' "${_line%%#*}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s|^\./||; s|/*$||')"
+    if [ -n "$_line" ]; then DECLINED+=("$_line"); fi
+  done < "$TARGET/$DECLINE_LIST"
+fi
+declined() { # $1 = target-relative path: is it listed, or inside a listed directory?
+  local d
+  # Guard on the count: bash 3.2 under `set -u` rejects an empty array.
+  [ ${#DECLINED[@]} -gt 0 ] || return 1
+  for d in "${DECLINED[@]}"; do
+    case "$1" in "$d"|"$d"/*) return 0 ;; esac
+  done
+  return 1
+}
+
 install_file() { # $1 = kit-relative src, $2 = target-relative dst, $3 = "x" for executable
   local src="$KIT_DIR/$1" dst="$TARGET/$2"
   if [ -e "$dst" ]; then
     SKIPPED+=("$2 (already exists — left untouched)")
+    return 1
+  fi
+  if declined "$2"; then
+    SKIPPED+=("$2 (declined in $DECLINE_LIST)")
     return 1
   fi
   mkdir -p "$(dirname "$dst")"
@@ -156,6 +190,10 @@ install_dir() { # $1 = kit-relative src dir, $2 = target-relative dst dir
     SKIPPED+=("$2 (already exists — left untouched)")
     return 1
   fi
+  if declined "$2"; then
+    SKIPPED+=("$2/ (declined in $DECLINE_LIST)")
+    return 1
+  fi
   mkdir -p "$(dirname "$dst")"
   cp -r "$src" "$dst"
   INSTALLED+=("$2/")
@@ -173,6 +211,8 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
     rel="${file#"$src"/}"
     if [ -e "$dst/$rel" ]; then
       SKIPPED+=("$2/$rel (already exists — left untouched)")
+    elif declined "$2/$rel"; then
+      SKIPPED+=("$2/$rel (declined in $DECLINE_LIST)")
     else
       mkdir -p "$(dirname "$dst/$rel")"
       cp "$file" "$dst/$rel"
@@ -215,7 +255,6 @@ if [ "$TOOL" = claude ]; then
   install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
   install_dir skills/semver .claude/skills/semver || true
   install_file settings.json.template .claude/settings.json || true
-  install_file hooks/session-start.sh.template .claude/hooks/session-start.sh x || true
   # The typed links, handed to the agent instead of looked up by it: who cites
   # the file it just edited, and — once — a link that broke before the turn
   # ends. Claude Code only; it is that tool's hook protocol. settings.json
@@ -281,6 +320,8 @@ fi
 # gate rejecting every existing record on day one.
 if [ -e "$TARGET/registries.json" ]; then
   SKIPPED+=("registries.json (already exists — left untouched)")
+elif [ ! -f "$TARGET/scripts/registry_tool.py" ]; then
+  SKIPPED+=("registries.json (scripts/registry_tool.py, which writes it, is not installed)")
 else
   ( cd "$TARGET" && "$KIT_DIR/scripts/python.sh" scripts/registry_tool.py init ) | sed 's/^/  init: /'
   INSTALLED+=("registries.json (inferred from the repository's existing conventions)")
@@ -327,6 +368,11 @@ install_template skills/_template/SKILL.md _skill-template.md
 install_template agents/_agent-template.md _agent-template.md
 if [ "$TOOL" = claude ]; then
   install_template commands/_command-template.md _command-template.md
+  # The SessionStart skeleton is a template too. Installed and registered, it
+  # ran in every session, checked nothing and printed "toolchain ready" into
+  # the session's context. A project copies it when sessions need environment
+  # setup (guide § 4.3); its header carries the settings.json entry to add.
+  install_template hooks/session-start.sh.template session-start.sh.template
 fi
 
 # The changelog rule is only correct once the registry layer is present, so it
@@ -357,8 +403,31 @@ if [ "$WITH_META" -eq 1 ]; then
   esac
 fi
 
+# Which kit this is. Nothing in the target records it (ADR-0011), so the run
+# is the one place the answer exists, and the handoff copies the line. Read
+# only from the kit's own checkout: a bare copy of starter-kit/ inside a
+# project sits in that project's repository, and its HEAD is not the kit's.
+kit_version() {
+  local root released commit
+  root="$(cd "$KIT_DIR/.." && pwd -P)"
+  released="$(sed -n '/^## \[[0-9]/{s/^## \[\([^]]*\)\].*/\1/p;q;}' "$root/CHANGELOG.md" 2>/dev/null || true)"
+  if [ -z "$released" ] || [ ! -f "$root/AGENTIC-ENGINEERING-GUIDE.md" ]; then
+    echo "Kit: version not recorded — this starter-kit/ is a copy without the kit's CHANGELOG.md beside it."
+    return 0
+  fi
+  commit=""
+  if [ "$(git -C "$root" rev-parse --show-toplevel 2>/dev/null || true)" = "$root" ]; then
+    commit="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || true)"
+    if [ -n "$commit" ] && [ -n "$(git -C "$root" status --porcelain -- starter-kit 2>/dev/null || true)" ]; then
+      commit="$commit, with uncommitted changes"
+    fi
+  fi
+  echo "Kit: last release $released${commit:+, at commit $commit}"
+}
+
 echo ""
 echo "=== bootstrap: $TOOL → $TARGET ==="
+kit_version
 if [ ${#INSTALLED[@]} -gt 0 ]; then
   echo "Installed:"; printf '  + %s\n' "${INSTALLED[@]}"
 fi
@@ -377,6 +446,12 @@ if [ "$RERUN" -eq 1 ]; then
   echo "  1. To move those to this version of the kit, follow 'Upgrading an existing install'"
   echo "     in $KIT_DIR/README.md."
   echo "  2. Run 'make lint'."
+  if [ ${#INSTALLED[@]} -gt 0 ]; then
+    echo "  If a path under 'Installed' is one you had deleted on purpose, this run could not"
+    echo "  know: delete it again and add the path to $DECLINE_LIST at the repository root —"
+    echo "  one per line, '# reason' after it; a directory covers everything beneath it. The"
+    echo "  installer then leaves it out, on every later run."
+  fi
 else
   echo "  1. Fill in the constitution's <placeholders> (find them: grep -n '<' $CONSTITUTION)."
   echo "     The template shows example rows, commands and links. Keep what your project has,"
@@ -390,6 +465,11 @@ else
   echo "     ('make registry-list' prints the identifier shapes this repo declares.)"
   echo "  2. Optional: enable further generic skills — the catalog is $KIT_DIR/skills/common-catalog.md"
   echo "     (in the kit, not in this repository)."
+  if [ "$TOOL" = claude ]; then
+    echo "     A skill installed here that your team already has from elsewhere — an organisation"
+    echo "     plugin, say — is a duplicate: delete the kit's copy and list its path in"
+    echo "     $DECLINE_LIST ('# reason' after it), or a later run of this installer puts it back."
+  fi
   if [ "$TOOL" != claude ]; then
     echo "     On $TOOL nothing loads a skill by itself: one you want becomes a playbook"
     echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."

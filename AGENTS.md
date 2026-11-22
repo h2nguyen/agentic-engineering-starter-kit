@@ -47,8 +47,9 @@ usually starts, so a command that leaves the path out writes here.
    ```bash
    ./starter-kit/bootstrap.sh --target /path/to/project --tool <tool>
    ```
-   Read what it prints: what it installed, what it skipped because it already
-   existed, and the next steps for this particular project.
+   Read what it prints: which kit it is (the `Kit:` line), what it installed,
+   what it skipped because it already existed, and the next steps for this
+   particular project.
 6. **Fill in what only the project can supply**, in the target:
    - the constitution's `<placeholders>` — the project in one paragraph, its
      stack, and its commands. Run a command before you write it down; leave
@@ -63,6 +64,11 @@ usually starts, so a command that leaves the path out writes here.
    `adopt` command it printed. If, on Claude Code, it kept an existing
    `.claude/settings.json`, show the user the two hook entries it printed and
    add them only with their approval: that file is theirs.
+   If, on Claude Code, a skill it installed duplicates one the user already
+   has from elsewhere — an organisation plugin, a user-level skill — say so,
+   and with their approval delete the kit's copy and list its path in the
+   target's `.starter-kit-declined`. A later run of the installer puts back
+   whatever is missing and not listed there.
 8. **Verify.** In the target, `make constitution` and then `make lint` must
    each exit 0. `make constitution` is the check on step 6: it names every
    template placeholder still in the constitution and every link to a file
@@ -76,9 +82,10 @@ usually starts, so a command that leaves the path out writes here.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
    out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.
-10. **Report** what was installed, what you filled in and what each fact came
-    from, what you guessed and want confirmed, and what the kit deliberately
-    defers until the project shows a need for it.
+10. **Report** which kit was installed (the installer's `Kit:` line — nothing
+    in the project records it), what was installed, what you filled in and
+    what each fact came from, what you guessed and want confirmed, and what
+    the kit deliberately defers until the project shows a need for it.
 
 Stop and ask the user, instead of deciding yourself, when: the tool is
 unknown, or the target has more than one; the target already has an agent workspace; a command you were going
@@ -110,7 +117,7 @@ scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one comma
 |---|---|
 | **Git** | Never commit to `main`. Branch prefixes: `feat/`, `fix/`, `docs/`, `chore/` |
 | **Test first** | A failing case in the acceptance suite before the change, with a control case where it closes a defect |
-| **The installer** | Never overwrites a file; safe to re-run; every artifact lands for all four tools, or the installer says why not |
+| **The installer** | Never overwrites a file; safe to re-run; leaves out what the target's `.starter-kit-declined` lists; every artifact lands for all four tools, or the installer says why not |
 | **Dependencies** | Bash and the Python standard library. No packages, no network. Anything the kit runs, and any command it writes down for someone to type, starts Python through `scripts/python.sh`, never as `python3 …` |
 | **What the installer copies stands alone** | An installed file is read in a repository that does not contain this one: no path into the kit, or into the rest of this repository. `starter-kit/README.md` and `bootstrap.sh` stay in the kit and may link to the guide |
 | **Templates** | A template embedded in the guide is byte-identical to its kit file; change both together |

@@ -21,12 +21,20 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+### Added
+
+- `.starter-kit-declined`: a list you write at the root of your repository, one path per line with an optional `# reason`. The installer leaves a listed file out, and a listed directory with everything beneath it — on a first install and on every re-run — and reports each under "Skipped" as declined. Until now a file of the kit's that you had deleted came back with the next run, because the installer adds whatever is missing and cannot tell "deleted on purpose" from "new in this kit". Use it for a skill your organisation already ships as a plugin, a suite you do not run, a template you do not want. The installer never creates or edits the list. See "Declining what the kit installs" in the kit README, and ADR-0014.
+- The installer prints which kit it is, as a `Kit:` line: the last release in the kit's changelog and, from a checkout, the commit. Nothing in your repository records the kit an install came from (ADR-0011), so the handoff copies that line. A bare copy of `starter-kit/` inside a project says the version is not recorded.
+- On Claude Code, `docs/agent-templates/session-start.sh.template`: the SessionStart hook skeleton, with the steps to put it in place and the `settings.json` entry in its header.
 
 <!-- category: Changed -->
 ### Changed
 
 - Every rule the kit ships is now named by a typed link of another installed artifact, on all four tools. `working-principles`, `comments-and-annotations` and `versioning-and-changelog` were cited only in prose, so `make graph-impact NODE=RULE:<name>` answered "nothing", a rename passed `make lint`, and the Claude Code hook stayed silent after an edit. The rules carry `**Related:**` lines for the dependencies they already described in sentences, and the `registry-entry` and `registry-conflict-triage` skills name the versioning rule. You get them by copying the rules and skills in upgrade steps 2 and 3.
 - If you deleted one of the kit's rules and copy a newer rule that names it, `make graph-links` fails on that `Related:` line and says which token resolves to nothing: remove the token from the line.
+- On Claude Code a fresh install no longer installs `.claude/hooks/session-start.sh` and no longer registers a `SessionStart` hook. The skeleton did nothing but append `PATH` to the session's environment file and print "session-start: toolchain ready" — into the session's context, about a toolchain it had not checked. It is a template now, for the day sessions need environment setup (ADR-0015).
+- **Your existing install is not changed.** If you have the hook and its entry in `.claude/settings.json`, they stay: fill the hook in, keep it, or delete the file and the entry together. If you delete it, nothing puts it back — newer kits do not install it. Upgrade step 1 adds the template.
+- A re-run of the installer that installed something says how to decline it, and the first-install steps on Claude Code say what to do about a skill you already have from elsewhere.
 - Every command the installed rules, skills and READMEs give you to type now starts Python the way the kit's own make targets do, as `./scripts/python.sh scripts/<tool> …`, or names the make target (`make registry-list`). Fourteen places said `python3 …` while the Makefile, the gates and the hook went through the launcher, and the one sentence that reconciled the two sat in the constitution template — which a repository that already had a constitution never received. ADR-0013 records the change; it supersedes one paragraph of ADR-0007.
 - You get the rules and skills by copying them in upgrade steps 2 and 3. Four texts are yours after the install and are not replaced: `changelog.d/README.md`, `docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md`, and the preamble above the generated region of `CHANGELOG.md` and of `docs/DEBUGGING-KNOWLEDGE-BASE.md`. Upgrade step 4 now lists them for comparing by hand. Nothing fails if you leave them: the old form still runs wherever it ran before.
 - The constitution template no longer tells the reader to substitute the launcher for `python3` "here and in every rule"; it says that commands are written through the launcher. If your constitution carries the old sentence, it can go once the rules are updated.
@@ -40,6 +48,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 ### Fixed
 
 - The installed `Makefile`, `.gitattributes`, `.github/workflows/lint.yml` and `.registry-id-duplicate-allowlist` no longer open with "Copy to …", an instruction to put the file where it already is. The header now says where the file is installed, which is true in the kit and in your repository alike. These four files are yours after the install and are not replaced by an upgrade; to take the fix, edit the one line in each.
+- The skeleton prints nothing as shipped. Its header gains a third design rule: what a SessionStart hook prints is read by the agent as fact, so print a state only after the step that checked it.
 
 <!-- category: Security -->
 
