@@ -94,7 +94,7 @@ aged_install() { # $1 = dir
          "$R/scripts/check-constitution.sh" "$R/scripts/tests/test_graph_tool.py" \
          "$R/scripts/tests/test-graph-links.sh" "$R/scripts/tests/test-python-launcher.sh" \
          "$R/scripts/tests/test-constitution.sh" "$R/docs/agent-templates" "$R/docs/rule-reference" \
-         "$R/.claude/hooks/workspace-graph.py"
+         "$R/.claude/hooks/workspace-graph.py" "$R/.claude/rules/project-annotations.md"
   cp "$KIT_DIR/scripts/tests/test-bootstrap-rerun.sh" "$KIT_DIR/scripts/tests/test-brownfield-adoption.sh" "$R/scripts/tests/"
   for f in "$R"/scripts/*.py "$R"/scripts/check-*.sh "$R"/scripts/tests/* "$R"/.claude/rules/*.md \
            "$R/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md"; do
@@ -214,7 +214,7 @@ MK
 }
 
 # Files of the adopter's that the upgrade must leave exactly as they were.
-THEIRS="CLAUDE.md .claude/settings.json .claude/rules/payments.md .claude/rules/comments-and-annotations.md
+THEIRS="CLAUDE.md .claude/settings.json .claude/rules/payments.md
         .claude/hooks/session-start.sh registries.json CHANGELOG.md changelog.d docs/adr
         docs/DEBUGGING-KNOWLEDGE-BASE.md docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md .github tests .gitattributes"
 
@@ -242,6 +242,11 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   grep -q '"PostToolUse"' "$WORK/$name-step1.log" \
     && ok "$name: and prints the hook entries for the settings.json it did not edit" \
     || bad "$name: step 1 does not say how to register the hook in an existing settings.json"
+  # An unfilled project-annotations.md would be loaded into every session and
+  # fail a `constitution` check chained into lint. Step 3 creates it.
+  [ ! -e "$R/.claude/rules/project-annotations.md" ] \
+    && ok "$name: step 1 does not drop an unfilled project-annotations.md into an install whose rows are in its comments rule" \
+    || bad "$name: step 1 added the project-annotations.md template to an existing install"
   # The SessionStart skeleton is a template in the newer kit. An install that
   # has the hook from an older one keeps it, registered as it was; what step 1
   # adds is the template, not a second copy of the hook and not a verdict on theirs.
@@ -280,8 +285,24 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   done
   [ -z "$out" ] && ok "$name: step 3 — the rules used as shipped are the newer kit's" || bad "$name: rules not updated:$out"
   git -C "$R" diff --quiet "$pre" -- .claude/rules/comments-and-annotations.md && grep -q 'ledger:frozen' "$R/.claude/rules/comments-and-annotations.md" \
-    && ok "$name: the rule the adopter filled in is not copied over: their rows are still there" \
+    && ok "$name: control — the rule the adopter filled in is not copied over blindly: their rows are still there" \
     || bad "$name: the adopter's rows in comments-and-annotations.md were lost"
+  # The one-time move step 3 describes: the project's rows and pointers leave
+  # the kit's rule for a file of the project's own, and from then on the rule
+  # is copied like the others.
+  cp "$KIT_DIR/rules/project-annotations.md.template" "$R/.claude/rules/project-annotations.md"
+  ( cd "$R" && make constitution > "$WORK/$name-annotations.log" 2>&1 ); rc=$?
+  [ "$rc" -ne 0 ] && grep -q '^FAIL: .claude/rules/project-annotations.md:[0-9]* — unfilled placeholder' "$WORK/$name-annotations.log" \
+    && ok "$name: step 3 — until it is filled in, 'make constitution' names the new file's placeholders" \
+    || bad "$name: 'make constitution' does not report the unfilled project-annotations.md (exit $rc)"
+  sed -E 's/<fill in: [^>]*>/`n\/a`/g' "$KIT_DIR/rules/project-annotations.md.template" > "$R/.claude/rules/project-annotations.md"
+  printf '| Freeze marker | `# ledger:frozen` | `scripts/check-payments.sh` |\n' >> "$R/.claude/rules/project-annotations.md"
+  cp "$KIT_DIR/rules/comments-and-annotations.md" "$R/.claude/rules/comments-and-annotations.md"
+  ( cd "$R" && make constitution > "$WORK/$name-annotations.log" 2>&1 ); rc=$?
+  [ "$rc" -eq 0 ] && cmp -s "$KIT_DIR/rules/comments-and-annotations.md" "$R/.claude/rules/comments-and-annotations.md" \
+    && grep -q 'ledger:frozen' "$R/.claude/rules/project-annotations.md" \
+    && ok "$name: with their rows moved, the comments rule is the kit's byte for byte, their marker is in project-annotations.md, and 'make constitution' passes" \
+    || { bad "$name: after the move (constitution exit $rc):"; grep -E '^FAIL' "$WORK/$name-annotations.log" | head -3 | cut -c1-150 | sed 's/^/         /'; }
 
   # Before step 5 the coverage gate says which gate lint does not reach.
   ( cd "$R" && make lint > "$WORK/$name-before5.log" 2>&1 ); rc=$?

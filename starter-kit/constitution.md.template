@@ -54,6 +54,7 @@ make graph-impact NODE=RULE:documentation   # what cites an artifact — run bef
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
 - [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives, typed links between artifacts
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
+- [`project-annotations.md`](.claude/rules/project-annotations.md) — this project's half of that rule: what its pointers stand for here, and the marker shapes our own tooling reads
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps

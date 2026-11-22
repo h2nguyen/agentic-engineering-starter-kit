@@ -102,6 +102,19 @@ grep -qi 'delete' "$WORK/run1.log" \
   && ok "the next steps say to delete template examples the project has no counterpart for" \
   || bad "the next steps never say what to do with an example the project lacks"
 
+# An install that predates project-annotations.md has its rows and pointers
+# inside the comments rule. A re-run that added the unfilled template would
+# load placeholders into every session and fail a `constitution` check the
+# adopter chained into lint — so the upgrade steps create the file, and a
+# re-run does not.
+rm -f "$R/.claude/rules/project-annotations.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run3.log" 2>&1
+[ ! -e "$R/.claude/rules/project-annotations.md" ] \
+  && grep -q 'project-annotations.md (not added to an existing install' "$WORK/run3.log" \
+  && ok "a re-run does not add an unfilled project-annotations.md to an existing install, and says where the upgrade steps create it" \
+  || bad "a re-run installed the project-annotations.md template into an existing install, or skipped it without saying why"
+git -C "$R" checkout -q -- . 2>/dev/null
+
 echo "=== run without --target: a project is installed into, the kit's own repository is not ==="
 # The kit's repository carries agent instructions of its own now, so tool
 # detection succeeds there. Run from its root with no --target, the installer
@@ -227,10 +240,30 @@ for tool in claude agents cursor copilot; do
     *)       c="$R/AGENTS.md";                        rules_dir="$R/docs/agent-rules" ;;
   esac
   [ -f "$c" ] && ok "$tool: constitution at ${c#"$R"/}" || bad "$tool: no constitution at ${c#"$R"/}"
-  installed="$(cd "$rules_dir" 2>/dev/null && ls *.md | sort)"
+  installed="$(cd "$rules_dir" 2>/dev/null && ls *.md | grep -v '^project-annotations\.md$' | sort)"
   [ "$installed" = "$expected_rules" ] \
     && ok "$tool: every shipped rule landed in ${rules_dir#"$R"/}" \
     || bad "$tool: ${rules_dir#"$R"/} holds: $(echo $installed)"
+  # The comments rule used to be the one kit file a project had to edit: a
+  # table to complete and four pointers to resolve, inside a rule that an
+  # upgrade then could not copy and no check read. The project's half is a
+  # file of its own now; the rule is the kit's, word for word.
+  pa="$rules_dir/project-annotations.md"
+  [ -f "$pa" ] && grep -q '^\*\*Related:\*\* RULE:comments-and-annotations' "$pa" \
+    && ok "$tool: the project's half of the comments rule is its own file, ${pa#"$R"/}" \
+    || bad "$tool: no project-annotations.md beside the rules, or it does not name the rule it completes"
+  ! grep -qiE 'fill-in|complete the second table|testing\.md' "$rules_dir/comments-and-annotations.md" \
+    && grep -q 'project-annotations\.md' "$rules_dir/comments-and-annotations.md" \
+    && ok "$tool: the comments rule asks the project to edit nothing in it, and names the file that holds the project's half" \
+    || bad "$tool: the comments rule still has a part to fill in, or names testing.md: $(grep -ciE 'fill-in|complete the second table|testing\.md' "$rules_dir/comments-and-annotations.md") line(s)"
+  grep -q "${c#"$R"/}.*project-annotations\|project-annotations" "$c" \
+    && ok "$tool: the constitution's rule index lists it" || bad "$tool: the constitution does not link project-annotations.md"
+  # The documentation rule prescribed docs/adr/ and `--registry adr` whether
+  # or not the repository keeps decision records there. A project that
+  # records decisions elsewhere had to overrule it in its constitution.
+  grep -q 'No `adr` registry' "$rules_dir/documentation.md" \
+    && ok "$tool: the documentation rule says when its decision-record format applies, and what holds when it does not" \
+    || bad "$tool: the documentation rule prescribes the adr registry unconditionally"
   if [ "$tool" = claude ]; then
     ! grep -q 'docs/agent-rules/' "$c" && ok "$tool: constitution links point at .claude/rules/" || bad "$tool: links retargeted by mistake"
   else
@@ -310,6 +343,9 @@ for tool in claude agents cursor copilot; do
   ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
   [ "$rc" -ne 0 ] && ok "$tool: 'make constitution' fails on a constitution nobody has filled in" \
     || bad "$tool: 'make constitution' passed on the untouched template"
+  grep -q "^FAIL: ${pa#"$R"/}:[0-9]* — unfilled placeholder" "$WORK/constitution-$tool.log" \
+    && ok "$tool: and on the project-annotations.md nobody has filled in" \
+    || bad "$tool: 'make constitution' does not report the unfilled project-annotations.md"
   unreported=""
   for n in $(awk '/^## Debugging/ {exit} /</ {print NR}' "$c"); do
     grep -q "^FAIL: ${c#"$R"/}:$n — " "$WORK/constitution-$tool.log" || unreported="$unreported $n"
@@ -323,14 +359,19 @@ for tool in claude agents cursor copilot; do
   # What filling it in comes to, mechanically: every placeholder line and both
   # example links gone. The Debugging section keeps its angle brackets — a
   # command argument in a fence, two token shapes in backticks — and must pass.
-  cp "$c" "$WORK/constitution-$tool.orig"
+  cp "$c" "$WORK/constitution-$tool.orig"; cp "$pa" "$WORK/annotations-$tool.orig"
   awk '/^## Debugging/ {keep=1} keep || !(/</ || /testing\.md/ || /security\.md/ || /^constraints that shape/)' \
     "$WORK/constitution-$tool.orig" > "$c"
+  ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
+  [ "$rc" -ne 0 ] && ! grep -q "^FAIL: ${c#"$R"/}:" "$WORK/constitution-$tool.log" \
+    && ok "$tool: with the constitution filled in, what is left to report is project-annotations.md alone" \
+    || bad "$tool: a filled-in constitution beside an unfilled project-annotations.md: exit $rc"
+  sed -E 's/<fill in: [^>]*>/`#123`/g' "$WORK/annotations-$tool.orig" > "$pa"
   ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ) \
-    && grep -q '<symptom>' "$c" \
-    && ok "$tool: with those lines gone it passes, and the angle brackets that belong there stayed" \
-    || { bad "$tool: a filled-in constitution still fails:"; grep -E '^FAIL' "$WORK/constitution-$tool.log" | head -3 | sed 's/^/         /'; }
-  cp "$WORK/constitution-$tool.orig" "$c"
+    && grep -q '<symptom>' "$c" && grep -q '<DECISION-RECORD-ID>' "$pa" \
+    && ok "$tool: with both filled in it passes, and the angle brackets that belong there stayed" \
+    || { bad "$tool: a filled-in constitution and project-annotations.md still fail:"; grep -E '^FAIL' "$WORK/constitution-$tool.log" | head -3 | sed 's/^/         /'; }
+  cp "$WORK/constitution-$tool.orig" "$c"; cp "$WORK/annotations-$tool.orig" "$pa"
 done
 
 echo "=== the kit's own tools leave no bytecode behind in the repository ==="

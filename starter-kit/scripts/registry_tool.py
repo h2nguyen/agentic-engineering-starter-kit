@@ -254,7 +254,13 @@ def load_registries(args) -> tuple[list[Registry], str, dict]:
         registries = [r for r in registries if r.name == wanted]
         if not registries:
             names = ", ".join(r.get("name", "?") for r in declared)
-            raise RegistryError(f"unknown registry {wanted!r} (declared: {names})")
+            # Not "unknown": a rule or a skill names this registry, and this
+            # repository does not keep those records in the fragment layout.
+            raise RegistryError(
+                f"{CONFIG_NAME} declares no registry named {wanted!r} (declared: {names}). "
+                f"If this repository keeps those records somewhere else, its constitution "
+                f"says where; to keep them here, declare the registry in {CONFIG_NAME}."
+            )
     return registries, root, cfg
 
 
@@ -1277,7 +1283,10 @@ def cmd_init(args) -> int:
             f"decision records: none found -> {adr_dir}/, files named "
             f"adr-YYYY-MM-DD-<slug>.md and cited as ADR-YYYY-MM-DD-<slug> "
             f"(for MADR numbering, adr-NNNN-<slug>.md, add \"id_scheme\": "
-            f"\"numeric\" to this registry before the first record)"
+            f"\"numeric\" to this registry before the first record; decisions "
+            f"recorded elsewhere, in a form this tool cannot see? delete the "
+            f"\"adr\" registry from {CONFIG_NAME} and say in the constitution "
+            f"where they live)"
         )
     registries.append(adr)
 

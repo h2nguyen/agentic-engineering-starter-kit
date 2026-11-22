@@ -104,6 +104,11 @@ homes below, with at most a one-line pointer left in the artifact:
 | Investigation, root cause, lessons learned | Knowledge base (`<KB-ENTRY-ID>`) |
 | Audience-facing release note | One terse changelog bullet: what changed and what the operator will observe, not the design history |
 
+`<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>` and `<tool-or-gate>`
+are pointers: this rule and its reference name a kind of record or gate, and
+`project-annotations.md`, beside this file, says what each one is in this
+project. That file is the project's to edit; this one is used as shipped.
+
 Commit and change messages are the relaxed case: decision context there is fine
 and helps future archaeology. Prefer the same "behaviour, not company" framing
 anyway.
@@ -127,7 +132,7 @@ durable home. They are tabled, with an example of each, in
 test. The ticket is what turns "someone should" into "someone will"; the
 annotation alone is a promise nobody owns.
 
-## Protected shapes (project fill-in)
+## Protected shapes
 
 Some annotation shapes are **required** by other rules, by law, or by tooling
 that parses them. This rule never overrides them. Removing or shortening one
@@ -149,15 +154,16 @@ one.
 | Installer block markers | `# >>> starter-kit registries >>>` and `# <<< starter-kit registries <<<` in `.gitattributes` | The template carries them and `bootstrap.sh` writes them when appending to a pre-existing file; on re-run it looks for them to leave the file alone |
 | Enforcement-script headers and escape markers | `# Enforces: RULE:<slug> § <section> — <what it checks>` at the top of a check script; `[<marker>]` in a commit message | The enforcement-script contract: the header names the rule as a typed link the link gate resolves, the marker is what the script greps for |
 | Allowlist reasons | the `# reason` after an entry in `.ci-lint-coverage-allowlist` or `.registry-id-duplicate-allowlist` | Those files' own headers: an entry without a reason is a gate that stopped running with nobody knowing why |
-| Decision-record headings | `## Status`, `## Context`, `## Decision`, `## Consequences` in their fixed order | `registry_tool.py check` asserts the required headings (documentation rule) |
+| Decision-record headings | `## Status`, `## Context`, `## Decision`, `## Consequences` in their fixed order | `registry_tool.py check` asserts the required headings, where `registries.json` declares an `adr` registry (documentation rule) |
 
-Complete the second table for your project; the rows are examples of the
-*kinds* of shape that belong here, not a list of what your project has:
+The second table is the *kinds* of shape a project's own tooling and rules
+add. Which of them this project has, token by token, is listed in
+`project-annotations.md`; a row goes there when a tool starts reading a comment:
 
 | Kind | Examples | Typically mandated by |
 |---|---|---|
 | Tooling-parsed markers | `# noqa: <code>` with a reason, `eslint-disable-next-line <rule>` with a reason, `<!-- toc -->`, CI grep markers of the form `<marker>-guarded: <reason>` | Your lint gates (`<tool-or-gate>`) |
-| Test-phase markers | `// GIVEN` / `// WHEN` / `// THEN`, `// Given / When / Then` | Your testing rule (`testing.md`, once the project has one); the test contract, not narration |
+| Test-phase markers | `// GIVEN` / `// WHEN` / `// THEN`, `// Given / When / Then` | Your testing rule, where the project has one; the test contract, not narration |
 | Contractual and legal text | licence headers, legal disclaimers, citations and footnotes, alt text on images | Your legal, writing or accessibility rule |
 | Classification tags | `<TIER>-PII` on a sensitive column, confidentiality banners | Your security or data rule |
 | Ordering and structure headers | header blocks on ordered seed or migration files, document front matter keys | Your database or documentation rule |
@@ -201,9 +207,10 @@ Two related invariants are already mechanical in a repository bootstrapped from
 this kit, and stay that way: `check-kb-shape.sh` asserts the field labels and
 typed links of knowledge-base entries, and `check-registry-drift.sh` asserts
 the generated-region markers of every registry artifact. Both gate *markers*,
-not annotation density, which is exactly the line this rule draws. If your
+not annotation density, which is exactly the line this rule draws. Where the
 project enforces another related invariant mechanically (marker parsing,
-front-matter presence), name the gate here: `<tool-or-gate>`.
+front-matter presence), `project-annotations.md` names that gate, as
+`<tool-or-gate>`.
 
 ## PR Checklist
 
@@ -237,6 +244,5 @@ Run against the change. Every answer should be "yes" or "n/a":
   base, the pull-request description) and docs updated in the same change.
 - `shared-registries.md`: the generated-region markers, category anchors and
   identifier conventions the protected-shapes table above guards.
-- The project's testing rule (`testing.md` in the constitution's index, once it
-  exists): the test-phase marker contract.
+- The project's testing rule, where it has one: the test-phase marker contract.
 - The project's domain rule files: front-matter mandates per domain.
