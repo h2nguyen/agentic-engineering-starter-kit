@@ -227,6 +227,8 @@ Run against the change. Every answer should be "yes" or "n/a":
 
 ## Related rules
 
+**Related:** RULE:working-principles, RULE:documentation, RULE:shared-registries
+
 - `working-principles.md`: surgical changes, and "mention pre-existing dead
   code, don't delete it", which is the no-sweeps stance in process form. Its
   "match existing style" yields to a domain rule by its own precedence clause;

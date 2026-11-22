@@ -1,7 +1,7 @@
 # Sanctioned duplicate registry identifiers.
 #
-# Copy to the repository root as `.registry-id-duplicate-allowlist`. One line
-# per sanctioned pair, naming BOTH fragment paths separated by whitespace:
+# Installed at the repository root as `.registry-id-duplicate-allowlist`. One
+# line per sanctioned pair, naming BOTH fragment paths separated by whitespace:
 #
 #   docs/adr/095-outbox-for-integration-events.md docs/adr/095-pin-image-by-digest.md
 #

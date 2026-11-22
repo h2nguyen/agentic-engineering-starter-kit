@@ -1,8 +1,9 @@
 # Umbrella lint target.
 #
-# Copy to the repository root as `Makefile`. The registry targets themselves
-# live in registry.mk (installed alongside) so that a repository which already
-# HAS a Makefile can adopt them with one `include` line rather than a merge.
+# Installed at the repository root as `Makefile` where there was none. The
+# registry targets themselves live in registry.mk (installed alongside) so
+# that a repository which already HAS a Makefile can adopt them with one
+# `include` line rather than a merge.
 #
 # CI must invoke the AGGREGATE target. A workflow that enumerates sub-targets
 # drifts away from the Makefile one pull request at a time, silently, until
