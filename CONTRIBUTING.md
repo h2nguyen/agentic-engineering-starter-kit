@@ -27,6 +27,7 @@ name your machine gives it — the make targets find it through
 | `make registry-generate` | Rebuilds `CHANGELOG.md` from `changelog.d/` |
 | `make graph-impact NODE=RULE:documentation` | What cites an artifact — run it before renaming or deleting one |
 | `make graph-coverage` | Which shipped rules a script enforces and an agent reviews |
+| `make agent-feedback` | Every `Agent-Feedback:` line in this repository's history, grouped by the kit artifact it names (ADR-0016) |
 
 ## Making a change
 
@@ -38,7 +39,7 @@ name your machine gives it — the make targets find it through
 
    | Suite | Covers |
    |---|---|
-   | `starter-kit/scripts/tests/test_registry_tool.py`, `test_graph_tool.py` | The two tools, unit level |
+   | `starter-kit/scripts/tests/test_registry_tool.py`, `test_graph_tool.py`, `test_feedback_tool.py` | The three tools, unit level — for the feedback collector, that an unlisted author's text never reaches its report |
    | `test-parallel-merge.sh` | Two branches add registry entries and merge clean and green |
    | `test-graph-links.sh` | A typed link to nothing fails; a rename names every citer |
    | `test-python-launcher.sh` | `scripts/python.sh` finds Python as `python3`, `python` or `py -3`, and skips a name that is not Python |

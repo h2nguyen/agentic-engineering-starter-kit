@@ -122,7 +122,10 @@ Create, at the locations your detected tool expects (Appendix A.1):
    installs a template; kit-less, write it): what the rule's
    `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>`
    and `<EVAL-RECORD-ID>` pointers stand for in this repo, and the marker
-   shapes its own lint, test and CI tooling reads, from Phase 1.
+   shapes its own lint, test and CI tooling reads, from Phase 1. The
+   documentation rule's "Feedback to an agent" section reads
+   `.agent-feedback-authors`, which starts naming nobody: ask the user whose
+   feedback counts, and never infer it from the history.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for

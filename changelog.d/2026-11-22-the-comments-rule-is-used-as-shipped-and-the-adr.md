@@ -2,7 +2,7 @@
 
 ## Added
 
-- `project-annotations.md`, installed beside the rules on a first install (`.claude/rules/` on Claude Code, `docs/agent-rules/` elsewhere): the project's half of the comments-and-annotations rule. It says what the rule's pointers — `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>`, `<EVAL-RECORD-ID>` — stand for in your project, and lists the marker shapes your own tooling reads. It is yours; no upgrade replaces it. The constitution template's rule index lists it. ADR-0016 records the change.
+- `project-annotations.md`, installed beside the rules on a first install (`.claude/rules/` on Claude Code, `docs/agent-rules/` elsewhere): the project's half of the comments-and-annotations rule. It says what the rule's pointers — `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>`, `<EVAL-RECORD-ID>` — stand for in your project, and lists the marker shapes your own tooling reads. It is yours; no upgrade replaces it. The constitution template's rule index lists it. ADR-0017 records the change.
 - `make constitution` reads `project-annotations.md` together with the constitution and names every `<fill in: …>` still open in it. A pointer left unresolved used to sit in a rule that no check read.
 
 ## Changed

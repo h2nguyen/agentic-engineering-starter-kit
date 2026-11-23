@@ -54,6 +54,8 @@ usually starts, so a command that leaves the path out writes here.
    - the constitution's `<placeholders>` — the project in one paragraph, its
      stack, and its commands. Run a command before you write it down; leave
      out what does not exist;
+   - whose feedback counts, in `.agent-feedback-authors` — ask the user for
+     the commit emails and logins; never infer them from the history;
    - `project-annotations.md` beside the rules, the project's half of the
      comments-and-annotations rule: every `<fill in: …>` in it —
      [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
