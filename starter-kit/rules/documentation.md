@@ -15,7 +15,7 @@ as the project grows.
 | Behaviour or API change | The affected doc + CHANGELOG bullet |
 | Bug fix that took >30 min to diagnose | Debugging-KB entry + CHANGELOG `Fixed` bullet — both as fragment files |
 | Architectural decision (affects multiple files or future choices) | New decision record — an ADR, or what this project keeps in its place (see below) |
-| New convention agents must follow | Rule file, started from `docs/agent-templates/_rule-template.md` — the imperative and its why, a WRONG/CORRECT pair, a litmus test, and a `Related:` line citing the incident or decision behind it — + constitution index line |
+| New convention agents must follow | Rule file, started from `docs/agent-templates/_rule-template.md` — the imperative and its why, a WRONG/CORRECT pair, a litmus test, and a `Related:` line citing the incident or decision behind it — + constitution index line. Check a new or changed rule from a fresh session: one that is already running may keep the rules it started with |
 | Documented rule violated anyway | Check script, started from `docs/agent-templates/check-convention.sh.template` — its header names the rule (`# Enforces: RULE:<name>`) — chained into the lint target. Then name the new rule or script on the `Related:` line of the incident that prompted it |
 | Same workflow walked through twice, or the same review comment on a second PR | Skill (or playbook) from `_skill-template.md`, reviewer agent (or review checklist) from `_agent-template.md`, both in `docs/agent-templates/` |
 | Renaming, deleting or rewriting a rule, skill, agent, command or script | Every artifact that cites it — `make graph-impact NODE=<KIND:name>` lists them |

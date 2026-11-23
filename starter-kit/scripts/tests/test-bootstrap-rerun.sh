@@ -429,6 +429,144 @@ for tool in claude agents cursor copilot; do
   cp "$WORK/constitution-$tool.orig" "$c"; cp "$WORK/annotations-$tool.orig" "$pa"
 done
 
+echo "=== load classes: which rules Claude Code loads into every session ==="
+# All five rules loaded at every session start — 788 lines, most of them
+# about registries, versioning and annotations, in sessions that touched none
+# of those. Claude Code loads a rule with a `paths:` header only when a
+# matching file is read or edited. The kit's rule files carry no header (they
+# are the same text for all four tools); the installer writes it.
+frontmatter() { awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1' "$1"; }
+rule_text() { # the file without a leading frontmatter block and the blank line after it
+  awk 'NR==1 && $0=="---" {fm=1; next} fm && $0=="---" {fm=0; gap=1; next} fm {next} gap {gap=0; if ($0=="") next} {print}' "$1"
+}
+scoped() { [ "$(sed -n 1p "$1")" = "---" ] && frontmatter "$1" | grep -q '^paths:'; }
+R="$WORK/claude"; rd="$R/.claude/rules"
+scoped "$rd/shared-registries.md" \
+  && ok "a fresh install binds the registries rule to paths" || bad "shared-registries.md has no paths: header"
+missing=""
+for want in 'changelog.d/**' 'CHANGELOG.md' 'docs/DEBUGGING-KNOWLEDGE-BASE.d/**' 'docs/DEBUGGING-KNOWLEDGE-BASE.md' 'docs/adr/**' \
+            'registries.json' 'registry.mk' '.gitattributes' '.registry-id-duplicate-allowlist'; do
+  frontmatter "$rd/shared-registries.md" | grep -qxF "  - \"$want\"" || missing="$missing $want"
+done
+[ -z "$missing" ] && ok "to every registry registries.json declares, and to the registry layer's own files" \
+  || bad "the registries rule's header lacks:$missing"
+rule_text "$rd/shared-registries.md" | cmp -s - "$KIT_DIR/rules/shared-registries.md" \
+  && ok "under the header the rule is the kit's text, byte for byte" \
+  || bad "the text of shared-registries.md differs from the kit's"
+unscoped=""
+for rule in working-principles documentation comments-and-annotations versioning-and-changelog; do
+  scoped "$rd/$rule.md" && unscoped="$unscoped $rule"
+done
+[ -z "$unscoped" ] \
+  && ok "with no --source-paths the other four load into every session: the installer does not guess where the source is" \
+  || bad "bound to paths nobody named:$unscoped"
+grep -q -- '--source-paths' "$WORK/boot-claude.out" \
+  && ok "and the next steps say how to bind the two rules that are about source" \
+  || bad "the installer never mentions --source-paths"
+( cd "$R" && ./scripts/check-graph-links.sh >/dev/null 2>&1 ) \
+  && ok "the link gate reads a rule with a header as it did without" || bad "a paths: header breaks the link gate"
+[ -f "$R/.claude/skills/rule-load-check/SKILL.md" ] && grep -qi 'new session' "$R/.claude/skills/rule-load-check/SKILL.md" \
+  && ok "the load-class check is installed as a skill, and says it runs in a new session" \
+  || bad "no rule-load-check skill, or it does not say that a running session keeps the rules it started with"
+
+R="$WORK/sourced"; fresh_repo "$R"; rd="$R/.claude/rules"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/**,tools/**' > "$WORK/sourced.log" 2>&1 || bad "bootstrap with --source-paths exited non-zero"
+missing=""
+for want in 'src/**' 'tools/**' '.github/**' '.claude/hooks/**' 'Makefile' 'registry.mk'; do
+  frontmatter "$rd/comments-and-annotations.md" | grep -qxF "  - \"$want\"" || missing="$missing comments:$want"
+done
+for want in 'src/**' 'tools/**' 'changelog.d/**' 'CHANGELOG.md'; do
+  frontmatter "$rd/versioning-and-changelog.md" | grep -qxF "  - \"$want\"" || missing="$missing versioning:$want"
+done
+[ -z "$missing" ] && ok "--source-paths binds the comments rule and the versioning rule to those paths and to the kit files each is about" \
+  || bad "headers lack:$missing"
+out=""
+for rule in comments-and-annotations versioning-and-changelog shared-registries; do
+  rule_text "$rd/$rule.md" | cmp -s - "$KIT_DIR/rules/$rule.md" || out="$out $rule"
+done
+[ -z "$out" ] && ok "each is still the kit's text under its header" || bad "text differs from the kit's:$out"
+grep -q 'Bound by this run: shared-registries comments-and-annotations versioning-and-changelog\.' "$WORK/sourced.log" \
+  && ok "and the run names the rules it bound" \
+  || bad "the closing message names as bound: $(grep -o 'Bound by this run:.*' "$WORK/sourced.log" | cut -c1-120)"
+always="$(for f in "$rd"/*.md; do scoped "$f" || basename "$f" .md; done | sort | tr '\n' ' ')"
+[ "$always" = "documentation project-annotations working-principles " ] \
+  && ok "what then loads into every session is the constitution and three files: $always" \
+  || bad "always loaded with --source-paths: $always"
+# A rule bound to paths arrives after the first matching access. What must
+# hold before that is the one line the constitution keeps for it.
+norow=""
+for f in "$rd"/*.md; do
+  scoped "$f" || continue
+  awk '/^## Non-Negotiable Rules/ {on=1; next} on && /^## / {exit} on' "$R/CLAUDE.md" | grep -q "(.claude/rules/$(basename "$f"))" \
+    || norow="$norow $(basename "$f" .md)"
+done
+[ -z "$norow" ] && ok "every rule bound to paths has its one-line form in the constitution's always-loaded table" \
+  || bad "bound to paths, and absent from the Non-Negotiable Rules table:$norow"
+( cd "$R" && make lint > "$WORK/sourced-lint.log" 2>&1 ) \
+  && ok "an install with three rules bound to paths lints green" \
+  || { bad "lint fails with path headers:"; grep -E '^FAIL|Error' "$WORK/sourced-lint.log" | head -3 | sed 's/^/         /'; }
+
+R="$WORK/sourced-agents"; fresh_repo "$R"
+"$BOOTSTRAP" --tool agents --target "$R" --source-paths 'src/**' > "$WORK/sourced-agents.log" 2>&1; rc=$?
+out=""
+for f in "$R"/docs/agent-rules/*.md; do [ "$(sed -n 1p "$f")" = "---" ] && out="$out $(basename "$f")"; done
+[ "$rc" -eq 0 ] && [ -f "$R/docs/agent-rules/documentation.md" ] && [ -z "$out" ] && grep -q 'source-paths was ignored' "$WORK/sourced-agents.log" \
+  && ok "on a tool that reads a rule when the constitution links to it, no header is written, and the installer says the flag does nothing there" \
+  || bad "agents: headers written ($out) or the ignored flag not mentioned"
+R="$WORK/sourced-bad"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/**,lib/"x"' > "$WORK/sourced-bad.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && [ -z "$(git -C "$R" status --porcelain)" ] && grep -q 'cannot go into a paths: header' "$WORK/sourced-bad.log" \
+  && ok "a pattern that would break the header is refused before anything is written" \
+  || bad "a pattern with a quote in it was accepted (exit $rc), or files were written"
+R="$WORK/sourced-brownfield"; fresh_repo "$R"; mkdir -p "$R/docs/decisions"
+printf '# Use Postgres\n\n## Status\n\nAccepted\n\n## Context\n\nc\n\n## Decision\n\nd\n\n## Consequences\n\ne\n' > "$R/docs/decisions/0001-use-postgres.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-brownfield.log" 2>&1
+frontmatter "$R/.claude/rules/shared-registries.md" | grep -qxF '  - "docs/decisions/**"' \
+  && ! frontmatter "$R/.claude/rules/shared-registries.md" | grep -q 'docs/adr' \
+  && ok "the header names the registries where this repository keeps them (docs/decisions/), not where a fresh install would" \
+  || bad "the registries rule is not bound to docs/decisions/**: $(frontmatter "$R/.claude/rules/shared-registries.md" | grep -c . ) header lines"
+# What else must not reach the header, or must not stop a run it has no part in.
+for bad_glob in 'src\x/**' $'src/**\nlib/**'; do
+  R="$WORK/sourced-bad2"; rm -rf "$R"; fresh_repo "$R"
+  "$BOOTSTRAP" --tool claude --target "$R" --source-paths "$bad_glob" > "$WORK/sourced-bad2.log" 2>&1; rc=$?
+  [ "$rc" -ne 0 ] && [ -z "$(git -C "$R" status --porcelain)" ] \
+    && ok "a glob with a $(printf '%s' "$bad_glob" | tr -d 'a-z/*' | od -c | sed -n '1s/^[0-9]* *//p' | tr -s ' ') in it is refused, with nothing written" \
+    || bad "a glob that breaks the header was accepted (exit $rc): $(printf '%q' "$bad_glob")"
+done
+R="$WORK/sourced-dir"; fresh_repo "$R"; mkdir -p "$R/src"; : > "$R/src/keep"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src' > "$WORK/sourced-dir.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && grep -q "src/\*\*" "$WORK/sourced-dir.log" \
+  && ok "a bare directory name, which matches no file, is refused and the glob that was meant is shown" \
+  || bad "--source-paths 'src' was accepted for a directory (exit $rc)"
+R="$WORK/sourced-space"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/my dir/**,dir/**' > "$WORK/sourced-space.log" 2>&1
+frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "src/my dir/**"' \
+  && frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "dir/**"' \
+  && ok "a glob with a space is written whole, and a later glob that is its tail is not taken for a duplicate" \
+  || bad "globs with a space: $(frontmatter "$R/.claude/rules/versioning-and-changelog.md" | tr '\n' ' ')"
+R="$WORK/sourced-copilot"; fresh_repo "$R"
+"$BOOTSTRAP" --tool copilot --target "$R" --source-paths 'src/**/*.{ts,tsx}' > "$WORK/sourced-copilot.log" 2>&1; rc=$?
+[ "$rc" -eq 0 ] && grep -q 'source-paths was ignored' "$WORK/sourced-copilot.log" \
+  && ok "where the flag does nothing, a glob it would refuse does not stop the install" \
+  || bad "copilot with a brace glob in --source-paths: exit $rc"
+R="$WORK/sourced-oddjson"; fresh_repo "$R"; printf '[]\n' > "$R/registries.json"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-oddjson.log" 2>&1
+! grep -q 'Traceback' "$WORK/sourced-oddjson.log" \
+  && ok "a registries.json that is not an object does not make the installer print a traceback" \
+  || bad "the installer prints a Python traceback for an odd registries.json"
+# A re-run cannot bind a rule that is already there — and used to take the
+# flag without a word, on the one tool where it means something.
+R="$WORK/sourced"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'app/**' > "$WORK/sourced-rerun.log" 2>&1
+! frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -q 'app/' \
+  && grep -q 'source-paths.*comments-and-annotations.*versioning-and-changelog\|not bound.*comments-and-annotations' "$WORK/sourced-rerun.log" \
+  && ok "on a re-run --source-paths changes no existing rule, and the installer names the rules it did not bind and why" \
+  || bad "a re-run with --source-paths says nothing about the rules it left unbound"
+grep -q ':(glob)' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && grep -q 'exclude-standard' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && ok "the load check finds its test file with the tool's glob meaning, among untracked files too" \
+  || bad "the skill lists candidate files with git's default pathspec, or only tracked ones"
+
 echo "=== the kit's own tools leave no bytecode behind in the repository ==="
 # The installer ships no .gitignore, so a __pycache__ the tools create shows
 # up as untracked files and rides into the next `git add -A`. A machine with

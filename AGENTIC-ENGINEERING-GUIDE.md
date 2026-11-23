@@ -50,11 +50,13 @@ Every line in an always-loaded file is paid for on **every request**. A mature s
 
 | Load class | Artifacts | Cost | Budget discipline |
 |---|---|---|---|
-| **Always loaded** | Constitution, rules files, anything imported into them | Paid every request | Strict — keep each file lean; relocate runbooks out |
-| **On demand** | Skills, skill `references/`, docs | Paid only when triggered | Generous — detail is cheap here |
+| **Always loaded** | Constitution, rule files with no path scope, anything imported into them | Paid every request | Strict — keep each file lean; relocate runbooks out |
+| **On demand** | Skills, skill `references/`, docs, rule files bound to paths where the tool loads rules by path | Paid only when triggered | Generous — detail is cheap here |
 | **Delegated** | Subagent instructions | Paid in a separate context | Isolated — a subagent can read 50 files without polluting the main session |
 
 The practical move: when a chunk of always-loaded text is relevant to <5 % of sessions, move it into a skill or an on-demand doc and leave a one-line pointer.
+
+A rule that is about particular files is the same move with nothing relocated: on a tool that loads rules by path, bind the rule to those files and keep its one line in the constitution. The line is what holds until the rule arrives, which is after the first matching access, not before it. The kit's installer does this on Claude Code for the registries rule, and for the versioning and comments rules once it is told where the source is (ADR-0018). What a tool really loaded is checked in a new session, never assumed from the files.
 
 *Reference project:* a workspace audit found a 1,095-line domain-data guide imported into the constitution yet relevant to ~0.5 % of commits. Converting it to a pointer (with its four safety-critical invariants distilled inline) cut always-loaded context by 20 % with zero knowledge loss.
 
