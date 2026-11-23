@@ -119,7 +119,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `skills/ai-engineering-workspace-audit/` | `.claude/skills/ai-engineering-workspace-audit/` | Level-4 audit skill — installed via `--with-meta` |
 | `commands/ai-engineering-workspace-audit.md` | `.claude/commands/ai-engineering-workspace-audit.md` | Thin `/command` entry for the audit skill — via `--with-meta` |
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
-| `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
+| `workspace-changelog/README.md` | `.claude/workspace-changelog/README.md` | The workspace's own history, one file per setup pass, audit or coach cycle; the README has the entry format — via `--with-meta`. An install with a single `WORKSPACE_CHANGELOG.md` keeps it as the archive |
 | `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
 | `settings.json.template` | `.claude/settings.json` | Registers the workspace-graph hook for its two events ([below](#the-workspace-graph-hook-claude-code)) |
 | `hooks/workspace-graph.py` | `.claude/hooks/workspace-graph.py` | Ready to use — after an edit it tells the agent who cites the file; at the end of a turn it holds the turn once if a typed link broke. See [The workspace-graph hook](#the-workspace-graph-hook-claude-code) |
@@ -173,7 +173,8 @@ whichever version you started from. For why a file changed, search the kit's
 `CHANGELOG.md` for its name.
 
 1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
-   layer (`agent-coach`, the workspace-audit skill).
+   layer (`agent-coach`, the workspace-audit skill) or keeps a workspace
+   changelog.
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
@@ -293,9 +294,11 @@ whichever version you started from. For why a file changed, search the kit's
    diff -u docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md
    diff -u .claude/hooks/session-start.sh "$KIT"/starter-kit/hooks/session-start.sh.template
    diff -u .claude/settings.json "$KIT"/starter-kit/settings.json.template
+   diff -u .claude/workspace-changelog/README.md "$KIT"/starter-kit/workspace-changelog/README.md
    ```
-   (The last two on Claude Code only, and the hook only if your install has
-   one: kits up to 3.0.1 installed and registered that skeleton, and it is
+   (The workspace-changelog README only with the Level-4 layer, and under
+   `docs/` on the other tools. The two before it on Claude Code only, and the
+   hook only if your install has one: kits up to 3.0.1 installed and registered that skeleton, and it is
    yours to keep, fill in or remove together with its `SessionStart` entry.
    Newer kits ship it as a template in `docs/agent-templates/` and register
    nothing.) Three more came from a kit template:
@@ -322,7 +325,7 @@ byte for byte as it went in.
 
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
-workspace — and, where you keep one, a line in the workspace changelog.
+workspace — and, where you keep one, a file in the workspace changelog.
 
 ## Load classes of the rules (Claude Code)
 

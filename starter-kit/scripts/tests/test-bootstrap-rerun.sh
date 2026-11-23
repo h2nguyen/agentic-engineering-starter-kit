@@ -749,6 +749,87 @@ case "$handoffs" in
   *) ok "the installed meta loop declares its human approval gates as hand-offs" ;;
 esac
 
+echo "=== the workspace changelog is one file per run ==="
+# It was one file, "newest first": every setup pass, audit and coach cycle
+# inserted at the same line, which is the shape the shared-registries rule
+# exists to remove. Three pull requests of one setup day had to go into it.
+wc="$R/.claude/workspace-changelog"
+[ -f "$wc/README.md" ] && [ ! -e "$R/.claude/WORKSPACE_CHANGELOG.md" ] \
+  && ok "--with-meta installs the workspace changelog as a directory with its format, not as a single file" \
+  || bad "--with-meta still installs .claude/WORKSPACE_CHANGELOG.md, or no .claude/workspace-changelog/README.md"
+out=""
+for f in .claude/skills/ai-engineering-workspace-audit/SKILL.md .claude/agents/agent-coach.md .claude/commands/ai-engineering-workspace-audit.md; do
+  grep -q 'workspace-changelog/' "$R/$f" || out="$out $f"
+done
+[ -z "$out" ] && ! grep -q 'Append to' "$R/.claude/skills/ai-engineering-workspace-audit/SKILL.md" \
+  && ! grep -rq 'WORKSPACE_CHANGELOG.md. (create it if missing)' "$R/.claude" \
+  && ok "the audit skill, its command and the agent-coach write their record into that directory, and none still says to append to the single file" \
+  || bad "still pointing at the single file, or still saying 'Append to':$out"
+git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "bootstrap with meta" 2>/dev/null
+entry() { printf '# 2026-11-21 — %s\n\n## Headline result\n\n%s\n\n## Changes applied\n\n## Deliberately NOT changed (with reasons)\n\n## Follow-ups\n' "$1" "$2"; }
+for b in audit coach; do
+  git -C "$R" checkout -q -b "wc-$b" main
+  entry "$b" "what the $b run did" > "$wc/2026-11-21-$b.md"
+  git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "record the $b run"
+done
+git -C "$R" checkout -q main
+git -C "$R" merge -q --no-edit wc-audit >/dev/null 2>&1 && git -C "$R" merge -q --no-edit wc-coach >/dev/null 2>&1 \
+  && [ -f "$wc/2026-11-21-audit.md" ] && [ -f "$wc/2026-11-21-coach.md" ] \
+  && ok "two branches that each record a run merge with no conflict, and both entries are there" \
+  || { bad "two branches that each added a file to the directory did not merge, or the directory is not there"; git -C "$R" merge --abort 2>/dev/null; }
+# One run is often several pull requests — the day that prompted this had
+# three. If each edits the run's file they meet on the same lines again, so
+# each adds a file of its own, and the installed README has to say that.
+readme_text="$(tr '\n' ' ' < "$wc/README.md" 2>/dev/null | tr -s ' ')"
+case "$readme_text" in
+  *"adds a file of its own"*) ok "the directory's README tells a later pull request of the same run to add a file of its own" ;;
+  *) bad "the README lets a second pull request of one run edit the first one's file" ;;
+esac
+case "$readme_text" in
+  *"edits that run's file"*) bad "the README still says a later pull request edits the run's file" ;;
+  *) ok "and nowhere to edit a file another open pull request may be editing" ;;
+esac
+for b in pr2 pr3; do
+  git -C "$R" checkout -q -b "wc-same-$b" main
+  printf '\n- a follow-up from %s\n' "$b" >> "$wc/2026-11-21-audit.md"
+  git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "amend the audit entry from $b"
+done
+git -C "$R" checkout -q main; git -C "$R" merge -q --no-edit wc-same-pr2 >/dev/null 2>&1
+git -C "$R" merge -q --no-edit wc-same-pr3 >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "control — two pull requests of one run that edit the same entry do conflict, which is why they do not" \
+  || bad "control: two edits of one entry merged cleanly"
+git -C "$R" merge --abort 2>/dev/null
+# Control: the shape it replaces, on the same two branches.
+C="$WORK/meta-control"; fresh_repo "$C"
+printf '# AI Workspace Changelog\n\nOne entry per run, newest first.\n\n## 2026-11-01 — setup\n\nThe first entry.\n' > "$C/WORKSPACE_CHANGELOG.md"
+git -C "$C" add -A >/dev/null; git -C "$C" commit -q -m "one file"
+for b in audit coach; do
+  git -C "$C" checkout -q -b "wc-$b" main
+  awk -v b="$b" '/^## / && !done {print "## 2026-11-21 — " b "\n\nwhat the " b " run did\n"; done=1} {print}' "$C/WORKSPACE_CHANGELOG.md" > "$C/x" && mv "$C/x" "$C/WORKSPACE_CHANGELOG.md"
+  git -C "$C" add -A >/dev/null; git -C "$C" commit -q -m "record the $b run"
+done
+git -C "$C" checkout -q main; git -C "$C" merge -q --no-edit wc-audit >/dev/null 2>&1
+git -C "$C" merge -q --no-edit wc-coach >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "control — the single newest-first file conflicts on the same two branches" \
+  || bad "control: two entries prepended to one file merged cleanly, so the case above proves nothing"
+git -C "$C" merge --abort 2>/dev/null
+# An install that has the single file keeps it: the installer never overwrites,
+# and the history in it is the adopter's.
+E="$WORK/meta-existing"; fresh_repo "$E"
+"$BOOTSTRAP" --tool claude --target "$E" >/dev/null 2>&1
+printf '# AI Workspace Changelog\n\n## 2026-10-01 — full audit\n\nKept.\n' > "$E/.claude/WORKSPACE_CHANGELOG.md"
+git -C "$E" add -A >/dev/null; git -C "$E" commit -q -m "an older install with the single file" 2>/dev/null
+"$BOOTSTRAP" --tool claude --with-meta --target "$E" >/dev/null 2>&1
+git -C "$E" diff --quiet -- .claude/WORKSPACE_CHANGELOG.md && [ -f "$E/.claude/workspace-changelog/README.md" ] \
+  && grep -q 'WORKSPACE_CHANGELOG.md' "$E/.claude/workspace-changelog/README.md" \
+  && ok "an install with the single file keeps it untouched, gets the directory, and the directory's README says what the old file is now" \
+  || bad "adding the meta layer to an install with WORKSPACE_CHANGELOG.md changed it, or left no directory"
+A="$WORK/meta-agents"; fresh_repo "$A"
+"$BOOTSTRAP" --tool agents --with-meta --target "$A" >/dev/null 2>&1
+[ -f "$A/docs/workspace-changelog/README.md" ] && [ ! -e "$A/docs/WORKSPACE_CHANGELOG.md" ] \
+  && ok "on a tool without .claude/ the directory is docs/workspace-changelog/" \
+  || bad "agents --with-meta: no docs/workspace-changelog/README.md, or the single file was installed"
+
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repos kept in $WORK"
 [ "$fail" -eq 0 ] || exit 1
