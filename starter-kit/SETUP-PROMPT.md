@@ -131,6 +131,8 @@ line is what holds before the rule arrives.
    documentation rule's "Feedback to an agent" section reads
    `.agent-feedback-authors`, which starts naming nobody: ask the user whose
    feedback counts, and never infer it from the history.
+   Ask too whether they want the weekly feedback digest (`bootstrap.sh
+   --with-coach-schedule`); install it only on a yes.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for

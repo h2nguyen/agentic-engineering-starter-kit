@@ -965,6 +965,8 @@ OBSERVE → DIAGNOSE → PROPOSE → [HUMAN APPROVES] → APPLY → MEASURE → 
 
 Guardrails: propose-never-silently-change, and prefer sharpening an existing agent over creating a new one (create only when a recurring task maps to a rule + gate no agent owns).
 
+**On a schedule, by choice.** A loop nobody runs does not turn. `bootstrap.sh --with-coach-schedule` installs a weekly workflow, asked for and never installed unasked (ADR-0021). It posts the week's `Agent-Feedback:` lines as a digest on an issue, and with an API key the coach's proposals beside them. It holds read access to code and write access to issues only, so it proposes and a person changes.
+
 ### 5.4 Anti-patterns
 
 | Anti-pattern | Why it kills the setup | Countermeasure |

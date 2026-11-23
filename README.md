@@ -82,7 +82,7 @@ self-improvement loop. To move an existing install to a newer kit, see
 |---|---|
 | [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The full guide: § 1 concepts → § 2 reference anatomy → § 3 blueprint → § 4 adoption → § 5 maintenance (+ § 3.12 the workspace graph, and § 5.6 for what graph engineering still defers) |
 | [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md) | Self-contained prompt that makes an agent drive the whole setup — with fallback specs, so it works even without the rest of this kit |
-| [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop |
+| [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop, `--with-coach-schedule` the weekly feedback digest (opt-in) |
 | [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, comments & annotations, versioning & changelog, shared registries — plus a rule-file template, and `reference/` with the worked examples and gotchas the two long rules point at (read on demand, never loaded) |
 | [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage, rule-load-check), the common-skills catalog, the workspace-audit and workspace-graph skills (Level 4), and a skill template |
 | [`starter-kit/agents/`](starter-kit/agents/) | Agent template + the agent-coach meta-agent (Level 4, propose-never-silently-change) |

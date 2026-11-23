@@ -42,6 +42,7 @@ Stdlib only.
 
   feedback_tool.py collect [--rev REV] [--since DATE] [--no-git]
                            [--from FILE]... [--authors FILE] [--out FILE]
+                           [--format json|markdown]
 """
 
 from __future__ import annotations
@@ -292,6 +293,39 @@ def collect(graph, messages, authors: set[str] | None) -> dict:
     }
 
 
+def render_markdown(report: dict, since: str | None) -> str:
+    """The report as a digest a person reads in an issue: the same content as
+    the JSON, so the same rule holds — an unlisted author's text is not in it."""
+    counts = report["counts"]
+    window = f"since {since}" if since else "in the history read"
+    if not any(counts.values()):
+        return f"No Agent-Feedback lines {window}.\n"
+    out = [f"## Agent feedback {window}", "",
+           f"{counts['accepted']} point(s) on {len(report['targets'])} artifact(s) · "
+           f"{counts['unresolved']} unresolved · {counts['excluded']} excluded", ""]
+    for group in report["targets"]:
+        out.append(f"### `{group['target']}` — {group['count']} point(s)")
+        out.append(f"`{group['path']}`")
+        out.append("")
+        for item in group["items"]:
+            out.append(f"- {item['text']} — {item['author']}, {', '.join(item['refs'])}")
+        out.append("")
+    if report["unresolved"]:
+        out += ["### Unresolved", ""]
+        for item in report["unresolved"]:
+            out.append(f"- `{item['target']}` — {item['reason']} — {item['author']}, {', '.join(item['refs'])}")
+        out.append("")
+    if report["excluded"]:
+        by_author: dict[str, int] = {}
+        for entry in report["excluded"]:
+            by_author[entry["author"]] = by_author.get(entry["author"], 0) + 1
+        who = ", ".join(f"{a} ({n})" for a, n in sorted(by_author.items()))
+        out += ["### Excluded", "",
+                f"{counts['excluded']} line(s) from authors not listed in `{AUTHORS_FILE}`: {who}. "
+                "Their text is not shown.", ""]
+    return "\n".join(out)
+
+
 def cmd_collect(args) -> int:
     graph = gt.load_graph(args.config)
     root = graph.root
@@ -311,7 +345,10 @@ def cmd_collect(args) -> int:
     report["authors_listed"] = len(authors or ())
     report.update(collect(graph, messages, authors))
 
-    text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    if args.format == "markdown":
+        text = render_markdown(report, args.since)
+    else:
+        text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.out:
         try:
             with open(args.out, "w", encoding="utf-8") as fh:
@@ -352,6 +389,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help='a JSON list of {"author", "body", "url"?, "date"?} comments; repeatable')
     p.add_argument("--authors", help=f"whose feedback counts (default: {AUTHORS_FILE} at the repository root)")
     p.add_argument("--out", help="write the report here instead of to stdout")
+    p.add_argument("--format", choices=("json", "markdown"), default="json",
+                   help="json for an agent (default), markdown for a digest a person reads")
     return parser
 
 
