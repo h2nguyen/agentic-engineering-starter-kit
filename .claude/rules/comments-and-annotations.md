@@ -1,0 +1,1 @@
+../../starter-kit/rules/comments-and-annotations.md

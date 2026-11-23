@@ -10,6 +10,10 @@ Cursor, GitHub Copilot (guide § 3.10). Extracted from a mature production
 repository (called *the reference project* throughout the guide) and fully
 de-branded: its material is illustration, never prescription.
 
+This repository runs on its own kit — the gates, the rules, the hook and the
+feedback loop. What that shows, computed from the repository itself and
+recomputed on every pull request, is in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+
 ## Requirements
 
 `git`, `make`, `bash` 3.2 or newer and Python 3.9 or newer — standard
@@ -91,6 +95,7 @@ self-improvement loop. To move an existing install to a newer kit, see
 | [`starter-kit/docs/`](starter-kit/docs/), `changelog.d/`, `registries.json.template`, `gitattributes.template`, `Makefile.template`, `ci/` | The shared-append-only-registry layer: fragment directories, declaration, merge behaviour, lint target and CI workflow (guide § 3.11) |
 | [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, [`starter-kit/workspace-changelog/`](starter-kit/workspace-changelog/) | The workspace-graph hook, which on Claude Code tells the agent what cites a file it has just edited; tool settings; a SessionStart hook template for the day sessions need environment setup; the workspace-changelog directory, one file per run |
 | [`docs/explainers/self-improving-agents.html`](docs/explainers/self-improving-agents.html) | Interactive explainer (German and English, opens in any browser, no build): how a correction becomes a reviewed change to an agent's instructions, what the kit already had, and how far the loop is automated |
+| [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | What this repository can show about running on its own kit: gates, the record of change, the feedback loop — every number computed from the repository and recomputed by `make lint` |
 | [`docs/adr/`](docs/adr/) | Decision records for this project — starting with why the repo is canonical and a plugin is a future distribution channel |
 | [`AGENTS.md`](AGENTS.md), [`CONTRIBUTING.md`](CONTRIBUTING.md) | How an agent installs or changes the kit; how a person changes it — tests, gates, changelog, release |
 

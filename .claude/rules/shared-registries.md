@@ -1,0 +1,1 @@
+../../starter-kit/rules/shared-registries.md

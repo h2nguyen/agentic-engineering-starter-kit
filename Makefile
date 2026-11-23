@@ -20,10 +20,11 @@ KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        guide-templates rule-budget documented-commands kit-smoke agent-feedback
+        guide-templates rule-budget documented-commands kit-smoke agent-feedback \
+        self-application evidence evidence-check
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands test
+lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands self-application evidence-check test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
@@ -37,7 +38,9 @@ test:
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 	$(KIT)/scripts/tests/test-upgrade.sh
 	$(KIT)/scripts/tests/test-graph-hooks.sh
+	$(KIT)/scripts/python.sh -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
 	scripts/tests/test-eval-run.sh
+	scripts/tests/test-self-application.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
@@ -102,6 +105,23 @@ rule-budget:
 ## starts Python through scripts/python.sh, as everything it runs does.
 documented-commands:
 	scripts/check-documented-commands.sh
+
+## self-application — this repository applies the agent side of its own kit:
+## every shipped rule, skill, agent and command is linked under .claude/, never
+## copied, and the workspace-graph hook is registered (ADR-0022).
+self-application:
+	scripts/check-self-application.sh
+
+## evidence — rewrite docs/EVIDENCE.md from the repository as it is at HEAD:
+## what this repository can show about running on its own kit. Commit the
+## result; run it before a release.
+evidence:
+	@$(KIT)/scripts/python.sh -B scripts/evidence_tool.py generate
+
+## evidence-check — docs/EVIDENCE.md reproduces at the commit it is stamped
+## with. Anyone with a clone can run it; nothing in the file is typed by hand.
+evidence-check:
+	scripts/check-evidence.sh
 
 ## kit-smoke — bootstrap into a throwaway repo and run its gates there.
 kit-smoke:

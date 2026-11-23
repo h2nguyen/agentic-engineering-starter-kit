@@ -143,6 +143,7 @@ make lint                                   # everything CI runs; must pass befo
 make kit-smoke                              # install into a throwaway repo and run its lint
 make registry-generate                      # rebuild CHANGELOG.md from changelog.d/
 make graph-impact NODE=RULE:documentation   # what cites an artifact — before renaming or deleting it
+make evidence                               # rewrite docs/EVIDENCE.md from the repository; never edit it by hand
 scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one command of an evaluation, recorded
 ```
 
@@ -162,11 +163,36 @@ scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one comma
 | **Rule files** | 250 lines at most; worked examples go to `starter-kit/rules/reference/` |
 | **Nothing speculative** | An artifact ships on day 1 only when waiting for a signal means waiting for one that never comes, and a decision record says so |
 
+### The kit's rules apply here
+
+This repository runs on its own kit (ADR-0022). On Claude Code the rules, the
+skills, the `agent-coach` and the workspace-graph hook load from `.claude/`,
+whose entries are links into `starter-kit/`. On any other tool, read the rules
+where the kit keeps them:
+[working principles](starter-kit/rules/working-principles.md),
+[documentation](starter-kit/rules/documentation.md),
+[comments and annotations](starter-kit/rules/comments-and-annotations.md) with
+this repository's half in
+[`project-annotations.md`](.claude/rules/project-annotations.md),
+[versioning and changelog](starter-kit/rules/versioning-and-changelog.md) and
+[shared registries](starter-kit/rules/shared-registries.md).
+
+A rule names paths as an installed project has them. Here they are:
+
+| A rule or skill says | In this repository |
+|---|---|
+| `./scripts/python.sh scripts/<tool>.py …` | `starter-kit/scripts/python.sh starter-kit/scripts/<tool>.py …` — the make targets are the same here: `make registry-generate`, `make graph-impact NODE=…`, `make agent-feedback` |
+| `docs/agent-templates/<template>` | `starter-kit/rules/_rule-template.md`, `starter-kit/skills/_template/SKILL.md`, `starter-kit/agents/_agent-template.md`, `starter-kit/commands/_command-template.md`, `starter-kit/scripts/check-convention.sh.template` |
+| `docs/rule-reference/` | `starter-kit/rules/reference/` |
+| `.claude/rules/<rule>.md`, `.claude/skills/<skill>/` | The same path, which is a link: edit the kit's file under `starter-kit/` |
+| The debugging knowledge base | None here; a registry is declared when it exists |
+
 ### Where things are
 
 | Path | What it is |
 |---|---|
 | [`starter-kit/`](starter-kit/) | Everything that gets installed, and `bootstrap.sh`, which installs it |
+| `.claude/` | The kit applied to this repository: links into `starter-kit/`, the hook's registration, and the two things that are this repository's own — `rules/project-annotations.md` and `workspace-changelog/` |
 | [`AGENTIC-ENGINEERING-GUIDE.md`](AGENTIC-ENGINEERING-GUIDE.md) | The reasoning: concepts, blueprint, adoption playbook, maintenance |
 | [`docs/adr/`](docs/adr/) | Why the kit is the way it is |
 | [`changelog.d/`](changelog.d/), [`CHANGELOG.md`](CHANGELOG.md) | One fragment per change; the generated changelog |
