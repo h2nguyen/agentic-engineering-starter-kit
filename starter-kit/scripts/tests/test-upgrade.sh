@@ -18,7 +18,10 @@
 #      says they will: first that lint does not reach the link gate, then the
 #      old-form `# Enforces:` header — and nothing else;
 #   4. at the end `make lint` is green, the project's own check and tests ran
-#      in it, and running step 1 again changes nothing.
+#      in it, and running step 1 again changes nothing;
+#   5. the record of which kit is installed (.starter-kit-version) is not
+#      written by step 1, is refused by step 7's command while kit files are
+#      still the older kit's, and is written by it once the steps are done.
 #
 # The commands for steps 1 and 2, and the command of step 3 that creates
 # project-annotations.md, are read out of the README, not retyped here, so
@@ -85,6 +88,9 @@ STEP3APPLY="$(block_with 'upgrade-rules.sh --apply')"
 case "$STEP3APPLY" in *'--apply <rule>'*) ok "the README's step 3 gives the --apply command with the rules left for the reader to name" ;;
   *) bad "the README's --apply command names the rules itself, or is gone: '$(printf '%s' "$STEP3APPLY" | head -1)'" ;; esac
 STEP3APPLY="$(printf '%s' "$STEP3APPLY" | sed 's/--apply .*$/--apply/')"
+STEP7="$(block_with 'kit-status.sh --record')"
+case "$STEP7" in '"$KIT"/starter-kit/kit-status.sh --record'*) ok "the README's step 7 is the command that records the kit" ;;
+  *) bad "the upgrade section has no command block that records the kit: '$STEP7'" ;; esac
 case "$STEP3MOVE" in *'project-annotations.md.template'*'project-annotations.md'*) ok "the README's step 3 has the command that creates project-annotations.md" ;;
   *) bad "the upgrade section no longer has a command block that creates project-annotations.md" ;; esac
 case "$STEP1" in *'bootstrap.sh --target .'*) ok "the README's step 1 is the installer, run on the repository itself" ;;
@@ -92,6 +98,7 @@ case "$STEP1" in *'bootstrap.sh --target .'*) ok "the README's step 1 is the ins
 case "$STEP2" in *'cp "$KIT"/starter-kit/scripts/'*'registry.mk'*) ok "the README's step 2 copies the kit's scripts and registry.mk" ;;
   *) bad "the upgrade section's second command block no longer copies the kit's files" ;; esac
 
+released="$(sed -n 's/^## \[\([0-9][^]]*\)\].*/\1/p' "$KIT_ROOT/CHANGELOG.md" | head -1)"
 fresh_repo() { # $1 = dir
   mkdir -p "$1"; git -C "$1" init -q -b main
   git -C "$1" config user.email t@example.invalid; git -C "$1" config user.name t
@@ -117,7 +124,8 @@ aged_install() { # $1 = dir
          "$R/scripts/check-constitution.sh" "$R/scripts/tests/test_graph_tool.py" \
          "$R/scripts/tests/test-graph-links.sh" "$R/scripts/tests/test-python-launcher.sh" \
          "$R/scripts/tests/test-constitution.sh" "$R/docs/agent-templates" "$R/docs/rule-reference" \
-         "$R/.claude/hooks/workspace-graph.py" "$R/.claude/rules/project-annotations.md"
+         "$R/.claude/hooks/workspace-graph.py" "$R/.claude/rules/project-annotations.md" \
+         "$R/.starter-kit-version"
   cp "$KIT_DIR/scripts/tests/test-bootstrap-rerun.sh" "$KIT_DIR/scripts/tests/test-brownfield-adoption.sh" "$R/scripts/tests/"
   # No kit before load classes wrote a `paths:` header: every rule was the
   # kit's file as it stood.
@@ -285,6 +293,21 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
     && ok "$name: step 1 adds the session-start template and leaves the hook the older kit installed alone" \
     || bad "$name: step 1 did not add the session-start template, or touched the existing hook"
 
+  # An install from before the record has none, and step 1 must not invent
+  # one: it replaced no file, so "this kit" would be false.
+  [ ! -e "$R/.starter-kit-version" ] && grep -q 'was NOT written' "$WORK/$name-step1.log" \
+    && ok "$name: step 1 writes no version record into an install it has not upgraded, and says so" \
+    || bad "$name: step 1 wrote .starter-kit-version, or does not say why it did not"
+  if [ "$name" != "1.x-shaped" ]; then
+    # Step 7's command, too early. On a real older install the files are that
+    # release's, and the kit's history can tell. (The 1.x-shaped fixture's
+    # files are no release's, so nothing can tell there.)
+    ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP7" ) > "$WORK/$name-step7-early.log" 2>&1; rc=$?
+    [ "$rc" -ne 0 ] && [ ! -e "$R/.starter-kit-version" ] && grep -q "$name" "$WORK/$name-step7-early.log" \
+      && ok "$name: control — run before steps 2 and 3, step 7's command refuses, names the release the files are, and writes nothing" \
+      || bad "$name: step 7's command recorded this kit over an install that is still $name's (exit $rc)"
+  fi
+
   # Step 2 — replace the files the kit owns.
   ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP2" ) > "$WORK/$name-step2.log" 2>&1; rc=$?
   [ "$rc" -eq 0 ] && ok "$name: step 2 runs as written" || { bad "$name: step 2 exited $rc:"; tail -3 "$WORK/$name-step2.log" | sed 's/^/         /'; }
@@ -299,6 +322,30 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   [ "$(ls "$R/scripts/tests" | grep -v __pycache__)" = "$(ls "$FRESH/scripts/tests")" ] \
     && ok "$name: scripts/tests/ holds exactly the suites a fresh install has — none of the kit's installer suites" \
     || bad "$name: scripts/tests/ differs from a fresh install: $(diff <(ls "$FRESH/scripts/tests") <(ls "$R/scripts/tests" | grep -v __pycache__) | grep '^[<>]' | tr '\n' ' ')"
+  # The second half of step 2, on Claude Code: the kit's skills, hook, coach
+  # and audit command. The README lists the ones that differ and leaves the
+  # copying to the reader, file by file; this is that reader, for every file
+  # no commit of the adopter's changed. It was not run here until the version
+  # record refused an upgrade that had skipped it.
+  STEP2LIST="$(block_with 'diff -rq "$KIT"/starter-kit/skills')"
+  case "$STEP2LIST" in *'hooks/workspace-graph.py'*'agents/agent-coach.md'*) ;;
+    *) bad "$name: the README's step 2 no longer lists the hook, skills, coach and command to compare" ;; esac
+  for f in $( cd "$R" && find .claude/skills .claude/hooks/workspace-graph.py .claude/agents/agent-coach.md \
+                .claude/commands/ai-engineering-workspace-audit.md -type f 2>/dev/null ); do
+    case "$f" in
+      .claude/skills/*) src="$KIT_DIR/skills/${f#.claude/skills/}" ;;
+      .claude/hooks/*)  src="$KIT_DIR/hooks/${f#.claude/hooks/}" ;;
+      .claude/agents/*) src="$KIT_DIR/agents/${f#.claude/agents/}" ;;
+      *)                src="$KIT_DIR/commands/${f#.claude/commands/}" ;;
+    esac
+    [ -f "$src" ] || continue
+    cmp -s "$src" "$R/$f" && continue
+    [ "$(git -C "$R" log --oneline -- "$f" | wc -l | tr -d ' ')" -le 1 ] && cp "$src" "$R/$f"
+  done
+  out="$( cd "$R" && KIT="$KIT_ROOT" bash -c "$STEP2LIST" 2>/dev/null | grep -c '^Files' )"
+  [ "$out" -eq 0 ] \
+    && ok "$name: step 2, second half — every skill and the hook the adopter did not change is the newer kit's" \
+    || bad "$name: $out of the kit's skills, hook, coach or command still differ after step 2"
   cmp -s "$R/scripts/check-payments.sh" <(git -C "$R" show "$pre:scripts/check-payments.sh") \
     && ok "$name: the adopter's own check script in scripts/ was not touched by the copy" \
     || bad "$name: step 2 changed scripts/check-payments.sh"
@@ -394,6 +441,18 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   [ "$rc" -eq 0 ] && ! grep -q '^SKIP' "$WORK/$name-suites.log" \
     && ok "$name: the kit's own suites pass from the upgraded repository, and none of them only skips" \
     || { bad "$name: 'make registry-test' fails or skips after the upgrade (exit $rc):"; grep -E 'FAIL|SKIP|Error|No such file' "$WORK/$name-suites.log" | head -4 | cut -c1-150 | sed 's/^/         /'; }
+
+  # Step 7 — the record, now that the files bear it out. The adopter's own
+  # changes are not the kit's text and do not stand in its way.
+  ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP7" ) > "$WORK/$name-step7.log" 2>&1; rc=$?
+  [ "$rc" -eq 0 ] && grep -q "^version: $released\$" "$R/.starter-kit-version" 2>/dev/null \
+    && grep -q '^tool: claude$' "$R/.starter-kit-version" \
+    && ok "$name: step 7 records this kit's release ($released) and the tool" \
+    || { bad "$name: step 7 exited $rc:"; tail -4 "$WORK/$name-step7.log" | cut -c1-150 | sed 's/^/         /'; }
+  ( cd "$R" && KIT="$KIT_ROOT" bash -e -c '"$KIT"/starter-kit/kit-status.sh' ) > "$WORK/$name-status.log" 2>&1
+  grep -qi 'up to date' "$WORK/$name-status.log" && ! grep -q "^  older kit" "$WORK/$name-status.log" \
+    && ok "$name: and the report then calls the repository up to date, with no file left the older kit's" \
+    || { bad "$name: after the upgrade the report says:"; grep -E '^Verdict|^  [a-z]' "$WORK/$name-status.log" | head -4 | cut -c1-150 | sed 's/^/         /'; }
 
   # Running step 1 again adds nothing and changes nothing.
   git -C "$R" add -A >/dev/null 2>&1; git -C "$R" commit -q -m "upgrade the agentic kit" 2>/dev/null

@@ -1,0 +1,92 @@
+# Installed as .github/workflows/kit-upgrade-notice.yml only when asked for:
+# `bootstrap.sh --with-upgrade-notice`, or yes to the installer's question.
+#
+# Once a week it compares the release .starter-kit-version records with the
+# release tags of the starter kit's repository. When a newer release exists it
+# opens one issue labelled `kit-upgrade`, or comments on the open one when the
+# newest release has changed since. Nothing newer, or no record: it does nothing.
+#
+# This is the one place the kit uses the network, which is why it is a choice.
+# It lists tag names (`git ls-remote`) and downloads nothing else: no code of
+# the kit's runs here. The job can read this repository and write to issues,
+# and nothing else — no push, no branch, no pull request. What changed, and
+# which of your files differ, is the offline report a person runs:
+#     make kit-status KIT=<path to a checkout of the kit>
+#
+# GitHub runs scheduled workflows from the default branch only, and in a public
+# repository it pauses the schedule after 60 days without activity. Run it by
+# hand from the Actions tab (workflow_dispatch) at any time.
+
+name: kit upgrade notice
+
+on:
+  schedule:
+    - cron: "43 6 * * 1" # Mondays, 06:43 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # Where the kit's releases are tagged. Point it at your fork if you install
+  # from one.
+  KIT_REPOSITORY: https://github.com/h2nguyen/agentic-engineering-starter-kit
+  NOTICE_LABEL: kit-upgrade
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare the record with the kit's releases
+        id: compare
+        run: |
+          recorded="$(sed -n 's/^version:[[:space:]]*//p' .starter-kit-version 2>/dev/null | head -1)"
+          case "$recorded" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "No release recorded in .starter-kit-version: nothing to compare. The kit's kit-status.sh --record writes one."; exit 0 ;;
+          esac
+          latest="$(git ls-remote --tags --refs "$KIT_REPOSITORY" 'v[0-9]*' \
+            | sed 's|.*refs/tags/v||' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          if [ -z "$latest" ]; then
+            echo "No release tags found at $KIT_REPOSITORY." >&2
+            exit 1
+          fi
+          echo "recorded=$recorded" >> "$GITHUB_OUTPUT"
+          newest="$(printf '%s\n%s\n' "$recorded" "$latest" | sort -V | tail -1)"
+          if [ "$latest" != "$recorded" ] && [ "$newest" = "$latest" ]; then
+            echo "newer=$latest" >> "$GITHUB_OUTPUT"
+            echo "Kit $latest is newer than the recorded $recorded."
+          else
+            echo "Recorded $recorded; the newest release is $latest. Nothing to do."
+          fi
+
+      - name: Open or update the issue
+        if: steps.compare.outputs.newer != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECORDED: ${{ steps.compare.outputs.recorded }}
+          NEWER: ${{ steps.compare.outputs.newer }}
+        run: |
+          title="Starter kit $NEWER is available (this repository records $RECORDED)"
+          {
+            echo "This repository's agent workspace records starter kit **$RECORDED** in \`.starter-kit-version\`."
+            echo "Release **$NEWER** is tagged at $KIT_REPOSITORY."
+            echo ""
+            echo "- What changed: $KIT_REPOSITORY/blob/v$NEWER/CHANGELOG.md — entries marked **Breaking** need a change to files of yours."
+            echo "- What that means here, offline, from a checkout of the kit at \`v$NEWER\`:"
+            echo "  \`make kit-status KIT=<path to the checkout>\` lists the changelog entries between the two releases and which of the kit's files in this repository differ."
+            echo "- The upgrade: \"Upgrading an existing install\" in the kit's \`starter-kit/README.md\`. Its last step, \`kit-status.sh --record\`, updates the record; this issue can be closed then."
+          } > notice.md
+          gh label create "$NOTICE_LABEL" --force --description "A newer starter kit is available" >/dev/null
+          open="$(gh issue list --label "$NOTICE_LABEL" --state open --json number,title --jq '.[0] // empty | "\(.number)\t\(.title)"')"
+          if [ -z "$open" ]; then
+            gh issue create --title "$title" --label "$NOTICE_LABEL" --body-file notice.md
+          elif [ "${open#*$'\t'}" != "$title" ]; then
+            gh issue comment "${open%%$'\t'*}" --body-file notice.md
+            gh issue edit "${open%%$'\t'*}" --title "$title"
+          else
+            echo "Issue #${open%%$'\t'*} already says so."
+          fi

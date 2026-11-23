@@ -12,7 +12,7 @@
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #                  [--source-paths <glob>[,<glob>...]]
-#                  [--with-coach-schedule]
+#                  [--with-coach-schedule] [--with-upgrade-notice]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
 #   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver, rule-load-check)
@@ -25,13 +25,19 @@
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
 #             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
 #             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh,
-#             check-constitution.sh, feedback_tool.py), .agent-feedback-authors
+#             check-constitution.sh, feedback_tool.py), .agent-feedback-authors,
+#             .starter-kit-version (first install only: the kit's release, its
+#             commit and the tool — kit-status.sh reads it and checks it)
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog directory (Claude Code; others: that directory only)
 #   --with-coach-schedule (opt-in, any tool): .github/workflows/agent-feedback.yml,
 #             a weekly digest of the Agent-Feedback lines on an issue, plus the
 #             coach's proposals there when an ANTHROPIC_API_KEY secret is set.
+#             Asked at a terminal on a first install; never installed unasked.
+#   --with-upgrade-notice (opt-in, any tool): .github/workflows/kit-upgrade-notice.yml,
+#             which once a week lists the kit's release tags over the network and
+#             opens an issue when one is newer than .starter-kit-version records.
 #             Asked at a terminal on a first install; never installed unasked.
 #
 # Placeholder templates (rule, check script, skill, reviewer agent, command,
@@ -59,6 +65,7 @@ TARGET="$(pwd)"
 TOOL=""
 WITH_META=0
 WITH_SCHEDULE=0
+WITH_NOTICE=0
 TARGET_GIVEN=0
 SOURCE_PATHS=""
 
@@ -68,6 +75,7 @@ while [ $# -gt 0 ]; do
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
     --with-coach-schedule) WITH_SCHEDULE=1; shift ;;
+    --with-upgrade-notice) WITH_NOTICE=1; shift ;;
     --source-paths) SOURCE_PATHS="${2:?--source-paths needs a value, e.g. 'src/**,scripts/**'}"; shift 2 ;;
     -h|--help) sed -n '2,/^set -euo pipefail/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
@@ -225,6 +233,18 @@ if [ "$WITH_SCHEDULE" -eq 0 ] && [ -t 0 ] && [ ! -e "$TARGET/$SCHEDULE_WORKFLOW"
   case "$_answer" in y|Y|yes|YES|Yes|j|J|ja|Ja) WITH_SCHEDULE=1 ;; esac
 fi
 
+# The upgrade notice is the one thing here that uses the network: a scheduled
+# workflow that lists the kit's release tags and opens an issue when one is
+# newer than the record. The kit itself stays offline, so this is installed on
+# the same terms as the digest: the flag, or yes to a question at a terminal.
+NOTICE_WORKFLOW=.github/workflows/kit-upgrade-notice.yml
+if [ "$WITH_NOTICE" -eq 0 ] && [ -t 0 ] && [ ! -e "$TARGET/$NOTICE_WORKFLOW" ] \
+   && [ ! -f "$TARGET/scripts/registry_tool.py" ] && ! declined "$NOTICE_WORKFLOW"; then
+  printf "Install a weekly check for a newer kit (%s)? It lists the kit's release\ntags over the network and opens an issue when one is newer than this install records.\nIt never changes the repository. [y/N]: " "$NOTICE_WORKFLOW"
+  read -r _answer || _answer=""
+  case "$_answer" in y|Y|yes|YES|Yes|j|J|ja|Ja) WITH_NOTICE=1 ;; esac
+fi
+
 install_file() { # $1 = kit-relative src, $2 = target-relative dst, $3 = "x" for executable
   local src="$KIT_DIR/$1" dst="$TARGET/$2"
   if [ -e "$dst" ]; then
@@ -287,7 +307,8 @@ install_tree() { # $1 = kit-relative src dir, $2 = target-relative dst dir
   # installs into has no bootstrap.sh for them to run.
   done < <(find "$src" -type f ! -name '*.pyc' ! -path '*/__pycache__/*' \
              ! -name 'test-bootstrap-rerun.sh' ! -name 'test-brownfield-adoption.sh' \
-             ! -name 'test-upgrade.sh' ! -name 'test-graph-hooks.sh')
+             ! -name 'test-upgrade.sh' ! -name 'test-graph-hooks.sh' \
+             ! -name 'test-kit-status.sh')
   return $any
 }
 
@@ -377,6 +398,9 @@ install_file registry.mk registry.mk || true
 install_file ci/lint.yml.template .github/workflows/lint.yml || true
 if [ "$WITH_SCHEDULE" -eq 1 ]; then
   install_file ci/agent-feedback.yml.template "$SCHEDULE_WORKFLOW" || true
+fi
+if [ "$WITH_NOTICE" -eq 1 ]; then
+  install_file ci/kit-upgrade-notice.yml.template "$NOTICE_WORKFLOW" || true
 fi
 RERUN="$HAD_KIT"
 install_file scripts/registry_tool.py scripts/registry_tool.py x || true
@@ -583,27 +607,59 @@ if [ "$WITH_META" -eq 1 ]; then
   esac
 fi
 
-# Which kit this is. Nothing in the target records it (ADR-0011), so the run
-# is the one place the answer exists, and the handoff copies the line. Read
-# only from the kit's own checkout: a bare copy of starter-kit/ inside a
-# project sits in that project's repository, and its HEAD is not the kit's.
+# Which kit this is: the last release in the kit's changelog and, from a
+# checkout, the commit. Read only from the kit's own checkout: a bare copy of
+# starter-kit/ inside a project sits in that project's repository, and its
+# HEAD is not the kit's.
+KIT_RELEASE=""; KIT_COMMIT=""; KIT_DIRTY=0
+_kit_root="$(cd "$KIT_DIR/.." && pwd -P)"
+if [ -f "$_kit_root/AGENTIC-ENGINEERING-GUIDE.md" ]; then
+  KIT_RELEASE="$(sed -n '/^## \[[0-9]/{s/^## \[\([^]]*\)\].*/\1/p;q;}' "$_kit_root/CHANGELOG.md" 2>/dev/null || true)"
+fi
+if [ -n "$KIT_RELEASE" ] && [ "$(git -C "$_kit_root" rev-parse --show-toplevel 2>/dev/null || true)" = "$_kit_root" ]; then
+  KIT_COMMIT="$(git -C "$_kit_root" rev-parse HEAD 2>/dev/null || true)"
+  if [ -n "$KIT_COMMIT" ] && [ -n "$(git -C "$_kit_root" status --porcelain -- starter-kit 2>/dev/null || true)" ]; then
+    KIT_DIRTY=1
+  fi
+fi
 kit_version() {
-  local root released commit
-  root="$(cd "$KIT_DIR/.." && pwd -P)"
-  released="$(sed -n '/^## \[[0-9]/{s/^## \[\([^]]*\)\].*/\1/p;q;}' "$root/CHANGELOG.md" 2>/dev/null || true)"
-  if [ -z "$released" ] || [ ! -f "$root/AGENTIC-ENGINEERING-GUIDE.md" ]; then
+  local commit
+  if [ -z "$KIT_RELEASE" ]; then
     echo "Kit: version not recorded — this starter-kit/ is a copy without the kit's CHANGELOG.md beside it."
     return 0
   fi
-  commit=""
-  if [ "$(git -C "$root" rev-parse --show-toplevel 2>/dev/null || true)" = "$root" ]; then
-    commit="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || true)"
-    if [ -n "$commit" ] && [ -n "$(git -C "$root" status --porcelain -- starter-kit 2>/dev/null || true)" ]; then
-      commit="$commit, with uncommitted changes"
-    fi
-  fi
-  echo "Kit: last release $released${commit:+, at commit $commit}"
+  commit="$(printf '%s' "$KIT_COMMIT" | cut -c1-7)"
+  if [ "$KIT_DIRTY" -eq 1 ]; then commit="$commit, with uncommitted changes"; fi
+  echo "Kit: last release $KIT_RELEASE${commit:+, at commit $commit}"
 }
+
+# The record of that, in the target (ADR-0024). Written here on a first
+# install and by `kit-status.sh --record` when an upgrade is finished, and by
+# nothing else: a re-run adds files and upgrades none, so it must not move the
+# record, and an install that has no record is not given one that guesses. It
+# is a claim; kit-status.sh checks it against the files every time it reads it.
+VERSION_RECORD=.starter-kit-version
+RECORD_NOTE=""
+if [ -e "$TARGET/$VERSION_RECORD" ]; then
+  SKIPPED+=("$VERSION_RECORD (already exists — left untouched)")
+elif declined "$VERSION_RECORD"; then
+  SKIPPED+=("$VERSION_RECORD (declined in $DECLINE_LIST)")
+elif [ -z "$KIT_RELEASE" ]; then
+  RECORD_NOTE=unknown-kit
+elif [ "$HAD_KIT" -eq 1 ]; then
+  RECORD_NOTE=existing-install
+else
+  {
+    echo "# The starter kit this repository's agent workspace was last brought in line with."
+    echo "# Written by the kit, not by hand: by bootstrap.sh on a first install, and by"
+    echo "# \`kit-status.sh --record\` when an upgrade is finished. It is a claim, checked"
+    echo "# against the files by:  make kit-status KIT=<path to a checkout of the kit>"
+    echo "version: $KIT_RELEASE"
+    echo "commit: ${KIT_COMMIT:-unknown}"
+    echo "tool: $TOOL"
+  } > "$TARGET/$VERSION_RECORD"
+  INSTALLED+=("$VERSION_RECORD (kit $KIT_RELEASE${KIT_COMMIT:+, commit $(printf '%s' "$KIT_COMMIT" | cut -c1-7)}, tool $TOOL)")
+fi
 
 echo ""
 echo "=== bootstrap: $TOOL → $TARGET ==="
@@ -624,8 +680,16 @@ if [ "$RERUN" -eq 1 ]; then
   echo "  (the 'Installed' list above, if any). No file that was already here was changed —"
   echo "  not your rules, and not the kit's own scripts."
   echo "  1. To move those to this version of the kit, follow 'Upgrading an existing install'"
-  echo "     in $KIT_DIR/README.md."
+  echo "     in $KIT_DIR/README.md. Which kit this repository records, what this one"
+  echo "     has that it lacks, and the changelog entries in between:"
+  echo "         $KIT_DIR/kit-status.sh --target $TARGET"
   echo "  2. Run 'make lint'."
+  if [ "$RECORD_NOTE" = existing-install ]; then
+    echo "  $VERSION_RECORD was NOT written. This repository had the kit before this run, and"
+    echo "  the run replaced none of its files, so a record naming this kit would be false. The"
+    echo "  report above names the release the files match; the last upgrade step,"
+    echo "  'kit-status.sh --record', writes the record once the files bear it out."
+  fi
   if [ ${#INSTALLED[@]} -gt 0 ]; then
     echo "  If a path under 'Installed' is one you had deleted on purpose, this run could not"
     echo "  know: delete it again and add the path to $DECLINE_LIST at the repository root —"
@@ -726,6 +790,44 @@ if [ -f "$TARGET/$SCHEDULE_WORKFLOW" ]; then
 elif ! declined "$SCHEDULE_WORKFLOW"; then
   echo "     Optional: a weekly digest of the Agent-Feedback lines on an issue, with the coach's"
   echo "     proposals when an API key is set — re-run with --with-coach-schedule to add it."
+fi
+if [ -f "$TARGET/$NOTICE_WORKFLOW" ]; then
+  echo "     $NOTICE_WORKFLOW checks once a week whether the kit has a release newer than"
+  echo "     $VERSION_RECORD records, and opens an issue when it does. It lists tag names over"
+  echo "     the network and runs none of the kit's code. GitHub runs it from the default branch only."
+elif ! declined "$NOTICE_WORKFLOW"; then
+  echo "     Optional: a weekly check for a newer kit, as an issue when there is one — re-run with"
+  echo "     --with-upgrade-notice to add it. Offline, at any time: make kit-status KIT=<kit checkout>."
+fi
+if [ "$RERUN" -eq 0 ] && [ -f "$TARGET/$VERSION_RECORD" ] && [ ${#SKIPPED[@]} -gt 0 ]; then
+  # Kit files that were here before the install stay the project's, and the
+  # record does not make them the kit's: kit-status lists them as changed here.
+  _kept_kit=""
+  for _s in "${SKIPPED[@]}"; do
+    case "$_s" in
+      *"already exists"*)
+        _p="${_s%% (*}"
+        case "$_p" in
+          scripts/*.py|scripts/check-*.sh|scripts/python.sh|scripts/tests/*|registry.mk|docs/agent-templates/*|docs/rule-reference/*|.claude/hooks/workspace-graph.py|.claude/skills/*|.claude/agents/agent-coach.md|.claude/commands/ai-engineering-workspace-audit.md|"$RULES_DIR"/*.md)
+            [ "$_p" = "$RULES_DIR/project-annotations.md" ] || _kept_kit="$_kept_kit $_p" ;;
+        esac ;;
+    esac
+  done
+  if [ -n "$_kept_kit" ]; then
+    echo "     $VERSION_RECORD names kit $KIT_RELEASE, but these kit files that were already here are"
+    echo "     yours, not the kit's — 'kit-status.sh' lists them as changed here:"
+    for _p in $_kept_kit; do echo "         $_p"; done
+    echo "     Merge the kit's version into each by hand if you want it."
+  fi
+fi
+if [ "$RECORD_NOTE" = unknown-kit ]; then
+  echo "     $VERSION_RECORD was not written: this starter-kit/ is a copy without the kit's"
+  echo "     CHANGELOG.md, so it cannot say which release it is. Install from a checkout of the kit"
+  echo "     to get a record, or write one later with the kit's kit-status.sh --record."
+fi
+if [ "$KIT_DIRTY" -eq 1 ] && [ -z "$RECORD_NOTE" ] && [ "$RERUN" -eq 0 ]; then
+  echo "     Note: the kit checkout has uncommitted changes under starter-kit/. $VERSION_RECORD names"
+  echo "     its commit; 'make kit-status' will list the files that differ from that commit."
 fi
 if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
