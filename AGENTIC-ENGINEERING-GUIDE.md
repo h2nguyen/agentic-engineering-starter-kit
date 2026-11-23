@@ -131,7 +131,7 @@ Autonomy is bounded by review gates that keep humans in control of anything hard
 | **MCP server** | An external tool server the agent can call (docs generators, analyzers) | On demand | `.mcp.json` |
 | **Enforcement script** | A CI-wired check that mechanically enforces a convention | Every PR | `scripts/check-*.sh` + lint target |
 | **Knowledge base** | Append-only log of diagnosed bugs in a fixed format | Searched on demand | `docs/…/DEBUGGING-KNOWLEDGE-BASE.*` |
-| **Workspace changelog** | Audit history of the AI configuration itself | On demand | `.claude/WORKSPACE_CHANGELOG.md` |
+| **Workspace changelog** | Audit history of the AI configuration itself, one file per run | On demand | `.claude/workspace-changelog/` |
 | **Registry fragment** | One entry of a shared append-only registry, as its own file — the authored source a generator assembles (§3.11) | Authored per entry | `changelog.d/`, `<artifact>.d/` |
 | **Typed link** | A line in one artifact that names another by a stable token (`Related:`, `Enforces:`, `Hands off to:`) — the edges of the workspace graph (§3.12) | Resolved on every PR | any artifact |
 
@@ -156,7 +156,7 @@ The reference project is a multi-tenant SaaS platform operating under a strict r
 | MCP | `.mcp.json` — 2 servers | — | Architecture analysis + arc42 docs as callable tools |
 | Enforcement | `scripts/check-*` — 37 scripts, ~44 `ci-lint` gates | — | Rules that cannot be silently violated |
 | Knowledge base | `DEBUGGING-KNOWLEDGE-BASE.adoc` | 160 entries | Paying for each bug class only once |
-| Meta | audit skill + `WORKSPACE_CHANGELOG.md` + `agent-coach` | — | The setup maintains itself |
+| Meta | audit skill + workspace changelog + `agent-coach` | — | The setup maintains itself |
 
 ### 2.2 Layer walkthrough
 
@@ -182,7 +182,7 @@ The reference project is a multi-tenant SaaS platform operating under a strict r
 
 **L9 — Knowledge base.** 160 entries in one fixed format: *Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug Shortcut*. The constitution wires it into the debugging protocol in both directions: search before investigating; write after resolving anything non-obvious (>30 min).
 
-**L10 — Meta.** Three artifacts make the workspace self-maintaining: the **`ai-engineering-workspace-audit` skill** (quick read-only drift report weekly; six-phase full audit per milestone, with a knowledge ledger built *before* any edit and human approval gating all writes); the **`WORKSPACE_CHANGELOG.md`** recording each audit's changes and — as importantly — its "deliberately NOT changed (with reasons)" list; and the **`agent-coach`** meta-agent (P7 above) that reviews the reviewers.
+**L10 — Meta.** Three artifacts make the workspace self-maintaining: the **`ai-engineering-workspace-audit` skill** (quick read-only drift report weekly; six-phase full audit per milestone, with a knowledge ledger built *before* any edit and human approval gating all writes); the **workspace changelog** recording each audit's changes and — as importantly — its "deliberately NOT changed (with reasons)" list; and the **`agent-coach`** meta-agent (P7 above) that reviews the reviewers.
 
 ### 2.3 How one bug becomes system knowledge (worked example)
 
@@ -229,7 +229,7 @@ your-repo/
 │   ├── hooks/
 │   │   ├── session-start.sh         # optional environment bootstrap
 │   │   └── workspace-graph.py       # hands the typed links to the agent (§3.12)
-│   └── WORKSPACE_CHANGELOG.md       # audit history of this configuration
+│   └── workspace-changelog/         # audit history of this configuration, one file per run
 ├── registries.json                  # declares the shared append-only registries (§3.11)
 ├── .agent-feedback-authors          # whose Agent-Feedback lines count (§5.1) — ships naming nobody
 ├── .gitattributes                   # merge behaviour for those registries (§3.11)
@@ -880,7 +880,7 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 9. The first review dimension where you keep making the same comments → a specialist agent with a violations list. Give it an `Enforces:` line for the rule it reviews against, and a `Hands off to: HUMAN` line if it may edit files.
 10. If sessions keep fighting the environment (missing toolchain, dead daemon) → a `SessionStart` hook.
 
-**Later — Level 4:** once the workspace has real mass (≥ ~10 rule/skill/agent files), install the meta layer — the kit ships it: `bootstrap.sh --with-meta` adds the workspace-audit skill + command, the agent-coach meta-agent, and the workspace-changelog skeleton (§5.2–§5.3). Deliberately not part of the day-1 install.
+**Later — Level 4:** once the workspace has real mass (≥ ~10 rule/skill/agent files), install the meta layer — the kit ships it: `bootstrap.sh --with-meta` adds the workspace-audit skill + command, the agent-coach meta-agent, and the workspace-changelog directory (§5.2–§5.3). Deliberately not part of the day-1 install.
 
 ### 4.3 Brownfield path (existing project)
 
@@ -948,7 +948,7 @@ The workspace itself accumulates drift: stale version numbers, rules referencing
 - **Quick (weekly / bi-weekly), strictly read-only:** inventory the artifacts, diff their claims against code reality, report drift. No writes.
 - **Full (per milestone), approval-gated:** six phases — inventory → assessment against context budgets → remediation plan → **human approval gate** → apply → verify. Two hard safety rules: build a **knowledge ledger** (every learning encoded anywhere in the workspace, each with an ID) *before* touching anything — it is the preservation baseline; and be **lossless-first** — relocate and compress before deleting; deleting learned knowledge requires written justification.
 
-Record every audit in `WORKSPACE_CHANGELOG.md`: what changed, what was **deliberately not changed and why**, and follow-ups. The not-changed list is what stops the next audit from re-litigating settled decisions.
+Record every audit as a file of its own in the workspace changelog (`.claude/workspace-changelog/<date>-<what>.md`): what changed, what was **deliberately not changed and why**, and follow-ups. One file per run, because a single file that every run inserts into at the top is itself a shared append-only registry (§3.11) — two open pull requests conflict on it. The not-changed list is what stops the next audit from re-litigating settled decisions.
 
 ### 5.3 The agent-coach loop (reviewing the reviewers)
 
@@ -995,7 +995,7 @@ Run quarterly (or as the quick-audit report):
 - [ ] No shared file that many PRs append to has escaped the fragment layout?
 - [ ] Agents' violation lists match the current rule files they enforce? `make graph-impact NODE=RULE:<name>` names the agents holding each rule.
 - [ ] `.graph-link-allowlist` absent or empty — or every entry still an immutable decision record citing something retired?
-- [ ] `WORKSPACE_CHANGELOG.md` has an entry newer than the last milestone?
+- [ ] The workspace changelog has an entry newer than the last milestone?
 
 ### 5.6 The next level: agentic graph engineering
 

@@ -68,10 +68,17 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The rule, skill and reviewer-agent templates in `docs/agent-templates/` each carry a `**Why:**` line. A rule, workflow or review mandate stated without its reason is followed to the letter and misapplied at the first case its examples do not show. With the reason, the next correction can sharpen a principle instead of adding one more special case. The templates are yours after the install: to take the new line, delete `docs/agent-templates/` and re-run the installer (upgrade step 2), or add the line by hand.
 - `rules/documentation.md` lists "its why" among the parts a new rule file carries. You get it by copying the rule in upgrade step 3.
 - The guide's P6 and its flywheel table (§ 5.1) now say what to do with memory an agent tool writes on its own. Treat it as an inbox. A note that holds a second time is promoted into a rule, skill or knowledge-base entry by pull request, and the note is deleted.
+- The record of what changed in your agent workspace — a setup or harmonize pass, a workspace audit, an agent-coach cycle — is now a directory with one file per run: `.claude/workspace-changelog/<date>-<what>.md` on Claude Code, `docs/workspace-changelog/` on the other tools. It was a single `WORKSPACE_CHANGELOG.md` with the newest entry on top, which every run inserted into at the same line; two pull requests open at once conflicted on it, and a day of setup work is easily three. That is the shape the shared-registries rule tells you to remove from your changelog. ADR-0019 records the change.
+- `bootstrap.sh --with-meta` installs the directory's `README.md` — naming, reason and entry format — and no longer the single-file skeleton. The entry format gains a `Kit:` field for the installer's version line.
+- The workspace-audit skill, its command and the agent-coach read the directory and write each run as a new file in it. The setup prompt's Harmonize track records its run the same way, whether or not the meta layer is installed.
+- **If you have a `WORKSPACE_CHANGELOG.md`, keep it.** Nothing migrates it and nothing fails: it is the archive, read for history and not written to. You get the directory at your next installer run with `--with-meta`, and the new wording when you copy the kit's skill, command and coach in upgrade step 2; until then they keep writing to the single file.
 
 <!-- category: Deprecated -->
 
 <!-- category: Removed -->
+### Removed
+
+- `starter-kit/WORKSPACE_CHANGELOG.md.template` from the kit. An installed `WORKSPACE_CHANGELOG.md` is yours and stays.
 
 <!-- category: Fixed -->
 ### Fixed

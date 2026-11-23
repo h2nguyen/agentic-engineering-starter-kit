@@ -119,7 +119,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `skills/ai-engineering-workspace-audit/` | `.claude/skills/ai-engineering-workspace-audit/` | Level-4 audit skill — installed via `--with-meta` |
 | `commands/ai-engineering-workspace-audit.md` | `.claude/commands/ai-engineering-workspace-audit.md` | Thin `/command` entry for the audit skill — via `--with-meta` |
 | `skills/workspace-graph/SKILL.md` | `.claude/skills/workspace-graph/SKILL.md` | Level-4 skill — impact-before-edit and coverage over the typed links, for the audit and the coach — via `--with-meta` |
-| `WORKSPACE_CHANGELOG.md.template` | `.claude/WORKSPACE_CHANGELOG.md` | Audit-history skeleton — via `--with-meta` |
+| `workspace-changelog/README.md` | `.claude/workspace-changelog/README.md` | The workspace's own history, one file per setup pass, audit or coach cycle; the README has the entry format — via `--with-meta`. An install with a single `WORKSPACE_CHANGELOG.md` keeps it as the archive |
 | `commands/_command-template.md` | `docs/agent-templates/_command-template.md` | Template — copy to `.claude/commands/<name>.md` per new command (Claude Code only) |
 | `settings.json.template` | `.claude/settings.json` | Registers the workspace-graph hook for its two events ([below](#the-workspace-graph-hook-claude-code)) |
 | `hooks/workspace-graph.py` | `.claude/hooks/workspace-graph.py` | Ready to use — after an edit it tells the agent who cites the file; at the end of a turn it holds the turn once if a typed link broke. See [The workspace-graph hook](#the-workspace-graph-hook-claude-code) |
@@ -322,7 +322,7 @@ byte for byte as it went in.
 
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
-workspace — and, where you keep one, a line in the workspace changelog.
+workspace — and, where you keep one, a file in the workspace changelog.
 
 ## Load classes of the rules (Claude Code)
 

@@ -27,7 +27,7 @@
 #             check-constitution.sh, feedback_tool.py), .agent-feedback-authors
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
-#             + workspace-changelog skeleton (Claude Code; others: changelog only)
+#             + workspace-changelog directory (Claude Code; others: that directory only)
 #
 # Placeholder templates (rule, check script, skill, reviewer agent, command,
 # SessionStart hook) install to docs/agent-templates/ — unloaded, and where a
@@ -550,10 +550,12 @@ if [ "$WITH_META" -eq 1 ]; then
       install_dir skills/ai-engineering-workspace-audit .claude/skills/ai-engineering-workspace-audit || true
       install_file skills/workspace-graph/SKILL.md .claude/skills/workspace-graph/SKILL.md || true
       install_file commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md || true
-      install_file WORKSPACE_CHANGELOG.md.template .claude/WORKSPACE_CHANGELOG.md || true
+      # One file per run, not one file every run inserts into at the same line.
+      # An install that has the single file from an earlier kit keeps it as its archive.
+      install_file workspace-changelog/README.md .claude/workspace-changelog/README.md || true
       ;;
     *)
-      install_file WORKSPACE_CHANGELOG.md.template docs/WORKSPACE_CHANGELOG.md || true
+      install_file workspace-changelog/README.md docs/workspace-changelog/README.md || true
       ;;
   esac
 fi
@@ -744,7 +746,7 @@ case "$TOOL" in
 esac
 if [ "$WITH_META" -eq 1 ] && [ "$TOOL" != "claude" ]; then
   echo "  Note ($TOOL): the meta subagent/skill are agent-tool-native — convert them to"
-  echo "  playbook docs per guide § 3.10; only the workspace-changelog skeleton was installed."
+  echo "  playbook docs per guide § 3.10; only the workspace-changelog directory was installed."
 fi
 if [ "$WITH_META" -eq 0 ]; then
   echo "  Level-4 meta artifacts (agent-coach, workspace-audit, workspace-graph, workspace changelog) ship"

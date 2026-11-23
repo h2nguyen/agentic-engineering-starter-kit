@@ -222,7 +222,13 @@ Appendix A.7 — the sequence:
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
    losslessly (relocate → split → compress) before ever deleting; deletions
    need written justification per Appendix A.7.
-7. **Record.** Append a workspace-changelog entry (create the file if missing):
+7. **Record.** Write a workspace-changelog entry as a file of its own —
+   `.claude/workspace-changelog/<date>-<what>.md`, or under
+   `docs/workspace-changelog/` where the tool has no `.claude/`; create the
+   directory if missing. One file per run, never an entry added to a shared
+   file: a setup is easily three pull requests in a day, and each would
+   insert at the same line. A later pull request of the same run edits that
+   run's file. In it:
    which kit was installed (the installer's `Kit:` line — nothing else records
    it), what changed, what was **deliberately NOT changed and why**, ladder
    rungs used, ledger items affected. If the repo has resident improvement machinery
@@ -414,7 +420,7 @@ the check is not deferred.
 - **Approval gate:** the change plan (with ledger items per change) needs
   explicit human approval before any pre-existing file is edited; apply as
   small one-concern commits.
-- **Record:** workspace-changelog entry per run — changes made, ladder rungs
+- **Record:** one workspace-changelog file per run — changes made, ladder rungs
   used, ledger items affected, and the "deliberately NOT changed (with
   reasons)" list that stops future runs from re-litigating.
 
