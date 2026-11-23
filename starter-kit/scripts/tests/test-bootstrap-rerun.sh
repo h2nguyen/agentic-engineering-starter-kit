@@ -265,6 +265,15 @@ for tool in claude agents cursor copilot; do
     && [ -f "$tdir/_skill-template.md" ] && [ -f "$tdir/_agent-template.md" ] \
     && ok "$tool: the rule, check-script, skill and reviewer templates are in docs/agent-templates/" \
     || bad "$tool: templates missing from docs/agent-templates/: $(ls "$tdir" 2>/dev/null | tr '\n' ' ')"
+  # A rule, skill or reviewer that states only what to do is followed to the
+  # letter and misapplied at the first case its examples do not show. Each
+  # template asks for the reason, so the artifact copied from it carries one.
+  nowhy=""
+  for t in _rule-template.md _skill-template.md _agent-template.md; do
+    grep -q '^\*\*Why:\*\*' "$tdir/$t" 2>/dev/null || nowhy="$nowhy $t"
+  done
+  [ -z "$nowhy" ] && ok "$tool: the rule, skill and reviewer templates each ask for the why" \
+    || bad "$tool: templates with no **Why:** line:$nowhy"
   if [ "$tool" != claude ]; then
     ! grep -rq '\.claude/rules/' "$tdir" && ok "$tool: the templates point at docs/agent-rules/, where this layout keeps rules" \
       || bad "$tool: a template still points at .claude/rules/"

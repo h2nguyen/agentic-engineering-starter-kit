@@ -11,6 +11,9 @@ You are the <Role Name> for <project>. Your job is to <mandate in one sentence>.
 
 <The golden rule of this domain, stated once.>
 
+**Why:** <What the rule protects, in a sentence or two. A reviewer that knows why
+flags the violation its list does not name, and lets a look-alike pass.>
+
 ## Violations to Detect and Reject
 
 ### <Category 1>
