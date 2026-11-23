@@ -132,7 +132,10 @@ line is what holds before the rule arrives.
    `.agent-feedback-authors`, which starts naming nobody: ask the user whose
    feedback counts, and never infer it from the history.
    Ask too whether they want the weekly feedback digest (`bootstrap.sh
-   --with-coach-schedule`); install it only on a yes.
+   --with-coach-schedule`); install it only on a yes. The same for the weekly
+   check for a newer kit (`--with-upgrade-notice`), which opens an issue when
+   the kit has a release newer than `.starter-kit-version` records and is the
+   one part of the kit that uses the network.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for
@@ -235,8 +238,8 @@ Appendix A.7 — the sequence:
    request that has something to record adds a file of its own, with a
    `<what>` no other branch would choose; none edits a file another open pull
    request may be editing. In it:
-   which kit was installed (the installer's `Kit:` line — nothing else records
-   it), what changed, what was **deliberately NOT changed and why**, ladder
+   which kit was installed (the installer's `Kit:` line, which the install
+   also records in `.starter-kit-version`), what changed, what was **deliberately NOT changed and why**, ladder
    rungs used, ledger items affected. If the repo has resident improvement machinery
    (Phase 0.3), run or extend it with this checklist as input — two competing
    improvement loops is itself an anti-pattern.

@@ -19,7 +19,7 @@
 
 .PHONY: registry-generate registry-list registry-drift registry-ids kb-shape \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        agent-feedback registry-test
+        agent-feedback kit-status registry-test
 
 ## registry-generate — assemble every registry artifact from its fragments.
 registry-generate:
@@ -82,6 +82,23 @@ constitution:
 ##     make agent-feedback FORMAT=markdown          (a digest a person reads)
 agent-feedback:
 	@./scripts/python.sh scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)") $(if $(FORMAT),--format "$(FORMAT)")
+
+## kit-status — which starter kit this repository records (.starter-kit-version).
+## With KIT=<a checkout of the kit>, the kit's own report: what is newer there,
+## the changelog entries in between, and which of the kit's files here are the
+## older kit's or were changed here. It reads the checkout, never the network.
+##     make kit-status KIT=../agentic-engineering-starter-kit
+kit-status:
+	@if [ -n "$(KIT)" ]; then \
+	  if [ -x "$(KIT)/starter-kit/kit-status.sh" ]; then "$(KIT)/starter-kit/kit-status.sh" --target .; \
+	  else echo "$(KIT)/starter-kit/kit-status.sh is not there: KIT must be a checkout of the starter kit, release 3.1.0 or newer." >&2; exit 2; fi; \
+	elif [ -f .starter-kit-version ]; then \
+	  grep -v '^#' .starter-kit-version; \
+	  echo "To compare with a kit: make kit-status KIT=<path to a checkout of the kit>"; \
+	else \
+	  echo "No .starter-kit-version: this install has no record of the kit it came from."; \
+	  echo "A checkout of the kit says which release its files match: make kit-status KIT=<path>"; \
+	fi
 
 ## registry-test — the registry layer's own suites. -B: the kit installs no
 ## .gitignore, so its tools must not leave a __pycache__ in your repository.

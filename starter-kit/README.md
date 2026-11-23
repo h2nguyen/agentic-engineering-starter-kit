@@ -77,6 +77,8 @@ until it stops naming placeholders and links to files that do not exist, run
 | `SETUP-PROMPT.md` | — (paste into an agent session at the target repo) | The agent drives the whole setup |
 | `bootstrap.sh` | — (run it, don't copy it into the repo) | `--help` for options |
 | `upgrade-rules.sh` | — (run it from the kit, in upgrade step 3) | Lists the rules whose text differs from the kit's, and takes the kit's text for the ones you name, keeping a `paths:` header |
+| `kit-status.sh` | — (run it from the kit, or through `make kit-status KIT=<checkout>`) | Which kit your repository records, what is newer, the changelog entries in between, which of the kit's files differ; `--record` is the last upgrade step — [Which kit is installed](#which-kit-is-installed) |
+| — (written by the installer) | `.starter-kit-version` | The kit's release, its commit and the tool. First install only; you never edit it |
 | `constitution.md.template` | `CLAUDE.md` / `AGENTS.md` / tool equivalent | Fill in every `<placeholder>` |
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
 | `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR format (Michael Nygard), where rationale lives) |
@@ -94,6 +96,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `Makefile.template` | `Makefile` | Greenfield only — includes `registry.mk`. An existing Makefile is never touched; bootstrap prints the two lines to add, and says whether `make lint` reaches the gates yet (run it again after the edit to confirm) |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
 | `ci/agent-feedback.yml.template` | `.github/workflows/agent-feedback.yml` | **Opt-in** — only with `bootstrap.sh --with-coach-schedule`, or a yes to the installer's question. Every Monday it posts the week's `Agent-Feedback:` lines as a digest on an issue labelled `agent-feedback`. With an `ANTHROPIC_API_KEY` secret and the Claude GitHub App, the coach's proposals follow on the same issue. It reads code and writes to issues only: no push, no branch, no pull request |
+| `ci/kit-upgrade-notice.yml.template` | `.github/workflows/kit-upgrade-notice.yml` | **Opt-in** — only with `bootstrap.sh --with-upgrade-notice`, or a yes to the installer's question. Every Monday it lists the kit's release tags and opens an issue labelled `kit-upgrade` when one is newer than `.starter-kit-version` records. The only part of the kit that uses the network; it downloads no code and writes to issues only |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
 | `scripts/python.sh` | `scripts/python.sh` | Starts Python under whatever name the machine gives it (`python3`, `python`, `py -3`); every make target, gate, test and hook of the kit goes through it |
@@ -106,7 +109,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `agent-feedback-authors.template` | `.agent-feedback-authors` | Whose feedback counts: one commit email or comment login per line. **Ships naming nobody**, and the installer says so until you fill it in — until then every line is counted, but no one's text reaches the report |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
 | `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist, or it or `project-annotations.md` still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
-| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade and hook suites test the installer and the Claude Code hook, so they stay in the kit |
+| `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade, kit-status and hook suites test the installer, the upgrade and the Claude Code hook, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
 | `skills/rule-load-check/SKILL.md` | `.claude/skills/rule-load-check/SKILL.md` | Which rules Claude Code really loaded, and when each arrives. Run it in a new session after installing, upgrading or editing a rule or its header |
@@ -168,14 +171,20 @@ as it is — including the kit's own scripts. Moving to a newer kit is these
 steps, in order, on a branch (`chore/upgrade-agentic-kit`, say), from the root
 of your repository. `KIT` is a checkout of the newer kit.
 
-The kit does not record in your repository which version it was installed
-from, and it does not need to: every step compares your files with the kit's,
-whichever version you started from. For why a file changed, search the kit's
-`CHANGELOG.md` for its name.
+Before you start, ask the newer kit what the upgrade is — which kit your
+repository records, the changelog entries between that one and this one with
+the breaking ones first, and which of the kit's files in your repository are
+the older kit's and which you changed
+([Which kit is installed](#which-kit-is-installed)). From the root of your
+repository: `"$KIT"/starter-kit/kit-status.sh`.
+
+The steps themselves do not depend on that answer: each compares your files
+with the kit's, whichever version you started from.
 
 1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
    layer (`agent-coach`, the workspace-audit skill) or keeps a workspace
-   changelog, and `--with-coach-schedule` to add the weekly feedback digest.
+   changelog, `--with-coach-schedule` to add the weekly feedback digest, and
+   `--with-upgrade-notice` to add the weekly check for a newer kit.
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
@@ -201,10 +210,10 @@ whichever version you started from. For why a file changed, search the kit's
    cp "$KIT"/starter-kit/scripts/tests/* scripts/tests/
    cp "$KIT"/starter-kit/registry.mk registry.mk
    cp "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md docs/DEBUGGING-KNOWLEDGE-BASE.d/
-   rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh scripts/tests/test-upgrade.sh scripts/tests/test-graph-hooks.sh
+   rm -f scripts/tests/test-bootstrap-rerun.sh scripts/tests/test-brownfield-adoption.sh scripts/tests/test-upgrade.sh scripts/tests/test-graph-hooks.sh scripts/tests/test-kit-status.sh
    ```
-   The last line removes the four suites that test the installer and the
-   Claude Code hook; they stay in the kit and are not run from your
+   The last line removes the five suites that test the installer, the upgrade
+   and the Claude Code hook; they stay in the kit and are not run from your
    repository. Your own `check-*.sh` scripts and tests are not touched: only
    files the kit has are copied.
 
@@ -318,6 +327,19 @@ whichever version you started from. For why a file changed, search the kit's
    before step 1, expect one kind: a check script whose header still reads
    `# Enforces: <rule> — see <file>` must name its rule as a token,
    `# Enforces: RULE:<name> — <what it checks>`.
+7. **Record the kit you are now on.** The installer wrote
+   `.starter-kit-version` on your first install and has not touched it since:
+   step 1 adds files and upgrades none. This command does, once the files
+   bear it out:
+   ```bash
+   "$KIT"/starter-kit/kit-status.sh --record
+   ```
+   It refuses, and names the files, while one of the kit's files is still the
+   older kit's or is missing without being listed in `.starter-kit-declined`.
+   The templates in `docs/agent-templates/` count too; step 2 says how to
+   refresh them. A file you changed yourself is accepted and named, and stays listed as
+   "changed here" in every later report. An install from before kit 3.1.0 has
+   no record; this step gives it one.
 
 `scripts/tests/test-upgrade.sh` in the kit runs these steps as written
 here — against an install shaped like 1.x and, where the kit's history has the
@@ -327,6 +349,59 @@ byte for byte as it went in.
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
 workspace — and, where you keep one, a file in the workspace changelog.
+
+## Which kit is installed
+
+A first install writes `.starter-kit-version` at the root of your repository:
+
+```text
+version: 3.1.0
+commit: 4f0c…        the kit commit the files came from
+tool: claude
+```
+
+Two things write it: the installer, on a first install, and
+`kit-status.sh --record`, as the last step of an upgrade. A re-run of the
+installer never changes it, and you do not edit it. It is a claim, and the
+report checks it against the files every time:
+
+```bash
+make kit-status                                   # what the record says
+make kit-status KIT=../agentic-engineering-starter-kit   # the report, against that checkout
+```
+
+The second form runs the kit's `starter-kit/kit-status.sh`, which stays in the
+kit like the installer. It rebuilds what the recorded kit and the kit in
+`KIT` would each install, with each kit's own installer, and compares your
+copies of the kit's files with both. It prints:
+
+| Part | What it says |
+|---|---|
+| `Recorded` / `Available` | The release and commit your repository records, and the ones of the checkout in `KIT` |
+| `Verdict` | Up to date; a newer kit is available; a **partial** upgrade — some files already the newer kit's, the record rightly still the older one; or the checkout is older than the record |
+| What changed in between | The kit's changelog entries after the recorded release, per release: **BREAKING** entries first, then Added, Changed, Fixed |
+| The kit's files | `older kit's` — untouched since the record, replaced by upgrade steps 2 and 3; `changed here` — neither kit's text, yours to merge or keep; `missing`, `declined`, `retired` |
+
+It uses no network: "available" is whatever the checkout in `KIT` has, so
+`git -C "$KIT" pull` is how it learns of a newer release.
+
+**No record.** An install from before kit 3.1.0 has none. The report says so,
+names the release whose files yours match best, and prints the command that
+records it (`kit-status.sh --record --as v3.0.1`). Or finish an upgrade first:
+step 7 records the kit you end up on.
+
+**A record the files contradict** — edited by hand, or the files reverted —
+is reported as one that does not hold, with the release the files match.
+
+**Being told about a newer release.** `bootstrap.sh --with-upgrade-notice`
+(or yes to the installer's question at a terminal) installs
+`.github/workflows/kit-upgrade-notice.yml`. Once a week it lists the kit's
+release tags over the network and, when one is newer than the record, opens an
+issue labelled `kit-upgrade`. It downloads no code of the kit's and can write
+to issues only. It is the one part of the kit that uses the network, so it is
+never installed unasked; list its path in `.starter-kit-declined` and the
+installer stops asking. If you install from a fork, set `KIT_REPOSITORY` in
+the workflow.
 
 ## Load classes of the rules (Claude Code)
 
@@ -407,7 +482,7 @@ the file:
 A listed file is not installed; a listed directory covers everything beneath
 it. The installer reports each as "declined" under "Skipped", and never
 writes to the list. The list is yours and states an intent — it is not a
-record of what is installed (the kit keeps none, ADR-0011 in its repository).
+record of what is installed: `.starter-kit-version` names the kit, not the files (ADR-0024 in the kit's repository).
 
 One file is held back without being listed: `project-annotations.md`, where
 the comments rule it belongs to was already in the repository. That rule may

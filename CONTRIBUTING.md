@@ -27,6 +27,7 @@ name your machine gives it — the make targets find it through
 | `make registry-generate` | Rebuilds `CHANGELOG.md` from `changelog.d/` |
 | `make graph-impact NODE=RULE:documentation` | What cites an artifact — run it before renaming or deleting one |
 | `make graph-coverage` | Which shipped rules a script enforces and an agent reviews |
+| `starter-kit/kit-status.sh --target <project>` | Which kit a project records, what this checkout has that is newer, and which of the kit's files there differ (ADR-0024) |
 | `make agent-feedback` | Every `Agent-Feedback:` line in this repository's history, grouped by the kit artifact it names (ADR-0016) |
 
 ## Making a change
@@ -47,11 +48,12 @@ name your machine gives it — the make targets find it through
    | `test-constitution.sh` | `check-constitution.sh`: a dead link and an unfilled placeholder fail; the angle brackets that belong in a constitution do not |
    | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where, and which tool it installs for when it is not told |
    | `test-upgrade.sh` | The README's upgrade steps, run as written on an older install an adopter customized: theirs stays theirs, the kit's becomes the newer kit's, lint ends green. Also `upgrade-rules.sh`: a rule's text is compared and replaced under its `paths:` header |
-   | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
+   | `test-kit-status.sh` | The version record and `kit-status.sh` (ADR-0024), against a kit with two releases that the suite builds: what a first install records, what the report says, that a half-done upgrade cannot move the record, an install with no record, and the opt-in notice workflow's compare step |
+| `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
    | `scripts/tests/test-eval-run.sh` | `scripts/eval-run.sh`, this repository's evaluation recorder (below) |
-| `scripts/tests/test_evidence_tool.py` | `evidence_tool.py`: what it counts, that `check` recomputes it, and that a number edited by hand fails |
-| `scripts/tests/test-self-application.sh` | `check-self-application.sh`: a kit rule with no link here, a link that became a copy or points elsewhere, and a hook that cannot find the graph tool each fail |
+   | `scripts/tests/test_evidence_tool.py` | `evidence_tool.py`: what it counts, that `check` recomputes it, and that a number edited by hand fails |
+   | `scripts/tests/test-self-application.sh` | `check-self-application.sh`: a kit rule with no link here, a link that became a copy or points elsewhere, and a hook that cannot find the graph tool each fail |
 
 3. **Make the change.**
 4. **Add a changelog fragment**, written for the adopter — what they will
@@ -93,12 +95,15 @@ cause; none of these has a quiet override.
 | A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; the gate list in `check-ci-lint-coverage.sh` and in the installer's "does not reach" message; an acceptance test with a control case; the `starter-kit/README.md` table; the `lint:` line `test-upgrade.sh` edits in step 5. A gate that is on by default is a MAJOR release (ADR-0008) — ship it unchained first, as `constitution` was |
 | A suite that needs `bootstrap.sh` | The `find` exclusions in `install_tree`, and the `rm -f` line of the README's upgrade step 2 — `test-upgrade.sh` fails when one is missing from either |
 | A hook | The file under `starter-kit/hooks/`; its entry in `settings.json.template` and in the guide's embedded copy; an install line in `bootstrap.sh`, Claude Code only; a case for each thing it says and each way it stays silent in `test-graph-hooks.sh`; the README section. A hook that adds context never blocks, never edits and ends silent when it cannot run |
+| Any file the installer copies | Its place in `owned()` or `yours()` in `starter-kit/kit_status.py`: the kit's, replaced by an upgrade, or the project's from the day of the install. `test-kit-status.sh` fails on a file that is on neither list |
 | A skill or agent | A self-contained directory or file — no path into the rest of the kit; an install line in `bootstrap.sh`; `skills/common-catalog.md`; the README tables; its link under `.claude/` (the `self-application` gate prints the command) |
 | A template | The kit file and the guide's embedded copy, together |
 
 Four invariants every such change keeps, each with a test behind it:
 
-- **The installer never overwrites a file and is safe to re-run.** A re-run
+- **The installer never overwrites a file and is safe to re-run.** That
+  includes `.starter-kit-version`: a first install writes it, a re-run leaves
+  it, and only `kit-status.sh --record` moves it (ADR-0024). A re-run
   adds what is missing, except a path the adopter listed in
   `.starter-kit-declined` (ADR-0014), and except `project-annotations.md`
   beside a comments rule that was already there (ADR-0017).

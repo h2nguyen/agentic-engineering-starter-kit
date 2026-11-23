@@ -56,7 +56,10 @@ usually starts, so a command that leaves the path out writes here.
    (a scheduled workflow that posts the week's `Agent-Feedback:` lines to an
    issue, with the coach's proposals when an API key is set). Add
    `--with-coach-schedule` only on a yes: run from you, the installer has
-   nobody to ask, and leaves it out.
+   nobody to ask, and leaves it out. Ask the same about the weekly check for
+   a newer kit (`--with-upgrade-notice`): it opens an issue when the kit has a
+   release newer than the install records, and is the one part of the kit that
+   uses the network.
    Read what it prints: which kit it is (the `Kit:` line), what it installed,
    what it skipped because it already existed, and the next steps for this
    particular project.
@@ -109,8 +112,9 @@ usually starts, so a command that leaves the path out writes here.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
    out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.
-10. **Report** which kit was installed (the installer's `Kit:` line — nothing
-    in the project records it), what was installed, what you filled in and
+10. **Report** which kit was installed (the installer's `Kit:` line; the
+    install records the same in `.starter-kit-version`, which is committed
+    with it and never edited by hand), what was installed, what you filled in and
     what each fact came from, and what you guessed and want confirmed. Then:
     - what the kit deliberately defers until the project shows a need for it,
       each with a signal that someone or something will notice while the
@@ -144,6 +148,7 @@ make kit-smoke                              # install into a throwaway repo and 
 make registry-generate                      # rebuild CHANGELOG.md from changelog.d/
 make graph-impact NODE=RULE:documentation   # what cites an artifact — before renaming or deleting it
 make evidence                               # rewrite docs/EVIDENCE.md from the repository; never edit it by hand
+starter-kit/kit-status.sh --target /abs/project   # which kit a project records, what is newer here, which of the kit's files differ
 scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one command of an evaluation, recorded
 ```
 
@@ -153,7 +158,7 @@ scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one comma
 |---|---|
 | **Git** | Never commit to `main`. Branch prefixes: `feat/`, `fix/`, `docs/`, `chore/` |
 | **Test first** | A failing case in the acceptance suite before the change, with a control case where it closes a defect |
-| **The installer** | Never overwrites a file; safe to re-run; leaves out what the target's `.starter-kit-declined` lists; every artifact lands for all four tools, or the installer says why not |
+| **The installer** | Never overwrites a file — `.starter-kit-version` included, which only a first install and `kit-status.sh --record` write (ADR-0024); safe to re-run; leaves out what the target's `.starter-kit-declined` lists; every artifact lands for all four tools, or the installer says why not |
 | **Dependencies** | Bash and the Python standard library. No packages, no network. Anything the kit runs, and any command it writes down for someone to type, starts Python through `scripts/python.sh`, never as `python3 …` |
 | **What the installer copies stands alone** | An installed file is read in a repository that does not contain this one: no path into the kit, or into the rest of this repository. `starter-kit/README.md` and `bootstrap.sh` stay in the kit and may link to the guide |
 | **Templates** | A template embedded in the guide is byte-identical to its kit file; change both together |

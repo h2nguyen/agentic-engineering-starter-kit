@@ -37,6 +37,7 @@ test:
 	$(KIT)/scripts/tests/test-brownfield-adoption.sh
 	$(KIT)/scripts/tests/test-bootstrap-rerun.sh
 	$(KIT)/scripts/tests/test-upgrade.sh
+	$(KIT)/scripts/tests/test-kit-status.sh
 	$(KIT)/scripts/tests/test-graph-hooks.sh
 	$(KIT)/scripts/python.sh -B -m unittest discover -b -s scripts/tests -p 'test_*.py'
 	scripts/tests/test-eval-run.sh
