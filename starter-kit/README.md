@@ -44,11 +44,30 @@ checkout of the kit only for `--with-meta` and the common-skills catalog.
 **Zero-copy alternative:** paste [`SETUP-PROMPT.md`](SETUP-PROMPT.md) into a
 fresh session of your AI coding agent at the target repo's root — the prompt
 drives the whole setup (detect tool → mine the repo → install → verify), uses
-this kit when present, and carries fallback specs when it isn't. Repos that
+this kit when present, clones it outside the repo when it can, and carries
+fallback specs when neither works. A one-line request with the kit's URL
+works too: the note at the top of the repository's README sends the agent to
+a clone outside your project and to its `AGENTS.md`. Repos that
 **already have** an agentic workspace are routed to a harmonize track:
 preserve-by-default, evidence-based keep/enhance/fix/relocate classification,
 lossless-first remediation, approval-gated changes — existing working
 conventions beat the blueprint's defaults (guide § 4.4).
+
+**A repository with an agent workspace of its own** — `CLAUDE.md`,
+`AGENTS.md`, `.cursorrules`, `.github/copilot-instructions.md`, or files under
+`.claude/rules`, `.claude/skills`, `.claude/agents`, `.claude/commands`,
+`.cursor/rules`, `.github/instructions` or `docs/agent-rules` — stops a first
+install before anything is written. The message names what it found and
+points at the Harmonize track. Once the user has approved installing beside
+those files, re-run with `--alongside-existing`; they are still never
+overwritten. On every tool but Claude Code a rule is read because the
+constitution links it, so beside a constitution of your own the installer
+lists the rules it does not link, and `make constitution` fails until it
+does. A re-run on an install of the kit is never stopped. The installer also
+refuses to run from a clone of the kit inside the project it installs into:
+committed with the project, it becomes an embedded repository. Clone the kit
+somewhere else (`KIT="$(mktemp -d)/kit"`); a copy of `starter-kit/` alone at
+the project's root still works.
 
 `bootstrap.sh` detects which agentic tool the repo uses (`.claude`/`CLAUDE.md`,
 `.cursor`, `.github/copilot-instructions.md`, `AGENTS.md`). When it finds none,
@@ -499,6 +518,9 @@ say which file is missing.
 |---|---|---|
 | `<file>:<line> — … link 'RULE:x' resolves to nothing` | A typed link names an artifact that was renamed, deleted or never written | Fix the citing line; the message lists the names that exist. `make graph-impact NODE=RULE:x` shows what cites an artifact *before* you rename it |
 | `check-<gate>.sh is installed but 'lint' never runs it` | Your own Makefile does not chain a gate the kit installed. All five are held: `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` | Add the target the message names to the `lint:` prerequisites |
+| `STOP: … already has an agent workspace of its own` (installer) | A first install found agent instructions, rules or skills the kit did not write | Follow the Harmonize track in `SETUP-PROMPT.md`; once the user approves installing beside them, re-run with `--alongside-existing`. Nothing was written |
+| `this kit is inside the project it would install into` (installer) | The kit was cloned or copied, as a whole repository, into the target | Clone it outside the project and run it from there; remove the copy inside. Nothing was written |
+| `no constitution links this rule` (`make constitution`) | On `agents`, `cursor` or `copilot`, a rule under `docs/agent-rules/` is linked from no constitution, so no session reads it | Link it from `AGENTS.md` or `.github/copilot-instructions.md` the way the template indexes its rules, or delete the rule |
 | `more than one agentic tool is set up … no --tool was given` | The installer found the files of several agent tools and nobody to ask | Re-run with `--tool` naming the one to install for. Nothing was written |
 | `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or it or `project-annotations.md` still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
 | `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
@@ -513,12 +535,13 @@ say which file is missing.
 `make constitution` reads the constitution — `CLAUDE.md`, `AGENTS.md` or
 `.github/copilot-instructions.md`, whichever the repository has — and
 `project-annotations.md` beside the rules, and fails, with the file and line,
-on two things:
+on these things:
 
 | It reports | For instance |
 |---|---|
 | A relative Markdown link to a file or directory that does not exist | The template's `testing.md` and `security.md` lines, left in a project that never wrote those rules; a rule that was renamed without its index line |
 | A template placeholder nobody filled in: `<…>` that opens with a letter and contains a space, outside code | `<Project Name>`, `<language, framework, versions>`, `<add one line per rule file …>`, and every `<fill in: …>` of `project-annotations.md` |
+| On `agents`, `cursor` and `copilot` (as `.starter-kit-version` records): a rule under `docs/agent-rules/` that no constitution links | The kit's rules installed beside an `AGENTS.md` of your own, which links none of them |
 
 `make lint` checks neither. The typed-link gate resolves `Related:`,
 `Enforces:` and `Hands off to:` lines, not ordinary links, so a constitution

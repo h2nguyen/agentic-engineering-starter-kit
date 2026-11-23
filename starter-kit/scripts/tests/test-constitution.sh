@@ -154,6 +154,32 @@ dir="$(repo)"; mkdir -p "$dir/sub"; printf '# <Project Name>\n' > "$dir/AGENTS.m
 [ "$rc" -eq 1 ] && ok "run from a subdirectory, it still reads the repository's constitution" \
   || bad "run from a subdirectory it found nothing (exit $rc)"
 
+echo "=== rules the constitution has to link ==="
+# On every tool but Claude Code, a rule under docs/agent-rules/ is read because
+# the constitution links it, and only then. Installed beside a constitution of
+# the project's own, the kit's rules were linked from nothing and the check
+# was green.
+record() { printf 'version: 4.0.0\ncommit: 0\ntool: %s\n' "$2" > "$1/.starter-kit-version"; }
+dir="$(repo)"; record "$dir" agents; echo "# Docs" > "$dir/docs/agent-rules/documentation.md"
+printf '# Project\n\n- [testing](docs/agent-rules/testing.md)\n' > "$dir/AGENTS.md"
+out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+[ "$rc" -eq 1 ] && [[ "$out" == *"docs/agent-rules/documentation.md"* ]] && [[ "$out" != *"agent-rules/testing.md"* ]] \
+  && ok "a rule the constitution does not link fails, by name; a linked one does not" \
+  || bad "an unlinked rule: exit $rc, '$(printf '%s' "$out" | head -2 | tr '\n' ' ')'"
+dir="$(repo)"; record "$dir" copilot
+printf '# Project\n\n- [testing](../docs/agent-rules/testing.md)\n' > "$dir/.github/copilot-instructions.md"
+( cd "$dir" && "$GATE" >/dev/null 2>&1 ); rc=$?
+[ "$rc" -eq 0 ] && ok "a link from .github/copilot-instructions.md counts, relative to that file" \
+  || bad "copilot: a linked rule was reported as unlinked (exit $rc)"
+dir="$(repo)"; record "$dir" claude; printf '# Project\n' > "$dir/CLAUDE.md"
+( cd "$dir" && "$GATE" >/dev/null 2>&1 ); rc=$?
+[ "$rc" -eq 0 ] && ok "control — on Claude Code rules load on their own, and nothing has to link them" \
+  || bad "control: an install recorded for claude was asked to link its rules (exit $rc)"
+dir="$(repo)"; printf '# Project\n' > "$dir/AGENTS.md"
+( cd "$dir" && "$GATE" >/dev/null 2>&1 ); rc=$?
+[ "$rc" -eq 0 ] && ok "control — with no install record, the check does not guess the tool" \
+  || bad "control: without .starter-kit-version an unlinked rule failed (exit $rc)"
+
 echo ""
 echo "=== $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ] || exit 1

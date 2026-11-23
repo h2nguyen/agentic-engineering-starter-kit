@@ -14,6 +14,21 @@ This repository runs on its own kit — the gates, the rules, the hook and the
 feedback loop. What that shows, computed from the repository itself and
 recomputed on every pull request, is in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
+> **An AI agent asked to apply, install or set up this kit in a project**,
+> from this page's URL or any other: do not install from this page. Clone the
+> kit **outside** the project, then follow `AGENTS.md`, section "Installing the
+> kit into a project", in that clone:
+>
+> ```bash
+> KIT="$(mktemp -d)/kit" && git clone --depth 1 https://github.com/h2nguyen/agentic-engineering-starter-kit "$KIT"
+> ```
+>
+> No network for `git clone`? Fetch
+> `https://raw.githubusercontent.com/h2nguyen/agentic-engineering-starter-kit/main/starter-kit/SETUP-PROMPT.md`
+> and follow it; it works without the kit. Never clone into the project: the
+> installer refuses a kit inside it, and stops at a project that already has
+> agent instructions of its own.
+
 ## Requirements
 
 `git`, `make`, `bash` 3.2 or newer and Python 3.9 or newer — standard
@@ -37,15 +52,20 @@ installs runs on `ubuntu-latest`.
    tool, mines your repo for ground truth, installs the setup, and verifies it —
    including a **harmonize track** for repos that already have agent
    configuration (preserve-by-default, evidence-based, approval-gated). Or
-   point your agent at a checkout of this repository: [`AGENTS.md`](AGENTS.md)
-   tells it how to install the kit into your project.
+   give your agent this repository's URL and a one-line request ("apply this
+   kit to my project"): the note at the top of this page sends it to a clone
+   outside your project and to [`AGENTS.md`](AGENTS.md), which tells it how
+   to install the kit, what to ask you, and how to verify.
 2. **Script.** From a checkout of this repository:
    ```bash
    ./starter-kit/bootstrap.sh --target /path/to/your-repo                 # detects your tool; asks if it finds none, or several
    ./starter-kit/bootstrap.sh --target /path/to/your-repo --tool claude   # claude | agents | cursor | copilot
    ```
    It installs to that tool's expected locations, never overwrites a file and
-   is safe to re-run. Nothing but the installed files lands in your repository,
+   is safe to re-run. A first install into a repository that already has agent
+   instructions, rules or skills of its own stops before writing anything:
+   follow the harmonize track of `SETUP-PROMPT.md`, then re-run with
+   `--alongside-existing`. Nothing but the installed files lands in your repository,
    and a path you list in `.starter-kit-declined` is left out.
 3. **Manual.** Follow the file-to-target mapping table in
    [`starter-kit/README.md`](starter-kit/README.md).

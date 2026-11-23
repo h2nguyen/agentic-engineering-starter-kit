@@ -14,6 +14,10 @@
 # comments-and-annotations rule — and on nothing else:
 #   1. every relative Markdown link names a file or directory that exists;
 #   2. no `<placeholder like this>` is left outside code.
+# And a third, where .starter-kit-version records a tool other than Claude
+# Code: every rule under docs/agent-rules/ is linked from the constitution.
+# On those tools a rule is read because the constitution links it, and a
+# constitution the project already had links none of the kit's rules.
 #
 # What counts as a placeholder is deliberately narrow, because a constitution
 # is full of angle brackets that are meant to stay. Only `<…>` that opens with
@@ -98,7 +102,7 @@ def exists(target, constitution):
                for base in (os.path.dirname(constitution), "."))
 
 
-problems, links = [], 0
+problems, links, linked = [], 0, set()
 for constitution in files:
     try:
         text = open(constitution, encoding="utf-8").read()
@@ -114,6 +118,9 @@ for constitution in files:
             if re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", target.strip("<>")) or target.startswith("#"):
                 continue  # a URL, a mail address, an anchor in this page
             links += 1
+            path = unquote(target.strip("<>").split("#", 1)[0].split("?", 1)[0])
+            for base in (os.path.dirname(constitution), "."):
+                linked.add(os.path.normpath(os.path.join(base, path)))
             if not exists(target, constitution):
                 found.append((line_of(match.start(1)),
                               "link '%s' names a file that does not exist" % target.strip("<>")))
@@ -130,6 +137,26 @@ for constitution in files:
         found.append((line_of(match.start()), "unfilled placeholder '<%s>'" % shown))
     problems += ["%s:%d — %s" % (constitution, line, what) for line, what in sorted(found)]
 
+
+def recorded_tool():
+    try:
+        for line in open(".starter-kit-version", encoding="utf-8"):
+            if line.startswith("tool:"):
+                return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
+RULES = "docs/agent-rules"
+if not sys.argv[1:] and recorded_tool() in ("agents", "cursor", "copilot") and os.path.isdir(RULES):
+    read_by = [f for f in files if f in CONSTITUTIONS and f != "CLAUDE.md"]
+    for name in sorted(os.listdir(RULES)):
+        rule = os.path.join(RULES, name)
+        if name.endswith(".md") and not name.startswith("_") and os.path.normpath(rule) not in linked:
+            problems.append("%s — no constitution links this rule (%s), so no session reads it"
+                            % (rule, ", ".join(read_by) or "none found"))
+
 if problems:
     for problem in problems:
         print("FAIL: " + problem)
@@ -139,6 +166,8 @@ if problems:
     print("  the line — the template's example rules are examples, not files you were given.")
     print("  A placeholder: replace it with what this project has, or delete the row.")
     print("  Angle brackets that are meant to stay go in `backticks` or a fenced block.")
+    print("  An unlinked rule: link it from the constitution, the way the kit's template")
+    print("  indexes its rules — or delete the rule if the project does not want it.")
     sys.exit(1)
 print("OK: %s — %d link(s) resolve, no unfilled placeholder" % (", ".join(files), links))
 PY

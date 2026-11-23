@@ -14,7 +14,12 @@
 #      template, and a registered hook command runs from a path with a space;
 #   4. what the adopter declined in .starter-kit-declined stays out, on a first
 #      install and on every re-run;
-#   5. the installer says which kit it is, so the install can be recorded.
+#   5. the installer says which kit it is, so the install can be recorded;
+#   6. a checkout of the kit's repository inside the target is refused before
+#      anything is written — committed, it becomes an embedded repository;
+#   7. a first install into a target with an agent workspace of its own stops
+#      before anything is written and names the Harmonize track, until
+#      --alongside-existing says the user approved installing beside it.
 #
 # Usage: test-bootstrap-rerun.sh [-v]
 set -uo pipefail
@@ -693,7 +698,9 @@ grep -q -- '--tool' "$WORK/several.log" && grep -q 'claude' "$WORK/several.log" 
 ! grep -q 'agents' "$WORK/several.log" \
   && ok "AGENTS.md beside .cursor/ is Cursor's own constitution, not a third tool" \
   || bad "AGENTS.md was counted as a separate tool beside Cursor"
-"$BOOTSTRAP" --tool cursor --target "$R" > "$WORK/several-told.log" 2>&1 < /dev/null; rc=$?
+# The AGENTS.md here is a workspace of the adopter's, so a first install needs
+# --alongside-existing too (the stop has its own cases further down).
+"$BOOTSTRAP" --tool cursor --alongside-existing --target "$R" > "$WORK/several-told.log" 2>&1 < /dev/null; rc=$?
 [ "$rc" -eq 0 ] && [ -f "$R/docs/agent-rules/documentation.md" ] && [ ! -e "$R/CLAUDE.md" ] && [ ! -e "$R/.claude/rules" ] \
   && ok "control: the same repository with --tool cursor installs that layout and no other" \
   || bad "--tool did not settle an ambiguous repository (exit $rc)"
@@ -705,7 +712,8 @@ for case in "claude:CLAUDE.md:CLAUDE.md" "claude:.claude/:CLAUDE.md" "cursor:.cu
   tool="${case%%:*}"; marker="${case#*:}"; marker="${marker%%:*}"; constitution="${case##*:}"
   R="$WORK/one-$tool-$(echo "$marker" | tr -c 'A-Za-z0-9\n' '_')"; fresh_repo "$R"
   case "$marker" in */) mkdir -p "$R/$marker" ;; *) mkdir -p "$(dirname "$R/$marker")"; echo "# ours" > "$R/$marker" ;; esac
-  "$BOOTSTRAP" --target "$R" > "$WORK/one.log" 2>&1 < /dev/null; rc=$?
+  # Detection is under test; a marker file is also a workspace, approved here.
+  "$BOOTSTRAP" --alongside-existing --target "$R" > "$WORK/one.log" 2>&1 < /dev/null; rc=$?
   [ "$rc" -eq 0 ] && grep -q "^Detected agentic tool: $tool\$" "$WORK/one.log" && [ -f "$R/$constitution" ] \
     && ok "one tool detected ($marker): $tool is used without asking" \
     || bad "a single $marker did not install for $tool (exit $rc): $(head -1 "$WORK/one.log")"
@@ -871,6 +879,75 @@ A="$WORK/meta-agents"; fresh_repo "$A"
 [ -f "$A/docs/workspace-changelog/README.md" ] && [ ! -e "$A/docs/WORKSPACE_CHANGELOG.md" ] \
   && ok "on a tool without .claude/ the directory is docs/workspace-changelog/" \
   || bad "agents --with-meta: no docs/workspace-changelog/README.md, or the single file was installed"
+
+echo "=== where an agent puts the kit: never inside the target ==="
+# An agent handed only the kit's URL clones it where it stands — in the
+# project. Everything then installs and lints green, and `git add -A` commits
+# the clone as an embedded repository that no other clone can check out.
+nested_kit() { # $1 = dir to make into a copy of the kit's repository
+  mkdir -p "$1"; cp -R "$KIT_DIR" "$1/starter-kit"
+  echo "# guide" > "$1/AGENTIC-ENGINEERING-GUIDE.md"
+}
+N="$WORK/nested-clone"; fresh_repo "$N"; nested_kit "$N/agentic-engineering-starter-kit"
+git -C "$N/agentic-engineering-starter-kit" init -q -b main
+out="$("$N/agentic-engineering-starter-kit/starter-kit/bootstrap.sh" --tool claude --target "$N" </dev/null 2>&1)"; rc=$?
+left="$(git -C "$N" status --short | grep -v '^?? agentic-engineering-starter-kit/$')"
+[ "$rc" -ne 0 ] && [ -z "$left" ] \
+  && ok "a clone of the kit inside the target is refused, and nothing is written" \
+  || bad "nested clone: exit $rc, wrote: $(echo "$left" | tr '\n' ' ')"
+[[ "$out" == *"outside"* ]] && [[ "$out" == *"mktemp -d"* ]] \
+  && ok "and the refusal says how to clone it outside the project" \
+  || bad "the nested-clone refusal does not say where to clone instead: $(printf '%s' "$out" | head -3 | tr '\n' ' ')"
+N="$WORK/nested-copy"; fresh_repo "$N"; nested_kit "$N/vendor/kit"
+"$N/vendor/kit/starter-kit/bootstrap.sh" --tool claude --target "$N" </dev/null >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && [ ! -e "$N/CLAUDE.md" ] \
+  && ok "so is a copy of the kit's repository without .git" \
+  || bad "a copy of the kit's repository inside the target was installed from (exit $rc)"
+N="$WORK/starter-kit-copy"; fresh_repo "$N"; cp -R "$KIT_DIR" "$N/starter-kit"
+( cd "$N" && ./starter-kit/bootstrap.sh --tool claude </dev/null >/dev/null 2>&1 ); rc=$?
+[ "$rc" -eq 0 ] && [ -f "$N/CLAUDE.md" ] \
+  && ok "control — a copy of starter-kit/ at the target's root still installs, as the README documents" \
+  || bad "control: the documented starter-kit/ copy no longer installs (exit $rc)"
+
+echo "=== a target with an agent workspace of its own: stop, then harmonize ==="
+# Run by an agent from a one-line prompt, the installer was the first thing to
+# touch such a repository: it kept the files and went on, the constitution was
+# not installed, and on the tools whose rules are reached through the
+# constitution's links nothing linked them.
+for case in "claude CLAUDE.md" "agents AGENTS.md" "copilot .github/copilot-instructions.md" \
+            "claude .claude/skills/deploy/SKILL.md" "agents .cursor/rules/style.mdc"; do
+  tool="${case%% *}"; file="${case#* }"
+  X="$WORK/existing-$(echo "$file" | tr '/.' '__')"; fresh_repo "$X"
+  mkdir -p "$X/$(dirname "$file")"; echo "# ours" > "$X/$file"
+  git -C "$X" add -A >/dev/null; git -C "$X" commit -q -m ours
+  out="$("$BOOTSTRAP" --tool "$tool" --target "$X" </dev/null 2>&1)"; rc=$?
+  [ "$rc" -ne 0 ] && [ -z "$(git -C "$X" status --short)" ] \
+    && ok "$file already there ($tool): the first install stops and writes nothing" \
+    || bad "$file already there ($tool): exit $rc, tree: $(git -C "$X" status --short | head -3 | tr '\n' ' ')"
+  [[ "$out" == *"$file"* ]] && [[ "$out" == *"Harmonize track"* ]] && [[ "$out" == *"--alongside-existing"* ]] \
+    || bad "the stop for $file does not name the file, the Harmonize track and --alongside-existing"
+done
+X="$WORK/existing-settings-only"; fresh_repo "$X"; mkdir -p "$X/.claude"; echo '{}' > "$X/.claude/settings.json"
+"$BOOTSTRAP" --target "$X" </dev/null >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && [ -f "$X/CLAUDE.md" ] \
+  && ok "control — .claude/settings.json alone is not a workspace: it installs" \
+  || bad "control: a target with only .claude/settings.json was stopped (exit $rc)"
+X="$WORK/existing-alongside"; fresh_repo "$X"; echo "# ours" > "$X/AGENTS.md"
+out="$("$BOOTSTRAP" --tool agents --alongside-existing --target "$X" </dev/null 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && [ "$(cat "$X/AGENTS.md")" = "# ours" ] && [ -f "$X/docs/agent-rules/working-principles.md" ] \
+  && ok "with --alongside-existing it installs beside the workspace and leaves AGENTS.md as it was" \
+  || bad "--alongside-existing: exit $rc, or AGENTS.md changed, or no rules installed"
+[[ "$out" == *"links none of"* ]] \
+  && ok "and says that AGENTS.md links none of the rules it installed" \
+  || bad "--alongside-existing on agents does not say the rules are unlinked"
+( cd "$X" && ./scripts/check-constitution.sh >/dev/null 2>&1 ); rc=$?
+[ "$rc" -ne 0 ] && ok "and 'make constitution' fails until AGENTS.md links them" \
+  || bad "check-constitution passes on an AGENTS.md that links none of the installed rules"
+X="$WORK/existing-rerun"; fresh_repo "$X"
+"$BOOTSTRAP" --tool agents --target "$X" </dev/null >/dev/null 2>&1
+"$BOOTSTRAP" --tool agents --target "$X" </dev/null >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "control — a re-run on the kit's own install is not stopped by the constitution it wrote" \
+  || bad "control: a re-run on a kit install was stopped (exit $rc)"
 
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repos kept in $WORK"

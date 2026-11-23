@@ -25,6 +25,22 @@ command (`--target`, `git -C`, `make -C`), never by relying on the directory
 you happen to be in. This repository is where a session installing the kit
 usually starts, so a command that leaves the path out writes here.
 
+**Started in the project, with only this kit's URL?** That is the usual
+request: "apply this kit to my project" and a link. Get the kit first, into a
+directory outside the project, and run everything below from that clone:
+
+```bash
+KIT="$(mktemp -d)/kit" && git clone --depth 1 https://github.com/h2nguyen/agentic-engineering-starter-kit "$KIT"
+```
+
+The project is then the directory you were started in: it is the target. Do
+not work from the rendered README or a summary of it: read this file in the
+clone. Never clone into the project; the installer refuses a kit inside its
+target, because committed with the project it becomes an embedded repository.
+Where `git clone` is not possible (no network, refused), fetch
+`starter-kit/SETUP-PROMPT.md` from `raw.githubusercontent.com` and follow it
+instead: it works without the kit.
+
 1. **Know the target.** You need the path of the project's git repository. If
    the user did not give one, ask.
 2. **Know the tool.** One of `claude`, `agents`, `cursor`, `copilot`. The
@@ -33,12 +49,15 @@ usually starts, so a command that leaves the path out writes here.
    If the target has none of these, or the files of more than one, and the
    user did not say, ask. Do not guess: run from an agent, the installer has
    nobody to ask either, and it stops before writing until `--tool` names one.
+   The tool you are running in is not the answer: a team may use another.
 3. **Look before you install.** If the target already has agent instructions,
    rules or skills of its own, do not run the installer on your own judgement:
    follow the Harmonize track in
    [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md), which
    preserves what works and needs the user's approval for every change to an
-   existing file.
+   existing file. The installer stops there too, before it writes anything,
+   and names what it found. Add `--alongside-existing` only once the user has
+   approved the plan that installs the kit beside those files.
 4. **Branch in the target.** Never work on its default branch.
    ```bash
    git -C /path/to/project checkout -b chore/agentic-workspace
@@ -109,8 +128,8 @@ usually starts, so a command that leaves the path out writes here.
    ```
    It must show a completed run that succeeded. A workflow file is not a
    run, and no gate in `make lint` can tell the difference.
-   Do not copy `starter-kit/` into the project; if a copy is there, leave it
-   out of the commit. The install itself needs no changelog fragment: the
+   Do not copy `starter-kit/` or clone the kit into the project; if a copy is
+   there, leave it out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.
 10. **Report** which kit was installed (the installer's `Kit:` line; the
     install records the same in `.starter-kit-version`, which is committed
@@ -158,7 +177,7 @@ scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one comma
 |---|---|
 | **Git** | Never commit to `main`. Branch prefixes: `feat/`, `fix/`, `docs/`, `chore/` |
 | **Test first** | A failing case in the acceptance suite before the change, with a control case where it closes a defect |
-| **The installer** | Never overwrites a file — `.starter-kit-version` included, which only a first install and `kit-status.sh --record` write (ADR-0024); safe to re-run; leaves out what the target's `.starter-kit-declined` lists; every artifact lands for all four tools, or the installer says why not |
+| **The installer** | On a first install, stops before writing at a workspace the target already has, until `--alongside-existing` (ADR-0025); never overwrites a file — `.starter-kit-version` included, which only a first install and `kit-status.sh --record` write (ADR-0024); safe to re-run; leaves out what the target's `.starter-kit-declined` lists; every artifact lands for all four tools, or the installer says why not |
 | **Dependencies** | Bash and the Python standard library. No packages, no network. Anything the kit runs, and any command it writes down for someone to type, starts Python through `scripts/python.sh`, never as `python3 …` |
 | **What the installer copies stands alone** | An installed file is read in a repository that does not contain this one: no path into the kit, or into the rest of this repository. `starter-kit/README.md` and `bootstrap.sh` stay in the kit and may link to the guide |
 | **Templates** | A template embedded in the guide is byte-identical to its kit file; change both together |
