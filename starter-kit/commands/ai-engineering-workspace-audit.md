@@ -14,6 +14,6 @@ This command is deliberately a thin, slash-only entry point (`disable-model-invo
 - `quick` — Phases 0–1 + drift report, strictly read-only (weekly cadence)
 - `full` — Phases 0–5 with the ⛔ approval gate before Phase 4 writes (per milestone, or when `quick` finds a blocker)
 
-Do not re-derive the phases, remediation ladder, or deletion policy here — on any conflict the skill file is canonical. Audit history: `.claude/WORKSPACE_CHANGELOG.md`.
+Do not re-derive the phases, remediation ladder, or deletion policy here — on any conflict the skill file is canonical. Audit history: `.claude/workspace-changelog/`, one file per run.
 
 **Hands off to:** SKILL:ai-engineering-workspace-audit

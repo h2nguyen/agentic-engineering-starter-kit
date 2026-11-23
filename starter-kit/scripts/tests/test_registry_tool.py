@@ -876,6 +876,31 @@ class TestInit(unittest.TestCase):
         self.assertIn(adr.id_pattern, out)
         self.assertNotIn("MADR naming adr-NNNN", out)
 
+    def test_the_greenfield_note_says_what_to_do_when_decisions_live_elsewhere(self):
+        # `init` cannot see a decision register that is not a directory of
+        # records — a table in a concept document, say. It declared `adr`
+        # anyway, and the adopter had to work out alone that the registry
+        # could go and what then became of the rule that names it.
+        _, out = self.init_output()
+        note = out.split("decision records:")[1].splitlines()[0]
+        self.assertIn("elsewhere", note)
+        self.assertIn("registries.json", note)
+
+    def test_an_undeclared_registry_is_named_as_undeclared_not_as_unknown(self):
+        # The command the documentation rule gives for a decision record, run
+        # in a repository that keeps its decisions somewhere else.
+        cfg = self.init()
+        cfg["registries"] = [r for r in cfg["registries"] if r["name"] != "adr"]
+        with open("registries.json", "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh)
+        args = rt.build_parser().parse_args(["new", "--registry", "adr", "--title", "x"])
+        with self.assertRaises(rt.RegistryError) as caught:
+            args.func(args)
+        message = str(caught.exception)
+        self.assertIn("registries.json declares no registry named 'adr'", message)
+        self.assertIn("debugging-kb, changelog", message)
+        self.assertIn("constitution", message)
+
     def test_a_changelog_that_already_has_the_generated_region_needs_no_adoption(self):
         # bootstrap installs the template changelog before it runs init.
         self.write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n<!-- BEGIN GENERATED: changelog — do not edit -->\n\n<!-- END GENERATED: changelog -->\n")

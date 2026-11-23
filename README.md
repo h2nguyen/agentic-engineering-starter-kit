@@ -48,16 +48,20 @@ installs runs on `ubuntu-latest`.
 
 ## After installing
 
-1. Fill in the constitution's `<placeholders>` and the project rows of the
-   comments-and-annotations rule —
+1. Fill in the constitution's `<placeholders>` and `project-annotations.md`,
+   the project's half of the comments-and-annotations rule —
    [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
-2. Run `make constitution`. It names every template placeholder and every
-   link to a file that does not exist that step 1 left in the constitution,
-   and passes when there is none.
+2. Run `make constitution`. It names every template placeholder that step 1
+   left in either file and every link in the constitution to a file that does
+   not exist, and passes when there is none.
 3. Run `make lint`. A working install prints an `OK:` line for each of its five
    gates and no `FAIL`. If your repository already had a Makefile, the
    installer left it alone and printed the two lines to add.
 4. Commit on a feature branch.
+5. Once the pull request is open, look at its CI run: it has to complete
+   with success. A workflow file is not a run, and `make lint` cannot tell
+   the difference. Then make `lint` a required status check on your default
+   branch.
 
 Later, once the workspace has real mass, `--with-meta` adds the Level-4
 self-improvement loop. To move an existing install to a newer kit, see
@@ -80,12 +84,12 @@ self-improvement loop. To move an existing install to a newer kit, see
 | [`starter-kit/SETUP-PROMPT.md`](starter-kit/SETUP-PROMPT.md) | Self-contained prompt that makes an agent drive the whole setup — with fallback specs, so it works even without the rest of this kit |
 | [`starter-kit/bootstrap.sh`](starter-kit/bootstrap.sh) | Tool-detecting installer; `--with-meta` adds the Level-4 loop, `--with-coach-schedule` the weekly feedback digest (opt-in) |
 | [`starter-kit/rules/`](starter-kit/rules/) | Ready-to-use rule defaults: working principles (incl. plan-first/QRSPI), documentation, comments & annotations, versioning & changelog, shared registries — plus a rule-file template, and `reference/` with the worked examples and gotchas the two long rules point at (read on demand, never loaded) |
-| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage), the common-skills catalog, the workspace-audit and workspace-graph skills (Level 4), and a skill template |
+| [`starter-kit/skills/`](starter-kit/skills/) | Shipped skills (prompt-enhancer, semver incl. validator + tests, registry-entry, registry-conflict-triage, rule-load-check), the common-skills catalog, the workspace-audit and workspace-graph skills (Level 4), and a skill template |
 | [`starter-kit/agents/`](starter-kit/agents/) | Agent template + the agent-coach meta-agent (Level 4, propose-never-silently-change) |
 | [`starter-kit/commands/`](starter-kit/commands/) | Slash-command template + the audit command entry point |
 | [`starter-kit/scripts/`](starter-kit/scripts/) | `registry_tool.py` (fragment generator + identifier gate), `graph_tool.py` (typed-link gate + impact and coverage queries) behind `check-graph-links.sh`, `feedback_tool.py` (`Agent-Feedback:` lines grouped by artifact, from listed authors only), `check-kb-shape.sh`, the registry drift/identifier gates, the CI-coverage gate, tests + the parallel-merge and typed-link acceptance tests, and an enforcement-script template |
 | [`starter-kit/docs/`](starter-kit/docs/), `changelog.d/`, `registries.json.template`, `gitattributes.template`, `Makefile.template`, `ci/` | The shared-append-only-registry layer: fragment directories, declaration, merge behaviour, lint target and CI workflow (guide § 3.11) |
-| [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, `WORKSPACE_CHANGELOG.md.template` | The workspace-graph hook, which on Claude Code tells the agent what cites a file it has just edited; tool settings; a SessionStart hook template for the day sessions need environment setup; audit-history skeleton |
+| [`starter-kit/hooks/`](starter-kit/hooks/), `settings.json.template`, [`starter-kit/workspace-changelog/`](starter-kit/workspace-changelog/) | The workspace-graph hook, which on Claude Code tells the agent what cites a file it has just edited; tool settings; a SessionStart hook template for the day sessions need environment setup; the workspace-changelog directory, one file per run |
 | [`docs/explainers/self-improving-agents.html`](docs/explainers/self-improving-agents.html) | Interactive explainer (German and English, opens in any browser, no build): how a correction becomes a reviewed change to an agent's instructions, what the kit already had, and how far the loop is automated |
 | [`docs/adr/`](docs/adr/) | Decision records for this project — starting with why the repo is canonical and a plugin is a future distribution channel |
 | [`AGENTS.md`](AGENTS.md), [`CONTRIBUTING.md`](CONTRIBUTING.md) | How an agent installs or changes the kit; how a person changes it — tests, gates, changelog, release |

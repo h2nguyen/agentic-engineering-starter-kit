@@ -1,5 +1,5 @@
 # This repository's own weekly feedback digest — the kit's
-# ci/agent-feedback.yml.template applied, switched on here (ADR-0017). The one
+# ci/agent-feedback.yml.template applied, switched on here (ADR-0021). The one
 # difference: the coach's instructions live in the kit, under starter-kit/.
 #
 # Installed as .github/workflows/agent-feedback.yml only when asked for:

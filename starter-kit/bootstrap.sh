@@ -11,10 +11,11 @@
 #
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
+#                  [--source-paths <glob>[,<glob>...]]
 #                  [--with-coach-schedule]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
-#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver)
+#   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver, rule-load-check)
 #   agents  → AGENTS.md, docs/agent-rules/          (AGENTS.md-convention tools)
 #   cursor  → AGENTS.md, docs/agent-rules/          (note printed re .cursor/rules/*.mdc)
 #   copilot → .github/copilot-instructions.md, docs/agent-rules/
@@ -27,7 +28,7 @@
 #             check-constitution.sh, feedback_tool.py), .agent-feedback-authors
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
-#             + workspace-changelog skeleton (Claude Code; others: changelog only)
+#             + workspace-changelog directory (Claude Code; others: that directory only)
 #   --with-coach-schedule (opt-in, any tool): .github/workflows/agent-feedback.yml,
 #             a weekly digest of the Agent-Feedback lines on an issue, plus the
 #             coach's proposals there when an ANTHROPIC_API_KEY secret is set.
@@ -36,6 +37,15 @@
 # Placeholder templates (rule, check script, skill, reviewer agent, command,
 # SessionStart hook) install to docs/agent-templates/ — unloaded, and where a
 # later session finds them.
+#
+# Load classes (Claude Code): a rule with a `paths:` header is loaded when a
+# matching file is read or edited, any other rule into every session. The
+# installer binds shared-registries to the registry files registries.json
+# declares. --source-paths 'src/**,scripts/**' also binds
+# comments-and-annotations and versioning-and-changelog, to those globs and to
+# the kit files each is about; without it both load into every session — where
+# a project's source is, is not something to guess. One glob per comma; write
+# brace alternatives out. Only rules this run installs get a header.
 #
 # Declining something: list its path in <repo-root>/.starter-kit-declined, one
 # per line, relative to the repository root, `# reason` after it. A listed file
@@ -50,6 +60,7 @@ TOOL=""
 WITH_META=0
 WITH_SCHEDULE=0
 TARGET_GIVEN=0
+SOURCE_PATHS=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -57,7 +68,8 @@ while [ $# -gt 0 ]; do
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
     --with-coach-schedule) WITH_SCHEDULE=1; shift ;;
-    -h|--help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --source-paths) SOURCE_PATHS="${2:?--source-paths needs a value, e.g. 'src/**,scripts/**'}"; shift 2 ;;
+    -h|--help) sed -n '2,/^set -euo pipefail/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -140,6 +152,38 @@ case "$TOOL" in
   claude|agents|cursor|copilot) ;;
   *) echo "ERROR: unknown tool '$TOOL' (expected claude|agents|cursor|copilot)" >&2; exit 1 ;;
 esac
+
+# The globs go into a YAML header between double quotes. One that cannot be
+# written there is refused here, before anything is installed: a header Claude
+# Code cannot parse is ignored without a word, and the rule then loads into
+# every session as if it had none. Only where the flag means something: on the
+# other tools it is reported as ignored, and must not stop the install.
+SOURCE_GLOBS=()
+if [ -n "$SOURCE_PATHS" ] && [ "$TOOL" = claude ]; then
+  refuse_glob() { # $1 = the glob, $2 = what is wrong with it
+    echo "ERROR: --source-paths: '$1' $2" >&2
+    echo "Give globs relative to the repository root, without quotes, backslashes or line" >&2
+    echo "breaks, one per comma — a brace alternative such as src/**/*.{ts,tsx} written out as" >&2
+    echo "two globs, a directory as src/**. Nothing was written." >&2
+    exit 1
+  }
+  _rest="$SOURCE_PATHS,"
+  while [ -n "$_rest" ]; do
+    _glob="${_rest%%,*}"; _rest="${_rest#*,}"
+    case "$_glob" in *$'\n'*|*$'\r'*) refuse_glob "$(printf '%s' "$_glob" | tr '\n\r' '  ')" "has a line break in it." ;; esac
+    _glob="$(printf '%s' "$_glob" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s|^\./||')"
+    [ -n "$_glob" ] || continue
+    case "$_glob" in
+      *'"'*|*'\'*|*'{'*|*'}'*|/*) refuse_glob "$_glob" "cannot go into a paths: header as it is." ;;
+    esac
+    # A bare directory name matches no file: the header would be valid and the
+    # rule would never arrive, which nothing reports.
+    if [ -d "$TARGET/$_glob" ]; then
+      refuse_glob "$_glob" "names a directory, which matches no file. Write '${_glob%/}/**'."
+    fi
+    SOURCE_GLOBS+=("$_glob")
+  done
+fi
 
 INSTALLED=()
 SKIPPED=()
@@ -257,15 +301,44 @@ case "$TOOL" in
   copilot)       CONSTITUTION=.github/copilot-instructions.md; RULES_DIR=docs/agent-rules ;;
 esac
 DEFAULT_RULES=(working-principles documentation comments-and-annotations versioning-and-changelog)
+# The registry tool is the kit's own file and nothing else's, so finding it
+# already here is what tells a re-run from a first install. An existing
+# constitution does not: a repository can have one and never have seen the kit.
+HAD_KIT=0
+if [ -e "$TARGET/scripts/registry_tool.py" ]; then HAD_KIT=1; fi
 
 # The constitution links its rules as .claude/rules/…; every other layout keeps
 # them under docs/agent-rules/, so the links are rewritten on those tools.
 if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
   retarget_rule_links "$CONSTITUTION"
 fi
+# Was the comments rule here before this run? That, not the kit having been
+# installed, is what decides about its project half below: the rule can be
+# new to a repository that has had the kit for years, or has it in another
+# tool's layout.
+HAD_COMMENTS_RULE=0
+if [ -e "$TARGET/$RULES_DIR/comments-and-annotations.md" ]; then HAD_COMMENTS_RULE=1; fi
+# Which rules this run put in place. Only those may get a `paths:` header
+# further down: a rule that was already here is the adopter's file.
+RULES_NOW=" "
 for rule in "${DEFAULT_RULES[@]}"; do
-  install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
+  if install_file "rules/$rule.md" "$RULES_DIR/$rule.md"; then RULES_NOW="$RULES_NOW$rule "; fi
 done
+installed_now() { case "$RULES_NOW" in *" $1 "*) return 0 ;; esac; return 1; }
+# The project's half of the comments rule: what its pointers stand for here,
+# and the markers this project's own tooling reads. A file of the project's,
+# so that the rule itself stays the kit's and an upgrade can copy it. It is
+# installed together with the rule that names it. Where the rule was already
+# here, it is held back: that rule may have the adopter's rows inside it, and
+# an unfilled template beside them would be loaded into every session and
+# fail a `constitution` check the adopter chained into lint. The upgrade
+# steps create the file there, as part of moving the rows.
+if [ "$HAD_COMMENTS_RULE" -eq 1 ] && [ ! -e "$TARGET/$RULES_DIR/project-annotations.md" ] \
+   && ! declined "$RULES_DIR/project-annotations.md"; then
+  SKIPPED+=("$RULES_DIR/project-annotations.md (not added beside a comments rule that was already here — 'Upgrading an existing install', step 3, creates it)")
+else
+  install_file rules/project-annotations.md.template "$RULES_DIR/project-annotations.md" || true
+fi
 # A rule file is loaded into every session, so the two long ones keep only
 # their imperative there and point at these for the worked examples and the
 # gotcha write-ups. One location for every tool, outside the rules directory:
@@ -275,6 +348,12 @@ if [ "$TOOL" = claude ]; then
   install_file skills/prompt-enhancer/SKILL.md .claude/skills/prompt-enhancer/SKILL.md || true
   install_dir skills/semver .claude/skills/semver || true
   install_file settings.json.template .claude/settings.json || true
+  # What actually loads is decided by Claude Code, not by this script: a header
+  # it cannot parse is ignored in silence, and a session already running keeps
+  # the rules it started with. The check is a skill because it has to run
+  # inside a new session, and it ships on day 1 because nothing else would
+  # ever report either of those.
+  install_file skills/rule-load-check/SKILL.md .claude/skills/rule-load-check/SKILL.md || true
   # The typed links, handed to the agent instead of looked up by it: who cites
   # the file it just edited, and — once — a link that broke before the turn
   # ends. Claude Code only; it is that tool's hook protocol. settings.json
@@ -299,11 +378,8 @@ install_file ci/lint.yml.template .github/workflows/lint.yml || true
 if [ "$WITH_SCHEDULE" -eq 1 ]; then
   install_file ci/agent-feedback.yml.template "$SCHEDULE_WORKFLOW" || true
 fi
-# The registry tool is the kit's own file and nothing else's, so finding it
-# already here is what tells a re-run from a first install. An existing
-# constitution does not: a repository can have one and never have seen the kit.
-RERUN=1
-if install_file scripts/registry_tool.py scripts/registry_tool.py x; then RERUN=0; fi
+RERUN="$HAD_KIT"
+install_file scripts/registry_tool.py scripts/registry_tool.py x || true
 # Everything the kit runs starts Python through this launcher, never by a
 # fixed name: `python3` is not Python on every machine (Windows has `python`
 # and `py`, and a Store alias called python3 that is neither).
@@ -407,7 +483,79 @@ fi
 
 # The changelog rule is only correct once the registry layer is present, so it
 # ships alongside it rather than with the default rules above.
-install_file rules/shared-registries.md "$RULES_DIR/shared-registries.md" || true
+if install_file rules/shared-registries.md "$RULES_DIR/shared-registries.md"; then RULES_NOW="${RULES_NOW}shared-registries "; fi
+
+# --- load classes (Claude Code) --------------------------------------------
+# Claude Code loads a rule with a `paths:` header when a matching file is read
+# or edited, and a rule without one into every session. Three of the five
+# rules are about particular files, and loading them everywhere cost every
+# session several hundred lines it had no use for. The header is written here
+# and not into the kit's rule files: those are one text for four tools, the
+# registry paths differ per repository, and the source paths are the adopter's
+# to name. The constitution keeps a one-line form of every rule, which is what
+# holds before a bound rule has arrived.
+registry_paths() { # $1 = all | changelog: the fragment directories and artifacts registries.json declares
+  [ -f "$TARGET/registries.json" ] || return 0
+  "$KIT_DIR/scripts/python.sh" -B - "$TARGET/registries.json" "$1" <<'PY' || true
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        cfg = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(0)
+registries = cfg.get("registries") if isinstance(cfg, dict) else None
+for registry in registries if isinstance(registries, list) else []:
+    if not isinstance(registry, dict):
+        continue
+    if sys.argv[2] == "changelog" and registry.get("kind") != "changelog":
+        continue
+    for key, suffix in (("fragments", "/**"), ("output", "")):
+        value = str(registry.get(key) or "").strip("/")
+        # The same refusals as for --source-paths, silently: a path that
+        # cannot be written into the header is left out of it.
+        if value and not any(c in value for c in '"\\{}\n\r'):
+            print(value + suffix)
+PY
+}
+bind_rule() { # $1 = rule name, then its globs: write the header onto a rule this run installed
+  # Seen globs are kept one per line: a glob may contain a space, and joined
+  # by spaces "dir/**" would be found inside "src/my dir/**".
+  local rule="$1" f="$TARGET/$RULES_DIR/$1.md" seen=$'\n' glob; shift
+  {
+    echo "---"; echo "paths:"
+    for glob in "$@"; do
+      case "$seen" in *$'\n'"$glob"$'\n'*) continue ;; esac
+      seen="$seen$glob"$'\n'
+      printf '  - "%s"\n' "$glob"
+    done
+    echo "---"; echo ""; cat "$f"
+  } > "$f.tmp" && mv "$f.tmp" "$f"
+  BOUND="$BOUND $rule"
+}
+BOUND=""
+UNBOUND=""
+if [ "$TOOL" = claude ]; then
+  ALL_REGISTRY=(); CHANGELOG_REGISTRY=()
+  while IFS= read -r _p; do [ -n "$_p" ] && ALL_REGISTRY+=("$_p"); done < <(registry_paths all)
+  while IFS= read -r _p; do [ -n "$_p" ] && CHANGELOG_REGISTRY+=("$_p"); done < <(registry_paths changelog)
+  # ${arr[@]+"${arr[@]}"}: bash 3.2 under `set -u` rejects an empty array.
+  if installed_now shared-registries; then
+    bind_rule shared-registries ${ALL_REGISTRY[@]+"${ALL_REGISTRY[@]}"} \
+      registries.json registry.mk .gitattributes .registry-id-duplicate-allowlist
+  fi
+  if [ ${#SOURCE_GLOBS[@]} -gt 0 ]; then
+    if installed_now comments-and-annotations; then
+      bind_rule comments-and-annotations "${SOURCE_GLOBS[@]}" '.github/**' '.claude/hooks/**' Makefile registry.mk
+    else
+      UNBOUND="$UNBOUND comments-and-annotations"
+    fi
+    if installed_now versioning-and-changelog; then
+      bind_rule versioning-and-changelog "${SOURCE_GLOBS[@]}" ${CHANGELOG_REGISTRY[@]+"${CHANGELOG_REGISTRY[@]}"}
+    else
+      UNBOUND="$UNBOUND versioning-and-changelog"
+    fi
+  fi
+fi
 if [ "$TOOL" = "claude" ]; then
   install_file skills/registry-entry/SKILL.md .claude/skills/registry-entry/SKILL.md || true
   install_file skills/registry-conflict-triage/SKILL.md .claude/skills/registry-conflict-triage/SKILL.md || true
@@ -425,10 +573,12 @@ if [ "$WITH_META" -eq 1 ]; then
       install_dir skills/ai-engineering-workspace-audit .claude/skills/ai-engineering-workspace-audit || true
       install_file skills/workspace-graph/SKILL.md .claude/skills/workspace-graph/SKILL.md || true
       install_file commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md || true
-      install_file WORKSPACE_CHANGELOG.md.template .claude/WORKSPACE_CHANGELOG.md || true
+      # One file per run, not one file every run inserts into at the same line.
+      # An install that has the single file from an earlier kit keeps it as its archive.
+      install_file workspace-changelog/README.md .claude/workspace-changelog/README.md || true
       ;;
     *)
-      install_file WORKSPACE_CHANGELOG.md.template docs/WORKSPACE_CHANGELOG.md || true
+      install_file workspace-changelog/README.md docs/workspace-changelog/README.md || true
       ;;
   esac
 fi
@@ -487,12 +637,11 @@ else
   echo "     The template shows example rows, commands and links. Keep what your project has,"
   echo "     and delete the rest: a command that does not run, a stack row with nothing in it,"
   echo "     a link to a rule file that was not installed. Run a command before you keep it."
-  echo "     Then the project rows of the comments-and-annotations rule: the second half of"
-  echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
-  echo "     and <tool-or-gate> pointers — see 'Adopting the comments-and-annotations rule' in"
-  echo "     $KIT_DIR/README.md."
-  echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
-  echo "     ('make registry-list' prints the identifier shapes this repo declares.)"
+  echo "     Then $RULES_DIR/project-annotations.md, the project's half of the comments rule:"
+  echo "     every '<fill in: …>' in it — what the rule's pointers stand for here, and the markers"
+  echo "     your own tooling reads out of comments. The rule itself is used as shipped; edit"
+  echo "     nothing in it. ('make registry-list' prints the identifier shapes this repo declares;"
+  echo "     see 'Adopting the comments-and-annotations rule' in $KIT_DIR/README.md.)"
   echo "  2. Optional: enable further generic skills — the catalog is $KIT_DIR/skills/common-catalog.md"
   echo "     (in the kit, not in this repository)."
   if [ "$TOOL" = claude ]; then
@@ -505,8 +654,9 @@ else
     echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."
   fi
   echo "  3. Run 'make constitution'. It fails, naming the line, for as long as $CONSTITUTION"
-  echo "     links to a file that does not exist or still carries a template <placeholder> —"
-  echo "     'make lint' does not check either, so a green lint does not mean step 1 is done."
+  echo "     links to a file that does not exist, or it or project-annotations.md still carries a"
+  echo "     template <placeholder> — 'make lint' does not check either, so a green lint does not"
+  echo "     mean step 1 is done."
   echo "     Then run 'make lint' — the registry gates, the knowledge-base shape check, the"
   echo "     typed-link gate and the CI-coverage check are already chained into it, and"
   echo "     the installed workflow invokes that same target so nothing can fall out of CI."
@@ -581,6 +731,38 @@ if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
   echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
   echo "     (the documentation rule's table says which, and what each must carry)."
+  echo "  5. See CI run. A workflow file is not a run, and no local check can tell. The installed"
+  echo "     workflow starts on a pull request and on a push to main — not on a push of this"
+  echo "     branch — so once the pull request is open, in THIS repository:"
+  echo "         gh run list --workflow lint.yml --limit 5"
+  echo "     must show a completed run that succeeded. None, or one that ends within seconds"
+  echo "     before any step, checked nothing. Until a run was seen to succeed, the handoff says"
+  echo "     that CI is not confirmed, and why."
+  echo "     Then make 'lint' a required status check on the default branch, so that a pull"
+  echo "     request CI did not check cannot be merged."
+fi
+if [ "$TOOL" = claude ] && [ -n "$BOUND" ]; then
+  echo "  Load classes: a rule with a 'paths:' header loads when a matching file is read or"
+  echo "  edited; every other rule loads into every session. Bound by this run:$BOUND."
+  if [ ${#SOURCE_GLOBS[@]} -eq 0 ]; then
+    echo "  comments-and-annotations and versioning-and-changelog load into every session, because"
+    echo "  where this project's source is was not given. To bind them, add a 'paths:' header to"
+    echo "  each ('Load classes' in $KIT_DIR/README.md shows it), or"
+    echo "  on a first install pass --source-paths 'src/**,scripts/**'."
+  fi
+  echo "  To see what really loads, start a NEW session and run the rule-load-check skill: a"
+  echo "  header Claude Code cannot parse is ignored in silence, and a session that is already"
+  echo "  running has been seen to keep the rules it started with."
+fi
+if [ "$TOOL" = claude ] && [ -n "$UNBOUND" ]; then
+  echo "  --source-paths bound nothing for:$UNBOUND. A rule that was not installed by this"
+  echo "  run — it was already here, or it is declined — is yours, and the installer does not"
+  echo "  write into it. To bind one, add the 'paths:' header by hand ('Load classes' in"
+  echo "  $KIT_DIR/README.md shows it)."
+fi
+if [ "$TOOL" != claude ] && [ -n "$SOURCE_PATHS" ]; then
+  echo "  Note ($TOOL): --source-paths was ignored. Only Claude Code loads a rule by path; here a"
+  echo "  rule is read when the constitution links to it, so there is no load class to set."
 fi
 case "$TOOL" in
   cursor)
@@ -595,7 +777,7 @@ case "$TOOL" in
 esac
 if [ "$WITH_META" -eq 1 ] && [ "$TOOL" != "claude" ]; then
   echo "  Note ($TOOL): the meta subagent/skill are agent-tool-native — convert them to"
-  echo "  playbook docs per guide § 3.10; only the workspace-changelog skeleton was installed."
+  echo "  playbook docs per guide § 3.10; only the workspace-changelog directory was installed."
 fi
 if [ "$WITH_META" -eq 0 ]; then
   echo "  Level-4 meta artifacts (agent-coach, workspace-audit, workspace-graph, workspace changelog) ship"

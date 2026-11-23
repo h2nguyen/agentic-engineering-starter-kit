@@ -47,6 +47,11 @@ usually starts, so a command that leaves the path out writes here.
    ```bash
    ./starter-kit/bootstrap.sh --target /path/to/project --tool <tool>
    ```
+   On Claude Code, add `--source-paths '<glob>,<glob>'` naming where the
+   project's source is (`'src/**,scripts/**'`); ask the user if the
+   repository does not make it evident. Without it two rules that are about
+   source load into every session
+   ([Load classes](starter-kit/README.md#load-classes-of-the-rules-claude-code)).
    Before you run it, ask the user whether they want the weekly feedback digest
    (a scheduled workflow that posts the week's `Agent-Feedback:` lines to an
    issue, with the coach's proposals when an API key is set). Add
@@ -61,38 +66,61 @@ usually starts, so a command that leaves the path out writes here.
      out what does not exist;
    - whose feedback counts, in `.agent-feedback-authors` — ask the user for
      the commit emails and logins; never infer them from the history;
-   - the project rows of the comments-and-annotations rule —
+   - `project-annotations.md` beside the rules, the project's half of the
+     comments-and-annotations rule: every `<fill in: …>` in it —
      [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
+     The rule itself is used as shipped; edit nothing in it.
      In the target, `./scripts/python.sh scripts/registry_tool.py list` prints
      the identifier shapes.
 7. **Do what the installer said it left to you.** If the project already had a
    Makefile, add the two lines it printed (`registry-test` on that line is
    optional). If it kept an existing changelog or knowledge base, run the
-   `adopt` command it printed. If, on Claude Code, it kept an existing
+   `adopt` command it printed. If the project already records its decisions
+   somewhere the installer could not see, delete the `adr` registry it
+   declared from the target's `registries.json` and say in the constitution
+   where decisions live; the documentation rule defers to that. If, on Claude Code, it kept an existing
    `.claude/settings.json`, show the user the two hook entries it printed and
    add them only with their approval: that file is theirs.
    If, on Claude Code, a skill it installed duplicates one the user already
    has from elsewhere — an organisation plugin, a user-level skill — say so,
    and with their approval delete the kit's copy and list its path in the
    target's `.starter-kit-declined`. A later run of the installer puts back
-   whatever is missing and not listed there.
+   what is missing and not listed there. (One file it holds back beside a
+   comments rule that was already there: `project-annotations.md`.)
 8. **Verify.** In the target, `make constitution` and then `make lint` must
    each exit 0. `make constitution` is the check on step 6: it names every
-   template placeholder still in the constitution and every link to a file
-   that does not exist — the template links two example rules, `testing.md`
+   template placeholder still in the constitution or in
+   `project-annotations.md`, and every link to a file that does not exist — the template links two example rules, `testing.md`
    and `security.md`; delete the lines unless the project has those files.
    `make lint` does not check either, so it is not enough alone. It must show
    an `OK:` line for each gate and no `FAIL`. A failure names the file, the
    line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.
 9. **Commit on the branch.** Do not push or open a pull request unless asked.
+   If you are asked to push and open the pull request, look at the run that
+   follows — the installed workflow starts on a pull request, not on the push
+   of a branch. Ask for the target's runs, not this repository's, which has a
+   workflow of the same name:
+   ```bash
+   gh run list --repo <owner>/<repo> --workflow lint.yml --limit 5
+   ```
+   It must show a completed run that succeeded. A workflow file is not a
+   run, and no gate in `make lint` can tell the difference.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
    out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.
 10. **Report** which kit was installed (the installer's `Kit:` line — nothing
     in the project records it), what was installed, what you filled in and
-    what each fact came from, what you guessed and want confirmed, and what
-    the kit deliberately defers until the project shows a need for it.
+    what each fact came from, and what you guessed and want confirmed. Then:
+    - what the kit deliberately defers until the project shows a need for it,
+      each with a signal that someone or something will notice while the
+      deferred artifact does not exist;
+    - whether a CI run was seen to succeed, or that CI is not confirmed and
+      why (nothing was pushed), and that the default branch needs `lint` as a
+      required status check;
+    - on Claude Code, which rules are bound to which paths, and that what
+      really loads has to be checked in a new session with the
+      `rule-load-check` skill: this session cannot see the rules it installed.
 
 Stop and ask the user, instead of deciding yourself, when: the tool is
 unknown, or the target has more than one; the target already has an agent workspace; a command you were going

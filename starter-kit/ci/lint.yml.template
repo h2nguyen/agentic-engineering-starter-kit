@@ -12,6 +12,16 @@
 #
 # If per-path job gating forces enumeration later, keep
 # check-ci-lint-coverage.sh in the lint target: it is what notices the drift.
+#
+# This file is not a run. It triggers on a pull request and on a push to
+# main, so once the first pull request is open, look at its run: the job below
+# must have completed with every step run. No run at all (Actions disabled),
+# or one that ends within seconds before any step (a billing stop), leaves
+# pull requests unchecked and reports nothing. Then make this job a required
+# status check on the default branch — the check is named after the job,
+# `lint` — so that an unchecked pull request cannot be merged. With a merge
+# queue, add `merge_group:` under `on:` first, or queued pull requests wait
+# for a check that never starts.
 
 name: lint
 

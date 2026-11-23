@@ -96,11 +96,61 @@ grep -q 'Upgrading an existing install' "$WORK/run2.log" \
 ! grep -q "Fill in the constitution" "$WORK/run2.log" \
   && ok "and a re-run does not repeat the first-install steps" \
   || bad "a re-run tells a repository that has the kit to fill in the constitution again"
+# A workflow file is not a run. An install was "finished" with lint green and
+# every CI run aborted before its first step, on an unprotected default
+# branch. The installer cannot see a run; it can say that one has to be seen.
+grep -q 'gh run list --workflow lint.yml' "$WORK/run1.log" && grep -q 'required status check' "$WORK/run1.log" \
+  && grep -q 'pull request is open' "$WORK/run1.log" \
+  && ok "the next steps say to see a completed run of the lint workflow once the pull request is open, and to make lint a required status check" \
+  || bad "a first install does not name the workflow's run on the pull request, or the required status check"
+! grep -q 'gh run list' "$WORK/run2.log" \
+  && ok "and a re-run does not repeat it" || bad "a re-run repeats the first-install CI step"
 # An agent filling in the constitution keeps whatever the template shows. The
 # next steps have to say that an example with no counterpart is deleted.
 grep -qi 'delete' "$WORK/run1.log" \
   && ok "the next steps say to delete template examples the project has no counterpart for" \
   || bad "the next steps never say what to do with an example the project lacks"
+
+# An install that predates project-annotations.md has its rows and pointers
+# inside the comments rule. A re-run that added the unfilled template would
+# load placeholders into every session and fail a `constitution` check the
+# adopter chained into lint — so the upgrade steps create the file, and a
+# re-run does not.
+rm -f "$R/.claude/rules/project-annotations.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run3.log" 2>&1
+[ ! -e "$R/.claude/rules/project-annotations.md" ] \
+  && grep -q 'project-annotations.md (not added beside a comments rule that was already here' "$WORK/run3.log" \
+  && ok "a re-run does not add an unfilled project-annotations.md to an existing install, and says where the upgrade steps create it" \
+  || bad "a re-run installed the project-annotations.md template into an existing install, or skipped it without saying why"
+git -C "$R" checkout -q -- . 2>/dev/null
+# The reason to hold the file back is the comments rule that was already
+# there, with the adopter's rows in it — not the kit having been installed.
+# Where the rule itself is new to the repository (an install from before the
+# rule existed, a second tool layout, a repository that had the registry tool
+# for another reason), it names project-annotations.md "beside this file",
+# and a run that installed the rule without the file left a pointer to nothing.
+rm -f "$R/.claude/rules/project-annotations.md" "$R/.claude/rules/comments-and-annotations.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run4.log" 2>&1
+[ -f "$R/.claude/rules/comments-and-annotations.md" ] && [ -f "$R/.claude/rules/project-annotations.md" ] \
+  && ok "where the comments rule is new to the repository too, a re-run installs its project half with it" \
+  || bad "a re-run installed comments-and-annotations.md and held back the project-annotations.md it names"
+git -C "$R" checkout -q -- . 2>/dev/null
+T="$WORK/second-layout"; fresh_repo "$T"
+"$BOOTSTRAP" --tool copilot --target "$T" >/dev/null 2>&1
+"$BOOTSTRAP" --tool claude --target "$T" > "$WORK/second-layout.log" 2>&1
+[ -f "$T/.claude/rules/comments-and-annotations.md" ] && [ -f "$T/.claude/rules/project-annotations.md" ] \
+  && ( cd "$T" && ./scripts/check-constitution.sh CLAUDE.md 2>&1 | grep -q "project-annotations.md' names a file that does not exist" ); rc=$?
+[ -f "$T/.claude/rules/project-annotations.md" ] && [ "$rc" -ne 0 ] \
+  && ok "a second tool layout added to a repository that has the kit gets the rule and its project half, and its constitution links nothing that is missing" \
+  || bad "adding --tool claude to a copilot install left .claude/rules/ without project-annotations.md"
+# Declined is declined, and says so — not "an existing install".
+rm -f "$R/.claude/rules/project-annotations.md"
+printf '.claude/rules/project-annotations.md   # our markers are in the constitution\n' > "$R/.starter-kit-declined"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run5.log" 2>&1
+grep -q 'project-annotations.md (declined in .starter-kit-declined)' "$WORK/run5.log" \
+  && ok "a declined project-annotations.md is reported as declined" \
+  || bad "a declined project-annotations.md is reported as: $(grep 'project-annotations.md (' "$WORK/run5.log" | head -1 | cut -c1-120)"
+rm -f "$R/.starter-kit-declined"; git -C "$R" checkout -q -- . 2>/dev/null
 
 echo "=== run without --target: a project is installed into, the kit's own repository is not ==="
 # The kit's repository carries agent instructions of its own now, so tool
@@ -258,10 +308,30 @@ for tool in claude agents cursor copilot; do
     *)       c="$R/AGENTS.md";                        rules_dir="$R/docs/agent-rules" ;;
   esac
   [ -f "$c" ] && ok "$tool: constitution at ${c#"$R"/}" || bad "$tool: no constitution at ${c#"$R"/}"
-  installed="$(cd "$rules_dir" 2>/dev/null && ls *.md | sort)"
+  installed="$(cd "$rules_dir" 2>/dev/null && ls *.md | grep -v '^project-annotations\.md$' | sort)"
   [ "$installed" = "$expected_rules" ] \
     && ok "$tool: every shipped rule landed in ${rules_dir#"$R"/}" \
     || bad "$tool: ${rules_dir#"$R"/} holds: $(echo $installed)"
+  # The comments rule used to be the one kit file a project had to edit: a
+  # table to complete and four pointers to resolve, inside a rule that an
+  # upgrade then could not copy and no check read. The project's half is a
+  # file of its own now; the rule is the kit's, word for word.
+  pa="$rules_dir/project-annotations.md"
+  [ -f "$pa" ] && grep -q '^\*\*Related:\*\* RULE:comments-and-annotations' "$pa" \
+    && ok "$tool: the project's half of the comments rule is its own file, ${pa#"$R"/}" \
+    || bad "$tool: no project-annotations.md beside the rules, or it does not name the rule it completes"
+  ! grep -qiE 'fill-in|complete the second table|testing\.md' "$rules_dir/comments-and-annotations.md" \
+    && grep -q 'project-annotations\.md' "$rules_dir/comments-and-annotations.md" \
+    && ok "$tool: the comments rule asks the project to edit nothing in it, and names the file that holds the project's half" \
+    || bad "$tool: the comments rule still has a part to fill in, or names testing.md: $(grep -ciE 'fill-in|complete the second table|testing\.md' "$rules_dir/comments-and-annotations.md") line(s)"
+  grep -qF "(${rules_dir#"$R"/}/project-annotations.md)" "$c" \
+    && ok "$tool: the constitution's rule index links it, at this layout's path" || bad "$tool: the constitution does not link ${rules_dir#"$R"/}/project-annotations.md"
+  # The documentation rule prescribed docs/adr/ and `--registry adr` whether
+  # or not the repository keeps decision records there. A project that
+  # records decisions elsewhere had to overrule it in its constitution.
+  grep -q 'No `adr` registry' "$rules_dir/documentation.md" \
+    && ok "$tool: the documentation rule says when its decision-record format applies, and what holds when it does not" \
+    || bad "$tool: the documentation rule prescribes the adr registry unconditionally"
   if [ "$tool" = claude ]; then
     ! grep -q 'docs/agent-rules/' "$c" && ok "$tool: constitution links point at .claude/rules/" || bad "$tool: links retargeted by mistake"
   else
@@ -366,6 +436,11 @@ for tool in claude agents cursor copilot; do
   ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
   [ "$rc" -ne 0 ] && ok "$tool: 'make constitution' fails on a constitution nobody has filled in" \
     || bad "$tool: 'make constitution' passed on the untouched template"
+  want="$(grep -c '<fill in:' "$KIT_DIR/rules/project-annotations.md.template")"
+  got="$(grep -c "^FAIL: ${pa#"$R"/}:[0-9]* — unfilled placeholder '<fill in:" "$WORK/constitution-$tool.log")"
+  [ "$want" -gt 0 ] && [ "$got" -eq "$want" ] \
+    && ok "$tool: and reports every one of the $want placeholders of the project-annotations.md nobody has filled in" \
+    || bad "$tool: 'make constitution' reports $got of the $want placeholders in project-annotations.md"
   unreported=""
   for n in $(awk '/^## Debugging/ {exit} /</ {print NR}' "$c"); do
     grep -q "^FAIL: ${c#"$R"/}:$n — " "$WORK/constitution-$tool.log" || unreported="$unreported $n"
@@ -379,15 +454,158 @@ for tool in claude agents cursor copilot; do
   # What filling it in comes to, mechanically: every placeholder line and both
   # example links gone. The Debugging section keeps its angle brackets — a
   # command argument in a fence, two token shapes in backticks — and must pass.
-  cp "$c" "$WORK/constitution-$tool.orig"
+  cp "$c" "$WORK/constitution-$tool.orig"; cp "$pa" "$WORK/annotations-$tool.orig"
   awk '/^## Debugging/ {keep=1} keep || !(/</ || /testing\.md/ || /security\.md/ || /^constraints that shape/)' \
     "$WORK/constitution-$tool.orig" > "$c"
+  ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
+  [ "$rc" -ne 0 ] && ! grep -q "^FAIL: ${c#"$R"/}:" "$WORK/constitution-$tool.log" \
+    && ok "$tool: with the constitution filled in, what is left to report is project-annotations.md alone" \
+    || bad "$tool: a filled-in constitution beside an unfilled project-annotations.md: exit $rc"
+  sed -E 's/<fill in: [^>]*>/`#123`/g' "$WORK/annotations-$tool.orig" > "$pa"
   ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ) \
-    && grep -q '<symptom>' "$c" \
-    && ok "$tool: with those lines gone it passes, and the angle brackets that belong there stayed" \
-    || { bad "$tool: a filled-in constitution still fails:"; grep -E '^FAIL' "$WORK/constitution-$tool.log" | head -3 | sed 's/^/         /'; }
-  cp "$WORK/constitution-$tool.orig" "$c"
+    && grep -q '<symptom>' "$c" && grep -q '<DECISION-RECORD-ID>' "$pa" \
+    && ok "$tool: with both filled in it passes, and the angle brackets that belong there stayed" \
+    || { bad "$tool: a filled-in constitution and project-annotations.md still fail:"; grep -E '^FAIL' "$WORK/constitution-$tool.log" | head -3 | sed 's/^/         /'; }
+  cp "$WORK/constitution-$tool.orig" "$c"; cp "$WORK/annotations-$tool.orig" "$pa"
 done
+
+echo "=== load classes: which rules Claude Code loads into every session ==="
+# All five rules loaded at every session start — 788 lines, most of them
+# about registries, versioning and annotations, in sessions that touched none
+# of those. Claude Code loads a rule with a `paths:` header only when a
+# matching file is read or edited. The kit's rule files carry no header (they
+# are the same text for all four tools); the installer writes it.
+frontmatter() { awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1' "$1"; }
+rule_text() { # the file without a leading frontmatter block and the blank line after it
+  awk 'NR==1 && $0=="---" {fm=1; next} fm && $0=="---" {fm=0; gap=1; next} fm {next} gap {gap=0; if ($0=="") next} {print}' "$1"
+}
+scoped() { [ "$(sed -n 1p "$1")" = "---" ] && frontmatter "$1" | grep -q '^paths:'; }
+R="$WORK/claude"; rd="$R/.claude/rules"
+scoped "$rd/shared-registries.md" \
+  && ok "a fresh install binds the registries rule to paths" || bad "shared-registries.md has no paths: header"
+missing=""
+for want in 'changelog.d/**' 'CHANGELOG.md' 'docs/DEBUGGING-KNOWLEDGE-BASE.d/**' 'docs/DEBUGGING-KNOWLEDGE-BASE.md' 'docs/adr/**' \
+            'registries.json' 'registry.mk' '.gitattributes' '.registry-id-duplicate-allowlist'; do
+  frontmatter "$rd/shared-registries.md" | grep -qxF "  - \"$want\"" || missing="$missing $want"
+done
+[ -z "$missing" ] && ok "to every registry registries.json declares, and to the registry layer's own files" \
+  || bad "the registries rule's header lacks:$missing"
+rule_text "$rd/shared-registries.md" | cmp -s - "$KIT_DIR/rules/shared-registries.md" \
+  && ok "under the header the rule is the kit's text, byte for byte" \
+  || bad "the text of shared-registries.md differs from the kit's"
+unscoped=""
+for rule in working-principles documentation comments-and-annotations versioning-and-changelog; do
+  scoped "$rd/$rule.md" && unscoped="$unscoped $rule"
+done
+[ -z "$unscoped" ] \
+  && ok "with no --source-paths the other four load into every session: the installer does not guess where the source is" \
+  || bad "bound to paths nobody named:$unscoped"
+grep -q -- '--source-paths' "$WORK/boot-claude.out" \
+  && ok "and the next steps say how to bind the two rules that are about source" \
+  || bad "the installer never mentions --source-paths"
+( cd "$R" && ./scripts/check-graph-links.sh >/dev/null 2>&1 ) \
+  && ok "the link gate reads a rule with a header as it did without" || bad "a paths: header breaks the link gate"
+[ -f "$R/.claude/skills/rule-load-check/SKILL.md" ] && grep -qi 'new session' "$R/.claude/skills/rule-load-check/SKILL.md" \
+  && ok "the load-class check is installed as a skill, and says it runs in a new session" \
+  || bad "no rule-load-check skill, or it does not say that a running session keeps the rules it started with"
+
+R="$WORK/sourced"; fresh_repo "$R"; rd="$R/.claude/rules"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/**,tools/**' > "$WORK/sourced.log" 2>&1 || bad "bootstrap with --source-paths exited non-zero"
+missing=""
+for want in 'src/**' 'tools/**' '.github/**' '.claude/hooks/**' 'Makefile' 'registry.mk'; do
+  frontmatter "$rd/comments-and-annotations.md" | grep -qxF "  - \"$want\"" || missing="$missing comments:$want"
+done
+for want in 'src/**' 'tools/**' 'changelog.d/**' 'CHANGELOG.md'; do
+  frontmatter "$rd/versioning-and-changelog.md" | grep -qxF "  - \"$want\"" || missing="$missing versioning:$want"
+done
+[ -z "$missing" ] && ok "--source-paths binds the comments rule and the versioning rule to those paths and to the kit files each is about" \
+  || bad "headers lack:$missing"
+out=""
+for rule in comments-and-annotations versioning-and-changelog shared-registries; do
+  rule_text "$rd/$rule.md" | cmp -s - "$KIT_DIR/rules/$rule.md" || out="$out $rule"
+done
+[ -z "$out" ] && ok "each is still the kit's text under its header" || bad "text differs from the kit's:$out"
+grep -q 'Bound by this run: shared-registries comments-and-annotations versioning-and-changelog\.' "$WORK/sourced.log" \
+  && ok "and the run names the rules it bound" \
+  || bad "the closing message names as bound: $(grep -o 'Bound by this run:.*' "$WORK/sourced.log" | cut -c1-120)"
+always="$(for f in "$rd"/*.md; do scoped "$f" || basename "$f" .md; done | sort | tr '\n' ' ')"
+[ "$always" = "documentation project-annotations working-principles " ] \
+  && ok "what then loads into every session is the constitution and three files: $always" \
+  || bad "always loaded with --source-paths: $always"
+# A rule bound to paths arrives after the first matching access. What must
+# hold before that is the one line the constitution keeps for it.
+norow=""
+for f in "$rd"/*.md; do
+  scoped "$f" || continue
+  awk '/^## Non-Negotiable Rules/ {on=1; next} on && /^## / {exit} on' "$R/CLAUDE.md" | grep -q "(.claude/rules/$(basename "$f"))" \
+    || norow="$norow $(basename "$f" .md)"
+done
+[ -z "$norow" ] && ok "every rule bound to paths has its one-line form in the constitution's always-loaded table" \
+  || bad "bound to paths, and absent from the Non-Negotiable Rules table:$norow"
+( cd "$R" && make lint > "$WORK/sourced-lint.log" 2>&1 ) \
+  && ok "an install with three rules bound to paths lints green" \
+  || { bad "lint fails with path headers:"; grep -E '^FAIL|Error' "$WORK/sourced-lint.log" | head -3 | sed 's/^/         /'; }
+
+R="$WORK/sourced-agents"; fresh_repo "$R"
+"$BOOTSTRAP" --tool agents --target "$R" --source-paths 'src/**' > "$WORK/sourced-agents.log" 2>&1; rc=$?
+out=""
+for f in "$R"/docs/agent-rules/*.md; do [ "$(sed -n 1p "$f")" = "---" ] && out="$out $(basename "$f")"; done
+[ "$rc" -eq 0 ] && [ -f "$R/docs/agent-rules/documentation.md" ] && [ -z "$out" ] && grep -q 'source-paths was ignored' "$WORK/sourced-agents.log" \
+  && ok "on a tool that reads a rule when the constitution links to it, no header is written, and the installer says the flag does nothing there" \
+  || bad "agents: headers written ($out) or the ignored flag not mentioned"
+R="$WORK/sourced-bad"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/**,lib/"x"' > "$WORK/sourced-bad.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && [ -z "$(git -C "$R" status --porcelain)" ] && grep -q 'cannot go into a paths: header' "$WORK/sourced-bad.log" \
+  && ok "a pattern that would break the header is refused before anything is written" \
+  || bad "a pattern with a quote in it was accepted (exit $rc), or files were written"
+R="$WORK/sourced-brownfield"; fresh_repo "$R"; mkdir -p "$R/docs/decisions"
+printf '# Use Postgres\n\n## Status\n\nAccepted\n\n## Context\n\nc\n\n## Decision\n\nd\n\n## Consequences\n\ne\n' > "$R/docs/decisions/0001-use-postgres.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-brownfield.log" 2>&1
+frontmatter "$R/.claude/rules/shared-registries.md" | grep -qxF '  - "docs/decisions/**"' \
+  && ! frontmatter "$R/.claude/rules/shared-registries.md" | grep -q 'docs/adr' \
+  && ok "the header names the registries where this repository keeps them (docs/decisions/), not where a fresh install would" \
+  || bad "the registries rule is not bound to docs/decisions/**: $(frontmatter "$R/.claude/rules/shared-registries.md" | grep -c . ) header lines"
+# What else must not reach the header, or must not stop a run it has no part in.
+for bad_glob in 'src\x/**' $'src/**\nlib/**'; do
+  R="$WORK/sourced-bad2"; rm -rf "$R"; fresh_repo "$R"
+  "$BOOTSTRAP" --tool claude --target "$R" --source-paths "$bad_glob" > "$WORK/sourced-bad2.log" 2>&1; rc=$?
+  [ "$rc" -ne 0 ] && [ -z "$(git -C "$R" status --porcelain)" ] \
+    && ok "a glob with a $(printf '%s' "$bad_glob" | tr -d 'a-z/*' | od -c | sed -n '1s/^[0-9]* *//p' | tr -s ' ') in it is refused, with nothing written" \
+    || bad "a glob that breaks the header was accepted (exit $rc): $(printf '%q' "$bad_glob")"
+done
+R="$WORK/sourced-dir"; fresh_repo "$R"; mkdir -p "$R/src"; : > "$R/src/keep"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src' > "$WORK/sourced-dir.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && grep -q "src/\*\*" "$WORK/sourced-dir.log" \
+  && ok "a bare directory name, which matches no file, is refused and the glob that was meant is shown" \
+  || bad "--source-paths 'src' was accepted for a directory (exit $rc)"
+R="$WORK/sourced-space"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/my dir/**,dir/**' > "$WORK/sourced-space.log" 2>&1
+frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "src/my dir/**"' \
+  && frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "dir/**"' \
+  && ok "a glob with a space is written whole, and a later glob that is its tail is not taken for a duplicate" \
+  || bad "globs with a space: $(frontmatter "$R/.claude/rules/versioning-and-changelog.md" | tr '\n' ' ')"
+R="$WORK/sourced-copilot"; fresh_repo "$R"
+"$BOOTSTRAP" --tool copilot --target "$R" --source-paths 'src/**/*.{ts,tsx}' > "$WORK/sourced-copilot.log" 2>&1; rc=$?
+[ "$rc" -eq 0 ] && grep -q 'source-paths was ignored' "$WORK/sourced-copilot.log" \
+  && ok "where the flag does nothing, a glob it would refuse does not stop the install" \
+  || bad "copilot with a brace glob in --source-paths: exit $rc"
+R="$WORK/sourced-oddjson"; fresh_repo "$R"; printf '[]\n' > "$R/registries.json"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-oddjson.log" 2>&1
+! grep -q 'Traceback' "$WORK/sourced-oddjson.log" \
+  && ok "a registries.json that is not an object does not make the installer print a traceback" \
+  || bad "the installer prints a Python traceback for an odd registries.json"
+# A re-run cannot bind a rule that is already there — and used to take the
+# flag without a word, on the one tool where it means something.
+R="$WORK/sourced"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'app/**' > "$WORK/sourced-rerun.log" 2>&1
+! frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -q 'app/' \
+  && grep -q 'source-paths.*comments-and-annotations.*versioning-and-changelog\|not bound.*comments-and-annotations' "$WORK/sourced-rerun.log" \
+  && ok "on a re-run --source-paths changes no existing rule, and the installer names the rules it did not bind and why" \
+  || bad "a re-run with --source-paths says nothing about the rules it left unbound"
+grep -q ':(glob)' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && grep -q 'exclude-standard' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && ok "the load check finds its test file with the tool's glob meaning, among untracked files too" \
+  || bad "the skill lists candidate files with git's default pathspec, or only tracked ones"
 
 echo "=== the kit's own tools leave no bytecode behind in the repository ==="
 # The installer ships no .gitignore, so a __pycache__ the tools create shows
@@ -561,6 +779,87 @@ case "$handoffs" in
   *"(0)"*|"") bad "the installed meta loop declares no human approval gate" ;;
   *) ok "the installed meta loop declares its human approval gates as hand-offs" ;;
 esac
+
+echo "=== the workspace changelog is one file per run ==="
+# It was one file, "newest first": every setup pass, audit and coach cycle
+# inserted at the same line, which is the shape the shared-registries rule
+# exists to remove. Three pull requests of one setup day had to go into it.
+wc="$R/.claude/workspace-changelog"
+[ -f "$wc/README.md" ] && [ ! -e "$R/.claude/WORKSPACE_CHANGELOG.md" ] \
+  && ok "--with-meta installs the workspace changelog as a directory with its format, not as a single file" \
+  || bad "--with-meta still installs .claude/WORKSPACE_CHANGELOG.md, or no .claude/workspace-changelog/README.md"
+out=""
+for f in .claude/skills/ai-engineering-workspace-audit/SKILL.md .claude/agents/agent-coach.md .claude/commands/ai-engineering-workspace-audit.md; do
+  grep -q 'workspace-changelog/' "$R/$f" || out="$out $f"
+done
+[ -z "$out" ] && ! grep -q 'Append to' "$R/.claude/skills/ai-engineering-workspace-audit/SKILL.md" \
+  && ! grep -rq 'WORKSPACE_CHANGELOG.md. (create it if missing)' "$R/.claude" \
+  && ok "the audit skill, its command and the agent-coach write their record into that directory, and none still says to append to the single file" \
+  || bad "still pointing at the single file, or still saying 'Append to':$out"
+git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "bootstrap with meta" 2>/dev/null
+entry() { printf '# 2026-11-21 — %s\n\n## Headline result\n\n%s\n\n## Changes applied\n\n## Deliberately NOT changed (with reasons)\n\n## Follow-ups\n' "$1" "$2"; }
+for b in audit coach; do
+  git -C "$R" checkout -q -b "wc-$b" main
+  entry "$b" "what the $b run did" > "$wc/2026-11-21-$b.md"
+  git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "record the $b run"
+done
+git -C "$R" checkout -q main
+git -C "$R" merge -q --no-edit wc-audit >/dev/null 2>&1 && git -C "$R" merge -q --no-edit wc-coach >/dev/null 2>&1 \
+  && [ -f "$wc/2026-11-21-audit.md" ] && [ -f "$wc/2026-11-21-coach.md" ] \
+  && ok "two branches that each record a run merge with no conflict, and both entries are there" \
+  || { bad "two branches that each added a file to the directory did not merge, or the directory is not there"; git -C "$R" merge --abort 2>/dev/null; }
+# One run is often several pull requests — the day that prompted this had
+# three. If each edits the run's file they meet on the same lines again, so
+# each adds a file of its own, and the installed README has to say that.
+readme_text="$(tr '\n' ' ' < "$wc/README.md" 2>/dev/null | tr -s ' ')"
+case "$readme_text" in
+  *"adds a file of its own"*) ok "the directory's README tells a later pull request of the same run to add a file of its own" ;;
+  *) bad "the README lets a second pull request of one run edit the first one's file" ;;
+esac
+case "$readme_text" in
+  *"edits that run's file"*) bad "the README still says a later pull request edits the run's file" ;;
+  *) ok "and nowhere to edit a file another open pull request may be editing" ;;
+esac
+for b in pr2 pr3; do
+  git -C "$R" checkout -q -b "wc-same-$b" main
+  printf '\n- a follow-up from %s\n' "$b" >> "$wc/2026-11-21-audit.md"
+  git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "amend the audit entry from $b"
+done
+git -C "$R" checkout -q main; git -C "$R" merge -q --no-edit wc-same-pr2 >/dev/null 2>&1
+git -C "$R" merge -q --no-edit wc-same-pr3 >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "control — two pull requests of one run that edit the same entry do conflict, which is why they do not" \
+  || bad "control: two edits of one entry merged cleanly"
+git -C "$R" merge --abort 2>/dev/null
+# Control: the shape it replaces, on the same two branches.
+C="$WORK/meta-control"; fresh_repo "$C"
+printf '# AI Workspace Changelog\n\nOne entry per run, newest first.\n\n## 2026-11-01 — setup\n\nThe first entry.\n' > "$C/WORKSPACE_CHANGELOG.md"
+git -C "$C" add -A >/dev/null; git -C "$C" commit -q -m "one file"
+for b in audit coach; do
+  git -C "$C" checkout -q -b "wc-$b" main
+  awk -v b="$b" '/^## / && !done {print "## 2026-11-21 — " b "\n\nwhat the " b " run did\n"; done=1} {print}' "$C/WORKSPACE_CHANGELOG.md" > "$C/x" && mv "$C/x" "$C/WORKSPACE_CHANGELOG.md"
+  git -C "$C" add -A >/dev/null; git -C "$C" commit -q -m "record the $b run"
+done
+git -C "$C" checkout -q main; git -C "$C" merge -q --no-edit wc-audit >/dev/null 2>&1
+git -C "$C" merge -q --no-edit wc-coach >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "control — the single newest-first file conflicts on the same two branches" \
+  || bad "control: two entries prepended to one file merged cleanly, so the case above proves nothing"
+git -C "$C" merge --abort 2>/dev/null
+# An install that has the single file keeps it: the installer never overwrites,
+# and the history in it is the adopter's.
+E="$WORK/meta-existing"; fresh_repo "$E"
+"$BOOTSTRAP" --tool claude --target "$E" >/dev/null 2>&1
+printf '# AI Workspace Changelog\n\n## 2026-10-01 — full audit\n\nKept.\n' > "$E/.claude/WORKSPACE_CHANGELOG.md"
+git -C "$E" add -A >/dev/null; git -C "$E" commit -q -m "an older install with the single file" 2>/dev/null
+"$BOOTSTRAP" --tool claude --with-meta --target "$E" >/dev/null 2>&1
+git -C "$E" diff --quiet -- .claude/WORKSPACE_CHANGELOG.md && [ -f "$E/.claude/workspace-changelog/README.md" ] \
+  && grep -q 'WORKSPACE_CHANGELOG.md' "$E/.claude/workspace-changelog/README.md" \
+  && ok "an install with the single file keeps it untouched, gets the directory, and the directory's README says what the old file is now" \
+  || bad "adding the meta layer to an install with WORKSPACE_CHANGELOG.md changed it, or left no directory"
+A="$WORK/meta-agents"; fresh_repo "$A"
+"$BOOTSTRAP" --tool agents --with-meta --target "$A" >/dev/null 2>&1
+[ -f "$A/docs/workspace-changelog/README.md" ] && [ ! -e "$A/docs/WORKSPACE_CHANGELOG.md" ] \
+  && ok "on a tool without .claude/ the directory is docs/workspace-changelog/" \
+  || bad "agents --with-meta: no docs/workspace-changelog/README.md, or the single file was installed"
 
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repos kept in $WORK"

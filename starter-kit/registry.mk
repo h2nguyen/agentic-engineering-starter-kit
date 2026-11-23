@@ -60,14 +60,16 @@ graph-impact:
 graph-coverage:
 	@./scripts/python.sh scripts/graph_tool.py coverage
 
-## ci-lint-coverage — every lint sub-target actually runs in CI, and the
+## ci-lint-coverage — every lint sub-target is invoked by a CI workflow step
+## (whether a run completed is not something a local check can see), and the
 ## registry and link gates are actually reached by lint.
 ci-lint-coverage:
 	./scripts/check-ci-lint-coverage.sh
 
-## constitution — the constitution links only to files that exist and has no
-## template placeholder left. Run it after filling the constitution in, and
-## after editing it. Not a prerequisite of lint as shipped; to hold it on every
+## constitution — the constitution links only to files that exist, and neither
+## it nor project-annotations.md (the project's half of the comments rule) has
+## a template placeholder left. Run it after filling them in, and after
+## editing them. Not a prerequisite of lint as shipped; to hold it on every
 ## pull request, add `constitution` to your lint line.
 constitution:
 	./scripts/check-constitution.sh

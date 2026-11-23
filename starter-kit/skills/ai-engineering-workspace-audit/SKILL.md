@@ -58,8 +58,10 @@ audit/consolidation.
    anything not captured here risks being silently lost during consolidation.
    Example entry:
    `L-07: integration tests need a local Redis on port 6380 (CLAUDE.md §Testing)`
-4. Check staleness: read `.claude/WORKSPACE_CHANGELOG.md` if present and note
-   the date and scope of the last audit.
+4. Check staleness: read the newest files in `.claude/workspace-changelog/`
+   (`docs/workspace-changelog/` where the tool has no `.claude/`), and a
+   single `WORKSPACE_CHANGELOG.md` if the repository still has one from an
+   earlier setup, and note the date and scope of the last audit.
 5. Protect the audit's own context: if the inventory means reading many or
    large files, delegate the bulk reading to a subagent and pull back only the
    structured inventory and ledger.
@@ -207,9 +209,15 @@ Implement the approved plan in small, reviewable git commits — one concern per
 commit, so any single change can be reverted without unwinding the rest.
 Update all cross-references between files, then run `make graph-links` where
 the repo ships it: a relocated or split file has a new name, and every typed
-link to the old one fails by `file:line` until it is changed. Append to
-`.claude/WORKSPACE_CHANGELOG.md` (create it if missing): date, mode, summary,
-ladder rungs used, ledger items affected.
+link to the old one fails by `file:line` until it is changed. Record the run
+as a new file in `.claude/workspace-changelog/` (`docs/workspace-changelog/`
+where the tool has no `.claude/`), named `<date>-<what>.md` with a `<what>`
+no other branch would choose (create the directory if missing; its README
+has the entry format): date, mode, summary, ladder rungs used, ledger items
+affected. A file is written once: a later pull request of the same audit
+adds its own. Never a line added to a file other runs also write to, and
+nothing new into a single `WORKSPACE_CHANGELOG.md` an earlier setup left
+behind.
 
 ## Phase 5 — Verify
 

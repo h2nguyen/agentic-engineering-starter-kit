@@ -110,21 +110,27 @@ ambiguity that changes what you will write. Nothing else pauses the work.
 
 ## Phase 2 — Install the core (Level 1)
 
-Create, at the locations your detected tool expects (Appendix A.1):
+Create, at the locations your detected tool expects (Appendix A.1). With the
+kit on Claude Code, give `bootstrap.sh` the source directories found in Phase
+1 as `--source-paths '<glob>,<glob>'`: it binds the rules that are about
+source to those paths, so they load when such a file is touched and not into
+every session. Each bound rule keeps its one line in the constitution — that
+line is what holds before the rule arrives.
 
 1. **The constitution** — always-loaded contract, ≤ ~200 lines, per the outline
    in Appendix A.2. Every claim in it must be true today.
 2. **The universal rule files** — working principles (Appendix A.3) plus the
    documentation, comments-and-annotations and versioning-and-changelog
-   defaults (Appendix A.8) — project-agnostic, used verbatim. The
-   comments-and-annotations rule has two project-specific parts: fill the
-   second half of its protected-shapes table from the lint, test and CI tooling
-   found in Phase 1, and resolve its `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`,
-   `<TICKET-ID>` and `<tool-or-gate>` pointers to the identifier shapes and
-   gates this repo actually uses (`<EVAL-RECORD-ID>` too, if the repo keeps
-   prompt-evaluation evidence). The documentation rule's "Feedback to an
-   agent" section reads `.agent-feedback-authors`, which starts naming nobody:
-   ask the user whose feedback counts, and never infer it from the history.
+   defaults (Appendix A.8) — project-agnostic, used verbatim, the
+   comments-and-annotations rule included. Its project-specific half is a
+   file of the project's own beside it, `project-annotations.md` (the kit
+   installs a template; kit-less, write it): what the rule's
+   `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>`
+   and `<EVAL-RECORD-ID>` pointers stand for in this repo, and the marker
+   shapes its own lint, test and CI tooling reads, from Phase 1. The
+   documentation rule's "Feedback to an agent" section reads
+   `.agent-feedback-authors`, which starts naming nobody: ask the user whose
+   feedback counts, and never infer it from the history.
    Ask too whether they want the weekly feedback digest (`bootstrap.sh
    --with-coach-schedule`); install it only on a yes.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
@@ -203,12 +209,32 @@ Appendix A.7 — the sequence:
    the umbrella target never reaches is green and checks nothing. Never
    renumber an existing record to fit a convention; change the config to fit
    the record.
+   **Decisions that already live somewhere `init` cannot see** — a register
+   table in a document, a wiki, a tracker label — stay there. `init` declares
+   an `adr` registry whenever it finds no decision-record directory: delete
+   that registry from `registries.json`, say in the constitution where
+   decisions are recorded and how one is cited, and give that as
+   `<DECISION-RECORD-ID>` in `project-annotations.md`. The documentation
+   rule's ADR section steps back by its own wording when no `adr` registry is
+   declared; nothing in the rule needs overruling. Do not start `docs/adr/`
+   beside a register that works: two homes for decisions is the duplication
+   the ledger exists to prevent.
 6. **Plan → approval → apply.** Present the full change plan (including the
    ledger items each change touches) and wait for explicit approval before
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
    losslessly (relocate → split → compress) before ever deleting; deletions
    need written justification per Appendix A.7.
-7. **Record.** Append a workspace-changelog entry (create the file if missing):
+7. **Record.** Where the repository already keeps a workspace changelog of
+   its own (Phase 0.3), record there, in its form — the existing convention
+   wins — and put the layout below into the change plan as a proposal if its
+   form is one shared file. Otherwise write the entry as a file of its own —
+   `.claude/workspace-changelog/<date>-<what>.md`, or under
+   `docs/workspace-changelog/` where the tool has no `.claude/`; create the
+   directory if missing. A setup is easily three pull requests in a day, and
+   in one shared file each would insert at the same line. So each pull
+   request that has something to record adds a file of its own, with a
+   `<what>` no other branch would choose; none edits a file another open pull
+   request may be editing. In it:
    which kit was installed (the installer's `Kit:` line — nothing else records
    it), what changed, what was **deliberately NOT changed and why**, ladder
    rungs used, ledger items affected. If the repo has resident improvement machinery
@@ -218,13 +244,14 @@ Appendix A.7 — the sequence:
 ## Phase 4 — Verify and hand off
 
 1. No leftover placeholders: search the new files for `<` markers. For the
-   constitution, where the kit is present, `make constitution` does this
-   search and exits non-zero until it is clean. The
-   comments-and-annotations rule is the one exception — its
-   `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>` and
-   `<EVAL-RECORD-ID>` are pointers to resolve, and the other angle-bracket
-   tokens inside its examples are illustrative and stay; never rewrite its
-   examples to make the search come back empty.
+   constitution and `project-annotations.md`, where the kit is present,
+   `make constitution` does this search and exits non-zero until both are
+   clean. The comments-and-annotations rule and its reference are the
+   exception, and are not edited — their `<DECISION-RECORD-ID>`,
+   `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>` and `<EVAL-RECORD-ID>` are
+   pointers that `project-annotations.md` resolves, and the other
+   angle-bracket tokens inside the examples are illustrative and stay; never
+   rewrite either file to make the search come back empty.
 2. Every command documented in the constitution has been executed successfully
    in this session.
 3. Every internal link in the new files resolves — `make constitution`
@@ -232,21 +259,40 @@ Appendix A.7 — the sequence:
    project never wrote — and every typed link (Appendix A.10): `make
    graph-links` where the kit is present, by hand otherwise.
 4. The umbrella lint target passes, and every check chained into it is reachable
-   from a CI workflow step.
+   from a CI workflow step. Reachable is not run: a workflow starts on the
+   events it names — the kit's on a pull request and on a push to the default
+   branch, not on the push of a feature branch. Once the pull request is
+   open, confirm that a run of that workflow completed with success
+   (`gh run list --workflow <file> --limit 5`, in this repository; none at
+   all, or one that ends within seconds before any step, checked nothing).
+   Where you were not asked to push and open it, or cannot see the runs, the
+   handoff says "CI not confirmed" and why — never "CI green" from a workflow
+   file. Separately, the handoff names the step that makes the check binding:
+   the lint check as a required status check on the default branch.
 5. Harmonize-track runs only: cross-check the ledger — every item is preserved
    in place, preserved elsewhere (relocated/merged), or its removal is
    justified in writing. Zero silent losses.
 6. Write the handoff summary: what was installed; what was deliberately
    deferred (specialist reviewer agents, hooks, external tool servers, the meta
    layer) and — from Appendix A.6 — the **signal** that should trigger each
-   deferred artifact later. On Claude Code a SessionStart hook is one of the
+   deferred artifact later. Test every signal you write down: *would it be
+   noticed while the deferred artifact does not exist?* "When the rule is
+   violated" is not a signal if the deferred thing is the check that would
+   notice the violation — nothing fails, so nothing fires. Name who or what
+   observes it (a line in a reviewer's checklist, the recurring audit, a
+   command that fails), or do not defer. On Claude Code a SessionStart hook is one of the
    deferred: the installer leaves a template in `docs/agent-templates/` and
    registers nothing, and the signal is sessions that keep fighting their
    environment. The installer does install the workspace-graph hook
    (`.claude/hooks/workspace-graph.py`, two entries in `settings.json`), which
    needs nothing filled in: leave it registered, and say in the handoff that
    the agent is now told what cites a file it edits.
-7. Commit on the feature branch with a clear message and propose the PR. Leave
+7. On Claude Code, the handoff says which rules are bound to which paths, and
+   that what really loads must be checked **in a new session** — the
+   `rule-load-check` skill where the kit is present. This session cannot do
+   it: it has been seen to keep the rules it started with, and a header the tool cannot parse
+   fails without a message.
+8. Commit on the feature branch with a clear message and propose the PR. Leave
    a `starter-kit/` directory out of the commit: it is the installer, nothing
    installed refers back to it, and it can be deleted once the setup is done.
 
@@ -255,7 +301,9 @@ Appendix A.7 — the sequence:
 - A fresh agent session in this repo starts from the contract and can state the
   project's non-negotiable rules without being told.
 - The umbrella lint target runs the first enforcement check locally and in CI,
-  and CI reaches it by invoking the aggregate target.
+  and CI reaches it by invoking the aggregate target — confirmed by a run that
+  completed with success, or recorded in the handoff as not confirmed, with
+  the reason.
 - Two branches can each add a registry entry and both merge with zero conflicts
   and zero duplicate identifiers. This is the acceptance test for the registry
   layer; run it rather than assuming it.
@@ -349,6 +397,12 @@ silent. Non-trivial scripts get their own tests.
 | Multiple specialist reviewers exist | Periodic meta-review of the reviewers (propose-only, human-approved) |
 | Workspace reaches real mass (~10+ files) | Workspace changelog + recurring audits |
 
+Each row works because someone is there to see the left-hand side happen. A
+deferred artifact's signal has to pass the same test: it must be noticeable
+while the artifact does not exist. "Documented rule violated anyway" is
+observed by a reviewer or an audit — so the handoff names that observer, or
+the check is not deferred.
+
 ### A.7 Harmonization protocol (existing workspaces)
 
 - **Knowledge ledger:** every learning/convention/constraint encoded in the
@@ -372,7 +426,7 @@ silent. Non-trivial scripts get their own tests.
 - **Approval gate:** the change plan (with ledger items per change) needs
   explicit human approval before any pre-existing file is edited; apply as
   small one-concern commits.
-- **Record:** workspace-changelog entry per run — changes made, ladder rungs
+- **Record:** one workspace-changelog file per run — changes made, ladder rungs
   used, ledger items affected, and the "deliberately NOT changed (with
   reasons)" list that stops future runs from re-litigating.
 
@@ -381,6 +435,7 @@ silent. Non-trivial scripts get their own tests.
 - **working-principles** — the five directives in A.3.
 - **documentation** — docs are part of the change (same-PR updates); >30-minute
   bugs become KB entries; cross-file design decisions become decision records
+  — in the register the project already keeps, where it has one, else as ADRs
   (Michael Nygard format: Status → Context → Decision → Consequences, with
   rejected options recorded inside Context as part of the forces; immutable once accepted,
   superseded by number); decision rationale is routed to the ADR, the KB entry
@@ -487,9 +542,13 @@ never there.
   are outside the generator's grammar — declare them out of the layout rather
   than half-adopting them.
 
-**Two traps.** A check chained into the lint target but not into a CI workflow
+**Three traps.** A check chained into the lint target but not into a CI workflow
 step does not run, and nothing reports it — have CI invoke the aggregate target
-so coverage is total by construction. And a **custom** merge driver named in
+so coverage is total by construction. A workflow step is not a run either: a
+workflow that is right on disk and never completes a run (Actions disabled, a
+billing stop) leaves every pull request unchecked while every local gate is
+green — look at a completed run, and require the check on the default branch.
+And a **custom** merge driver named in
 `.gitattributes` needs `git config` in every clone; when that is missing git
 falls back silently. `union` is built in and needs nothing, which is why it is
 the only driver worth putting in a file you expect other people to clone.

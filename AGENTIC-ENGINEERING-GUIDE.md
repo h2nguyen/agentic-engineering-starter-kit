@@ -50,11 +50,13 @@ Every line in an always-loaded file is paid for on **every request**. A mature s
 
 | Load class | Artifacts | Cost | Budget discipline |
 |---|---|---|---|
-| **Always loaded** | Constitution, rules files, anything imported into them | Paid every request | Strict — keep each file lean; relocate runbooks out |
-| **On demand** | Skills, skill `references/`, docs | Paid only when triggered | Generous — detail is cheap here |
+| **Always loaded** | Constitution, rule files with no path scope, anything imported into them | Paid every request | Strict — keep each file lean; relocate runbooks out |
+| **On demand** | Skills, skill `references/`, docs, rule files bound to paths where the tool loads rules by path | Paid only when triggered | Generous — detail is cheap here |
 | **Delegated** | Subagent instructions | Paid in a separate context | Isolated — a subagent can read 50 files without polluting the main session |
 
 The practical move: when a chunk of always-loaded text is relevant to <5 % of sessions, move it into a skill or an on-demand doc and leave a one-line pointer.
+
+A rule that is about particular files is the same move with nothing relocated: on a tool that loads rules by path, bind the rule to those files and keep its one line in the constitution. The line is what holds until the rule arrives, which is after the first matching access, not before it. The kit's installer does this on Claude Code for the registries rule, and for the versioning and comments rules once it is told where the source is (ADR-0018). What a tool really loaded is checked in a new session, never assumed from the files.
 
 *Reference project:* a workspace audit found a 1,095-line domain-data guide imported into the constitution yet relevant to ~0.5 % of commits. Converting it to a pointer (with its four safety-critical invariants distilled inline) cut always-loaded context by 20 % with zero knowledge loss.
 
@@ -129,7 +131,7 @@ Autonomy is bounded by review gates that keep humans in control of anything hard
 | **MCP server** | An external tool server the agent can call (docs generators, analyzers) | On demand | `.mcp.json` |
 | **Enforcement script** | A CI-wired check that mechanically enforces a convention | Every PR | `scripts/check-*.sh` + lint target |
 | **Knowledge base** | Append-only log of diagnosed bugs in a fixed format | Searched on demand | `docs/…/DEBUGGING-KNOWLEDGE-BASE.*` |
-| **Workspace changelog** | Audit history of the AI configuration itself | On demand | `.claude/WORKSPACE_CHANGELOG.md` |
+| **Workspace changelog** | Audit history of the AI configuration itself, one file per run | On demand | `.claude/workspace-changelog/` |
 | **Registry fragment** | One entry of a shared append-only registry, as its own file — the authored source a generator assembles (§3.11) | Authored per entry | `changelog.d/`, `<artifact>.d/` |
 | **Typed link** | A line in one artifact that names another by a stable token (`Related:`, `Enforces:`, `Hands off to:`) — the edges of the workspace graph (§3.12) | Resolved on every PR | any artifact |
 
@@ -154,7 +156,7 @@ The reference project is a multi-tenant SaaS platform operating under a strict r
 | MCP | `.mcp.json` — 2 servers | — | Architecture analysis + arc42 docs as callable tools |
 | Enforcement | `scripts/check-*` — 37 scripts, ~44 `ci-lint` gates | — | Rules that cannot be silently violated |
 | Knowledge base | `DEBUGGING-KNOWLEDGE-BASE.adoc` | 160 entries | Paying for each bug class only once |
-| Meta | audit skill + `WORKSPACE_CHANGELOG.md` + `agent-coach` | — | The setup maintains itself |
+| Meta | audit skill + workspace changelog + `agent-coach` | — | The setup maintains itself |
 
 ### 2.2 Layer walkthrough
 
@@ -180,7 +182,7 @@ The reference project is a multi-tenant SaaS platform operating under a strict r
 
 **L9 — Knowledge base.** 160 entries in one fixed format: *Symptom → Investigation Trail → Root Cause → Fix → Prevention → Debug Shortcut*. The constitution wires it into the debugging protocol in both directions: search before investigating; write after resolving anything non-obvious (>30 min).
 
-**L10 — Meta.** Three artifacts make the workspace self-maintaining: the **`ai-engineering-workspace-audit` skill** (quick read-only drift report weekly; six-phase full audit per milestone, with a knowledge ledger built *before* any edit and human approval gating all writes); the **`WORKSPACE_CHANGELOG.md`** recording each audit's changes and — as importantly — its "deliberately NOT changed (with reasons)" list; and the **`agent-coach`** meta-agent (P7 above) that reviews the reviewers.
+**L10 — Meta.** Three artifacts make the workspace self-maintaining: the **`ai-engineering-workspace-audit` skill** (quick read-only drift report weekly; six-phase full audit per milestone, with a knowledge ledger built *before* any edit and human approval gating all writes); the **workspace changelog** recording each audit's changes and — as importantly — its "deliberately NOT changed (with reasons)" list; and the **`agent-coach`** meta-agent (P7 above) that reviews the reviewers.
 
 ### 2.3 How one bug becomes system knowledge (worked example)
 
@@ -227,7 +229,7 @@ your-repo/
 │   ├── hooks/
 │   │   ├── session-start.sh         # optional environment bootstrap
 │   │   └── workspace-graph.py       # hands the typed links to the agent (§3.12)
-│   └── WORKSPACE_CHANGELOG.md       # audit history of this configuration
+│   └── workspace-changelog/         # audit history of this configuration, one file per run
 ├── registries.json                  # declares the shared append-only registries (§3.11)
 ├── .agent-feedback-authors          # whose Agent-Feedback lines count (§5.1) — ships naming nobody
 ├── .gitattributes                   # merge behaviour for those registries (§3.11)
@@ -315,6 +317,7 @@ make graph-impact NODE=RULE:documentation   # what cites an artifact — run bef
 - [`working-principles.md`](.claude/rules/working-principles.md) — process directives
 - [`documentation.md`](.claude/rules/documentation.md) — docs-with-the-change, ADR format (Michael Nygard), where rationale lives, typed links between artifacts
 - [`comments-and-annotations.md`](.claude/rules/comments-and-annotations.md) — self-explaining work in every domain: structure before annotation, the one-line brevity standard, protected marker shapes (never strip), no annotation sweeps
+- [`project-annotations.md`](.claude/rules/project-annotations.md) — this project's half of that rule: what its pointers stand for here, and the marker shapes our own tooling reads
 - [`versioning-and-changelog.md`](.claude/rules/versioning-and-changelog.md) — SemVer levels, Keep-a-Changelog discipline
 - [`shared-registries.md`](.claude/rules/shared-registries.md) — fragment layout for files many PRs append to, identifier schemes, merge behaviour
 - [`testing.md`](.claude/rules/testing.md) — test conventions, known flake traps
@@ -638,7 +641,7 @@ fi
 **Design rules**
 
 1. One script per convention; exit non-zero with a **`file:line` trail and a pointer to the rule** it enforces ("see `.claude/rules/database.md § Baseline Cutover`"). Its header names the same rule as a typed link — `# Enforces: RULE:database § Baseline Cutover` — which the link gate resolves (§3.12), so a renamed rule cannot leave its script pointing at nothing.
-2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR.
+2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR. Then look at a run: a workflow file that never completed one enforces nothing, and no local gate can see that. Make the check required on the default branch.
 3. Design the escape hatch: a greppable commit-message marker (`[sanctioned-exception]`) for the rare legitimate violation — logged in history forever, never silent.
 4. Non-trivial check scripts get their own unit tests.
 
@@ -770,7 +773,7 @@ The third tier deserves its demotion for a specific reason. An agent resolving t
 | drift check | regenerate and compare what the artifact *says* to its fragments — same entries, same content, any order — so a union merge that only reorders is green, and one that mangles an entry is not |
 | identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
 | `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
-| coverage check | proves every check in that target actually runs in CI |
+| coverage check | proves every check in that target is invoked by a CI workflow step — not that a run completed, which only the hosting platform shows |
 | two skills | authoring the entry; triaging a conflict — deliberately separate |
 
 **Granularity is a separate decision from layout, and it is easy to get wrong.**
@@ -860,9 +863,9 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 **Day 1 — Level 1 (≈ 1–2 hours):**
 
 1. Run `starter-kit/bootstrap.sh` from your repo root — it detects which agentic tool the repo uses (or asks), then installs the constitution, the universal rule files (working principles, documentation, comments & annotations, versioning & changelog, shared registries), the knowledge-base and changelog skeletons in their fragment layout, the `.gitattributes` that makes registry merges behave, the gate that resolves typed links between artifacts (§3.12), the templates the workspace will grow from (`docs/agent-templates/`), and a lint target wired into a CI workflow — to that tool's expected locations. The registry layer is a day-1 default rather than a later upgrade for one reason: retrofitting it is cheap while the registries are empty and expensive once their identifiers are cited (§3.11). Manual copy per the starter-kit README works too — or skip the copying entirely and paste `starter-kit/SETUP-PROMPT.md` into an agent session: the prompt drives the whole setup (detect → mine → install → verify) and carries its own fallback specs, so it also works in repos where the kit isn't present.
-2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling). Then the project rows of the comments-and-annotations rule — the second half of its protected-shapes table and its pointer placeholders; the starter-kit README's adoption note says how.
+2. Fill in the constitution: identity paragraph, stack table — including the infrastructure, auth, and messaging/integration rows — the commands that exist so far, and the 3–5 rules you already know are non-negotiable (branch discipline, TDD stance, secret handling). Then `project-annotations.md`, the project's half of the comments-and-annotations rule — what the rule's pointers stand for here and the marker shapes the project's own tooling reads; the starter-kit README's adoption note says how. The rule itself is used as shipped.
 3. Enable the common generic skills worth having from day one — `starter-kit/skills/common-catalog.md` lists them with adoption notes; the prompt-enhancer and semver skills already ship in the kit, and architecture review / architecture docs are one copy away.
-4. Run `make constitution`, then `make lint`. The first fails for as long as the constitution still carries a template placeholder or links to a rule file that was never written — the template's `testing.md` and `security.md` lines are examples — and `make lint` checks neither, so a green lint alone does not mean step 2 is finished.
+4. Run `make constitution`, then `make lint`. The first fails for as long as the constitution or `project-annotations.md` still carries a template placeholder, or the constitution links to a rule file that was never written — the template's `testing.md` and `security.md` lines are examples — and `make lint` checks neither, so a green lint alone does not mean step 2 is finished.
 5. Commit. The setup is live: every agent session now starts from the contract.
 
 **Week 1 — Level 2:**
@@ -877,7 +880,7 @@ Use this to locate yourself and pick the next step. Don't skip levels — each o
 9. The first review dimension where you keep making the same comments → a specialist agent with a violations list. Give it an `Enforces:` line for the rule it reviews against, and a `Hands off to: HUMAN` line if it may edit files.
 10. If sessions keep fighting the environment (missing toolchain, dead daemon) → a `SessionStart` hook.
 
-**Later — Level 4:** once the workspace has real mass (≥ ~10 rule/skill/agent files), install the meta layer — the kit ships it: `bootstrap.sh --with-meta` adds the workspace-audit skill + command, the agent-coach meta-agent, and the workspace-changelog skeleton (§5.2–§5.3). Deliberately not part of the day-1 install.
+**Later — Level 4:** once the workspace has real mass (≥ ~10 rule/skill/agent files), install the meta layer — the kit ships it: `bootstrap.sh --with-meta` adds the workspace-audit skill + command, the agent-coach meta-agent, and the workspace-changelog directory (§5.2–§5.3). Deliberately not part of the day-1 install.
 
 ### 4.3 Brownfield path (existing project)
 
@@ -936,6 +939,8 @@ The single habit that separates a living setup from a decorative one — run the
 
 The "same PR" clause matters: the author of the fix is the only one who knows what to write, and the knowledge decays within days.
 
+Every row needs an observer: someone or something that sees the left-hand side happen. That is the test for anything you defer with a trigger — *would the trigger be noticed while the deferred artifact does not exist?* "Add the check when the rule is violated" fails it when the check is the only thing that would notice a violation: nothing turns red, so the trigger never fires. Name the observer (a reviewer's checklist line, the recurring audit, a command that fails) or do not defer.
+
 ### 5.2 Workspace audits
 
 The workspace itself accumulates drift: stale version numbers, rules referencing renamed files, commands duplicating skills, always-loaded bloat. Institutionalize two cadences (the reference project pioneered this as its `ai-engineering-workspace-audit` skill; a copy ships in the starter kit — `bootstrap.sh --with-meta`):
@@ -943,7 +948,7 @@ The workspace itself accumulates drift: stale version numbers, rules referencing
 - **Quick (weekly / bi-weekly), strictly read-only:** inventory the artifacts, diff their claims against code reality, report drift. No writes.
 - **Full (per milestone), approval-gated:** six phases — inventory → assessment against context budgets → remediation plan → **human approval gate** → apply → verify. Two hard safety rules: build a **knowledge ledger** (every learning encoded anywhere in the workspace, each with an ID) *before* touching anything — it is the preservation baseline; and be **lossless-first** — relocate and compress before deleting; deleting learned knowledge requires written justification.
 
-Record every audit in `WORKSPACE_CHANGELOG.md`: what changed, what was **deliberately not changed and why**, and follow-ups. The not-changed list is what stops the next audit from re-litigating settled decisions.
+Record every audit as a file of its own in the workspace changelog (`.claude/workspace-changelog/<date>-<what>.md`; `docs/workspace-changelog/` where the tool has no `.claude/`): what changed, what was **deliberately not changed and why**, and follow-ups. One file per run, because a single file that every run inserts into at the top is itself a shared append-only registry (§3.11) — two open pull requests conflict on it. For the same reason a later pull request of the same run adds a file of its own instead of editing the first. The not-changed list is what stops the next audit from re-litigating settled decisions.
 
 ### 5.3 The agent-coach loop (reviewing the reviewers)
 
@@ -960,7 +965,7 @@ OBSERVE → DIAGNOSE → PROPOSE → [HUMAN APPROVES] → APPLY → MEASURE → 
 
 Guardrails: propose-never-silently-change, and prefer sharpening an existing agent over creating a new one (create only when a recurring task maps to a rule + gate no agent owns).
 
-**On a schedule, by choice.** A loop nobody runs does not turn. `bootstrap.sh --with-coach-schedule` installs a weekly workflow, asked for and never installed unasked (ADR-0017). It posts the week's `Agent-Feedback:` lines as a digest on an issue, and with an API key the coach's proposals beside them. It holds read access to code and write access to issues only, so it proposes and a person changes.
+**On a schedule, by choice.** A loop nobody runs does not turn. `bootstrap.sh --with-coach-schedule` installs a weekly workflow, asked for and never installed unasked (ADR-0021). It posts the week's `Agent-Feedback:` lines as a digest on an issue, and with an API key the coach's proposals beside them. It holds read access to code and write access to issues only, so it proposes and a person changes.
 
 ### 5.4 Anti-patterns
 
@@ -988,11 +993,11 @@ Run quarterly (or as the quick-audit report):
 - [ ] KB entry count growing (bugs are being converted, not just fixed)?
 - [ ] No rule file contradicts current code reality (spot-check the three oldest)?
 - [ ] No command duplicates a skill's body?
-- [ ] Every gate in the lint target actually runs in CI (not just present in the Makefile)?
+- [ ] Every gate in the lint target is invoked by CI (not just present in the Makefile), and a recent run of that workflow completed with success?
 - [ ] No shared file that many PRs append to has escaped the fragment layout?
 - [ ] Agents' violation lists match the current rule files they enforce? `make graph-impact NODE=RULE:<name>` names the agents holding each rule.
 - [ ] `.graph-link-allowlist` absent or empty — or every entry still an immutable decision record citing something retired?
-- [ ] `WORKSPACE_CHANGELOG.md` has an entry newer than the last milestone?
+- [ ] The workspace changelog has an entry newer than the last milestone?
 
 ### 5.6 The next level: agentic graph engineering
 

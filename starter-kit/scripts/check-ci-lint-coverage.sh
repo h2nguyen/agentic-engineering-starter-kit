@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Enforces: RULE:shared-registries § A Makefile target is not a CI step —
-# every check chained into the umbrella lint target actually runs in CI.
+# every check chained into the umbrella lint target is invoked by a CI
+# workflow step.
 #
 # The failure this prevents is not hypothetical and not loud. A repository
 # gains checks by adding them to `make lint`, while its workflow enumerates
@@ -13,6 +14,13 @@
 # total by construction and this script exits immediately. Enumerating is only
 # worth it when jobs need per-path gating, and that is when this gate earns
 # its place.
+#
+# What it cannot see: whether a run ever completed. It reads the workflow
+# files in the checkout. A workflow that is correct on disk and has never run
+# a step — Actions disabled, a billing stop, a runner that never picks the job
+# up — passes here on every lint. That a file says the checks run is one fact;
+# that they ran is another, and only the hosting platform has it. The OK line
+# says so, and names the command that answers it.
 #
 # Usage: check-ci-lint-coverage.sh [lint-target] [makefile]
 #        default target: lint       default makefile: Makefile
@@ -366,6 +374,7 @@ runs_target() { # $1 = make target name
 if runs_target "$TARGET"; then
   if [ "$fail" -eq 0 ]; then
     echo "OK: CI invokes 'make $TARGET' directly — every sub-target is covered by construction."
+    echo "    (Read from the workflow files — not that a run completed. In this repository, 'gh run list --limit 5' shows whether one did.)"
   fi
   exit "$fail"
 fi
@@ -432,4 +441,5 @@ if [ "$fail" -ne 0 ]; then
   fi
   exit 1
 fi
-echo "OK: every '$TARGET' sub-target runs in CI"
+echo "OK: every '$TARGET' sub-target is invoked by a CI workflow step"
+echo "    (Read from the workflow files — not that a run completed. In this repository, 'gh run list --limit 5' shows whether one did.)"
