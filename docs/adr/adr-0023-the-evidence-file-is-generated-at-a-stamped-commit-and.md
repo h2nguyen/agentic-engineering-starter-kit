@@ -46,8 +46,13 @@ never from the working tree.
 commit and fails on any difference. A commit made after the stamp leaves the
 file older, not wrong, and the check says how many commits behind it is. The
 release procedure regenerates it, so a release publishes its own numbers. A
-stamp that names a commit outside the history fails; in a shallow clone, which
-cannot tell, the check passes with a note and CI verifies.
+stamp that names a commit outside the history fails.
+
+The tool needs the whole history. In a shallow clone it refuses to generate,
+because it would count fewer commits and pull requests than there are, and the
+check says that it verified nothing and leaves the verdict to CI. The first
+file was generated in such a clone, undercounted, and was caught by the first
+CI run: the check doing its job, and the reason for the refusal.
 
 It counts four things:
 

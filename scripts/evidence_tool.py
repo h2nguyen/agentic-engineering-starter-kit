@@ -15,6 +15,10 @@ a number cannot be edited by hand, and anyone with a clone can reproduce it.
 Commits made after the stamp leave the file older, never wrong: it says what
 was true at its commit, and the check reports how far behind it is.
 
+It needs the whole history. In a shallow clone, whose history is cut off,
+`generate` refuses — it would count fewer commits and pull requests than there
+are — and `check` says that it verified nothing.
+
 Everything is measured in an export of the stamped commit, so the working
 tree — and whatever is uncommitted in it — plays no part. Git writes the
 export itself, and a symbolic link is read from git's tree, not from the file
@@ -352,7 +356,18 @@ def repository() -> str:
     return done.stdout.strip()
 
 
+def shallow(root: str) -> bool:
+    """Whether this clone's history is cut off — in which case nothing read from history is right."""
+    return git(root, "rev-parse", "--is-shallow-repository").strip() == "true"
+
+
 def cmd_generate(root: str) -> int:
+    if shallow(root):
+        print(f"FAIL: this is a shallow clone: its history is cut off, so the commits and merged pull\n"
+              f"      requests counted here would be fewer than there are, and {OUTPUT} would be wrong.\n"
+              "      Fetch the whole history, then generate:  git fetch --unshallow && make evidence",
+              file=sys.stderr)
+        return 1
     head = git(root, "rev-parse", "HEAD").strip()
     path = os.path.join(root, OUTPUT)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -374,15 +389,18 @@ def cmd_check(root: str) -> int:
         print(f"FAIL: {OUTPUT} has no 'evidence: as of <commit>' stamp on its first line. "
               "It is generated, never written by hand:  make evidence", file=sys.stderr)
         return 1
+    if shallow(root):
+        # Half the file is read from history, and a clone without the history
+        # cannot recompute it. Saying OK here would be the claim this gate exists
+        # to refuse; so it says what it did not do.
+        print(f"OK: {OUTPUT} is stamped {commit[:7]} — not verified in this shallow clone, whose history is\n"
+              "    cut off. CI recomputes it with the whole history; here:  git fetch --unshallow && make evidence-check")
+        return 0
     known = subprocess.run(["git", "-C", root, "cat-file", "-e", f"{commit}^{{commit}}"],
                            capture_output=True).returncode == 0
     ancestor = known and subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", commit, "HEAD"],
                                         capture_output=True).returncode == 0
     if not ancestor:
-        if git(root, "rev-parse", "--is-shallow-repository").strip() == "true":
-            print(f"OK: {OUTPUT} is stamped {commit[:7]}, which this shallow clone does not hold — "
-                  "not verified here; CI, with the full history, verifies it")
-            return 0
         print(f"FAIL: {OUTPUT} was computed at {commit[:7]}, which is not in this repository's history.\n"
               "      Evidence from a commit nobody can check is not evidence. Regenerate:  make evidence",
               file=sys.stderr)

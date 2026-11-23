@@ -81,7 +81,7 @@ cause; none of these has a quiet override.
 | `documented-commands` | No command the kit or this repository writes down for someone to type starts Python as `python3 …`; each goes through `scripts/python.sh` or a make target (ADR-0013) |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
 | `ci-lint-coverage` | Every check in `make lint` is invoked by a CI workflow step. It reads the workflow files; that a run completed is seen on the pull request, not here (ADR-0019) |
-| `evidence-check` | `docs/EVIDENCE.md` reproduces at the commit it is stamped with. It is generated: `make evidence`, never an edit. Commits after the stamp leave it older, not wrong (ADR-0023) |
+| `evidence-check` | `docs/EVIDENCE.md` reproduces at the commit it is stamped with. It is generated: `make evidence`, never an edit. Commits after the stamp leave it older, not wrong. It needs the whole history: in a shallow clone `make evidence` refuses and the check verifies nothing (ADR-0023) |
 | `self-application` | Every rule, skill, agent and command the kit ships is linked under `.claude/`, never copied, and the workspace-graph hook is registered there with `--tool` (ADR-0022). The failure prints the `ln -s` to run |
 | `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
 

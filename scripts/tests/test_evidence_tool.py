@@ -200,6 +200,29 @@ class GenerateAndCheck(EvidenceTestCase):
         self.assertEqual(code, 1)
         self.assertIn("not in this repository's history", out)
 
+    def test_a_shallow_clone_cannot_generate_and_does_not_pretend_to_verify(self):
+        # A clone with its history cut off counts fewer commits and fewer merged
+        # pull requests than there are. Evidence generated there was wrong, and
+        # nothing said so until a machine with the whole history recomputed it.
+        self.merged_pr(1, "fix: one", {"changelog.d/2026-01-02-a.md": "# a\n"})
+        self.run_tool("generate")
+        self.commit("docs: evidence")
+        full = self.evidence()
+        shallow = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, shallow, ignore_errors=True)
+        subprocess.run(["git", "clone", "-q", "--depth", "1", "file://" + self.root, shallow], check=True)
+        os.chdir(shallow)
+        code, out = self.run_tool("generate")
+        self.assertEqual(code, 1)
+        self.assertIn("shallow", out)
+        self.assertIn("git fetch --unshallow", out)
+        with open(os.path.join(shallow, "docs", "EVIDENCE.md"), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), full)          # and it wrote nothing
+        code, out = self.run_tool("check")
+        self.assertEqual(code, 0)
+        self.assertIn("not verified", out)
+        self.assertNotIn("reproduces", out)
+
     def test_with_no_evidence_file_the_check_says_how_to_make_one(self):
         code, out = self.run_tool("check")
         self.assertEqual(code, 1)
