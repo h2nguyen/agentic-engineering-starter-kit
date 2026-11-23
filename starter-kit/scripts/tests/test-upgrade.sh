@@ -112,6 +112,13 @@ aged_install() { # $1 = dir
          "$R/scripts/tests/test-constitution.sh" "$R/docs/agent-templates" "$R/docs/rule-reference" \
          "$R/.claude/hooks/workspace-graph.py" "$R/.claude/rules/project-annotations.md"
   cp "$KIT_DIR/scripts/tests/test-bootstrap-rerun.sh" "$KIT_DIR/scripts/tests/test-brownfield-adoption.sh" "$R/scripts/tests/"
+  # No kit before load classes wrote a `paths:` header: every rule was the
+  # kit's file as it stood.
+  for f in "$KIT_DIR"/rules/*.md; do
+    case "$(basename "$f")" in _*) continue ;; esac
+    cp "$f" "$R/.claude/rules/$(basename "$f")"
+  done
+  rm -rf "$R/.claude/skills/rule-load-check"
   for f in "$R"/scripts/*.py "$R"/scripts/check-*.sh "$R"/scripts/tests/* "$R"/.claude/rules/*.md \
            "$R/docs/DEBUGGING-KNOWLEDGE-BASE.d/_template.md"; do
     case "$f" in *.md) printf '\n<!-- as shipped by kit 1.x -->\n' >> "$f" ;; *) printf '\n# as shipped by kit 1.x\n' >> "$f" ;; esac
@@ -289,12 +296,17 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
     && ok "$name: the adopter's own check script in scripts/ was not touched by the copy" \
     || bad "$name: step 2 changed scripts/check-payments.sh"
 
-  # Step 3 — a rule no commit of the adopter's changed is copied; the one they
-  # filled in is theirs to merge, and stays.
+  # Step 3 — a rule no commit of the adopter's changed takes the kit's text,
+  # through the kit's upgrade-rules.sh as the README says; the one they filled
+  # in is theirs to move first, and stays for now.
+  untouched=""
   for f in "$KIT_DIR"/rules/*.md; do
-    n="$(basename "$f")"; case "$n" in _*) continue ;; esac
-    [ "$(git -C "$R" log --oneline -- ".claude/rules/$n" | wc -l | tr -d ' ')" -eq 1 ] && cp "$f" "$R/.claude/rules/$n"
+    n="$(basename "$f" .md)"; case "$n" in _*) continue ;; esac
+    [ "$(git -C "$R" log --oneline -- ".claude/rules/$n.md" | wc -l | tr -d ' ')" -eq 1 ] && untouched="$untouched $n"
   done
+  # shellcheck disable=SC2086 — the names are the kit's own, split on purpose
+  "$KIT_DIR/upgrade-rules.sh" --target "$R" --apply $untouched > "$WORK/$name-step3.log" 2>&1 \
+    || { bad "$name: upgrade-rules.sh --apply$untouched failed:"; tail -2 "$WORK/$name-step3.log" | sed 's/^/         /'; }
   out=""
   for n in working-principles documentation versioning-and-changelog shared-registries; do
     cmp -s "$KIT_DIR/rules/$n.md" "$R/.claude/rules/$n.md" || out="$out $n"
@@ -316,7 +328,7 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
     || bad "$name: 'make constitution' does not report the unfilled project-annotations.md (exit $rc)"
   sed -E 's/<fill in: [^>]*>/`n\/a`/g' "$KIT_DIR/rules/project-annotations.md.template" > "$R/.claude/rules/project-annotations.md"
   printf '| Freeze marker | `# ledger:frozen` | `scripts/check-payments.sh` |\n' >> "$R/.claude/rules/project-annotations.md"
-  cp "$KIT_DIR/rules/comments-and-annotations.md" "$R/.claude/rules/comments-and-annotations.md"
+  "$KIT_DIR/upgrade-rules.sh" --target "$R" --apply comments-and-annotations >> "$WORK/$name-step3.log" 2>&1
   ( cd "$R" && make constitution > "$WORK/$name-annotations.log" 2>&1 ); rc=$?
   [ "$rc" -eq 0 ] && cmp -s "$KIT_DIR/rules/comments-and-annotations.md" "$R/.claude/rules/comments-and-annotations.md" \
     && grep -q 'ledger:frozen' "$R/.claude/rules/project-annotations.md" \
@@ -429,6 +441,47 @@ awk '/^## Upgrading an existing install/ {on=1; next} on && /^## / {exit} on' "$
 [ "$rc" -eq 0 ] && [ "$(cat "$R/AGENTS.md")" = "# For the other agents" ] \
   && ok "with the tool named, step 1 runs and leaves the other tool's file alone" \
   || bad "step 1 with --tool failed on a two-tool repository (exit $rc)"
+
+echo "=== step 3 on rules that carry a paths: header ==="
+# On Claude Code the installer writes a `paths:` header onto some rules, and
+# an adopter may write one onto any. Such a file never equals the kit's, so
+# `diff` reports it on every upgrade and `cp` would take the header away. The
+# kit's upgrade-rules.sh compares and replaces the text under the header.
+SYNC="$KIT_DIR/upgrade-rules.sh"
+R="$WORK/headers"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/**' >/dev/null 2>&1
+git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "install" 2>/dev/null
+! cmp -s "$KIT_DIR/rules/shared-registries.md" "$R/.claude/rules/shared-registries.md" \
+  && ok "control — a rule with a header is not byte-equal to the kit's although nobody changed its text" \
+  || bad "control: shared-registries.md equals the kit file, so there is no header to keep"
+out="$("$SYNC" --target "$R" 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q '^differs' && [ "$(printf '%s\n' "$out" | grep -c '^same')" -eq 5 ] \
+  && ok "on a fresh install the comparison calls all five rules the same as the kit's, headers or not" \
+  || bad "upgrade-rules.sh on a fresh install (exit $rc): $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-160)"
+printf '\n<!-- as shipped by an older kit -->\n' >> "$R/.claude/rules/versioning-and-changelog.md"
+printf '\n<!-- as shipped by an older kit -->\n' >> "$R/.claude/rules/working-principles.md"
+printf '\nOurs: one more principle.\n' >> "$R/.claude/rules/documentation.md"
+out="$("$SYNC" --target "$R" 2>&1)"
+[ "$(printf '%s\n' "$out" | grep '^differs' | awk '{print $2}' | sort | tr '\n' ' ')" = "documentation versioning-and-changelog working-principles " ] \
+  && ok "it lists the rules whose text differs from the kit's, and only those" \
+  || bad "the list of differing rules is: $(printf '%s\n' "$out" | grep '^differs' | tr '\n' ' ')"
+head_before="$(awk 'NR==1 || !done {print} NR>1 && $0=="---" {done=1}' "$R/.claude/rules/versioning-and-changelog.md")"
+"$SYNC" --target "$R" --apply versioning-and-changelog working-principles > "$WORK/headers-apply.log" 2>&1; rc=$?
+head_after="$(awk 'NR==1 || !done {print} NR>1 && $0=="---" {done=1}' "$R/.claude/rules/versioning-and-changelog.md")"
+[ "$rc" -eq 0 ] && [ "$head_before" = "$head_after" ] && grep -q '^paths:' "$R/.claude/rules/versioning-and-changelog.md" \
+  && ! grep -q 'older kit' "$R/.claude/rules/versioning-and-changelog.md" \
+  && ok "--apply replaces the text of a named rule with the kit's and keeps its header" \
+  || bad "--apply lost the header or kept the old text (exit $rc)"
+cmp -s "$KIT_DIR/rules/working-principles.md" "$R/.claude/rules/working-principles.md" \
+  && ok "a rule with no header becomes the kit's file, byte for byte" || bad "--apply on a rule without a header did not produce the kit's file"
+grep -q 'Ours: one more principle' "$R/.claude/rules/documentation.md" \
+  && ok "a rule that was not named is not touched, however it differs" || bad "--apply changed a rule it was not asked to"
+[ "$(git -C "$R" status --porcelain | grep -v 'rules/\(versioning-and-changelog\|working-principles\|documentation\)\.md' | wc -l | tr -d ' ')" -eq 0 ] \
+  && ok "and nothing outside the rules directory" || bad "upgrade-rules.sh changed other files: $(git -C "$R" status --porcelain | tr '\n' ' ')"
+"$SYNC" --target "$R" --apply no-such-rule > "$WORK/headers-bad.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "a rule the kit does not ship is refused" || bad "--apply no-such-rule exited 0"
+awk '/^## Upgrading an existing install/ {on=1; next} on && /^## / {exit} on' "$README" | grep -q 'upgrade-rules.sh' \
+  && ok "the README's step 3 uses it" || bad "the README's upgrade steps never mention upgrade-rules.sh"
 
 echo ""; echo "=== $pass passed, $fail failed ==="
 [ "$VERBOSE" -eq 1 ] && echo "scratch repos kept in $WORK"

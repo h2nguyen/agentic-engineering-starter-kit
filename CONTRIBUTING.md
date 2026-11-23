@@ -46,7 +46,7 @@ name your machine gives it — the make targets find it through
    | `test-ci-lint-coverage.sh` | A gate CI never runs is detected: which workflows count, which directory a step runs in, which installed gates lint must reach |
    | `test-constitution.sh` | `check-constitution.sh`: a dead link and an unfilled placeholder fail; the angle brackets that belong in a constitution do not |
    | `test-bootstrap-rerun.sh` | The installer: all four tools, re-runs, what lands where, and which tool it installs for when it is not told |
-   | `test-upgrade.sh` | The README's upgrade steps, run as written on an older install an adopter customized: theirs stays theirs, the kit's becomes the newer kit's, lint ends green |
+   | `test-upgrade.sh` | The README's upgrade steps, run as written on an older install an adopter customized: theirs stays theirs, the kit's becomes the newer kit's, lint ends green. Also `upgrade-rules.sh`: a rule's text is compared and replaced under its `paths:` header |
    | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
    | `scripts/tests/test-eval-run.sh` | `scripts/eval-run.sh`, this repository's evaluation recorder (below) |
@@ -85,7 +85,7 @@ cause; none of these has a quiet override.
 
 | You add | Also change |
 |---|---|
-| A default rule | `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table |
+| A default rule | If it is about particular files, its `bind_rule` line in `bootstrap.sh` and its row in the README's load-class table; `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table |
 | A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; the gate list in `check-ci-lint-coverage.sh` and in the installer's "does not reach" message; an acceptance test with a control case; the `starter-kit/README.md` table; the `lint:` line `test-upgrade.sh` edits in step 5. A gate that is on by default is a MAJOR release (ADR-0008) — ship it unchained first, as `constitution` was |
 | A suite that needs `bootstrap.sh` | The `find` exclusions in `install_tree`, and the `rm -f` line of the README's upgrade step 2 — `test-upgrade.sh` fails when one is missing from either |
 | A hook | The file under `starter-kit/hooks/`; its entry in `settings.json.template` and in the guide's embedded copy; an install line in `bootstrap.sh`, Claude Code only; a case for each thing it says and each way it stays silent in `test-graph-hooks.sh`; the README section. A hook that adds context never blocks, never edits and ends silent when it cannot run |

@@ -47,6 +47,11 @@ usually starts, so a command that leaves the path out writes here.
    ```bash
    ./starter-kit/bootstrap.sh --target /path/to/project --tool <tool>
    ```
+   On Claude Code, add `--source-paths '<glob>,<glob>'` naming where the
+   project's source is (`'src/**,scripts/**'`); ask the user if the
+   repository does not make it evident. Without it two rules that are about
+   source load into every session
+   ([Load classes](starter-kit/README.md#load-classes-of-the-rules-claude-code)).
    Read what it prints: which kit it is (the `Kit:` line), what it installed,
    what it skipped because it already existed, and the next steps for this
    particular project.
@@ -93,7 +98,10 @@ usually starts, so a command that leaves the path out writes here.
 10. **Report** which kit was installed (the installer's `Kit:` line — nothing
     in the project records it), what was installed, what you filled in and
     what each fact came from, what you guessed and want confirmed, and what
-    the kit deliberately defers until the project shows a need for it.
+    the kit deliberately defers until the project shows a need for it. On
+    Claude Code, say which rules are bound to which paths, and that what
+    really loads has to be checked in a new session with the
+    `rule-load-check` skill: this session cannot see the rules it installed.
 
 Stop and ask the user, instead of deciding yourself, when: the tool is
 unknown, or the target has more than one; the target already has an agent workspace; a command you were going

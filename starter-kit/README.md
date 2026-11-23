@@ -60,8 +60,8 @@ shared registries) + the
 knowledge-base and changelog skeletons in their fragment layout + the
 `.gitattributes`, `Makefile` and CI workflow that make the registry gates and
 the typed-link gate run
-(+ the prompt-enhancer, semver, registry-entry and registry-conflict-triage
-skills on Claude Code, and the hook that hands the typed links to the agent —
+(+ the prompt-enhancer, semver, registry-entry, registry-conflict-triage and
+rule-load-check skills on Claude Code, and the hook that hands the typed links to the agent —
 [below](#the-workspace-graph-hook-claude-code)) to that tool's locations, and
 never overwrites existing files. Then: fill in the constitution's `<placeholders>` and
 `project-annotations.md`, the project's half of the comments-and-annotations rule
@@ -76,6 +76,7 @@ until it stops naming placeholders and links to files that do not exist, run
 |---|---|---|
 | `SETUP-PROMPT.md` | — (paste into an agent session at the target repo) | The agent drives the whole setup |
 | `bootstrap.sh` | — (run it, don't copy it into the repo) | `--help` for options |
+| `upgrade-rules.sh` | — (run it from the kit, in upgrade step 3) | Lists the rules whose text differs from the kit's, and takes the kit's text for the ones you name, keeping a `paths:` header |
 | `constitution.md.template` | `CLAUDE.md` / `AGENTS.md` / tool equivalent | Fill in every `<placeholder>` |
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
 | `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR format (Michael Nygard), where rationale lives) |
@@ -83,7 +84,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `rules/project-annotations.md.template` | `.claude/rules/project-annotations.md` | Yours: fill in every `<fill in: …>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule). First installs only; an upgrade creates it in step 3 |
 | `rules/reference/` | `docs/rule-reference/` | The worked examples of the comments rule and the gotchas of the registries rule — read on demand, never loaded. Same location for every tool |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
-| `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
+| `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour). On Claude Code the installer binds it to the registry paths — [Load classes](#load-classes-of-the-rules-claude-code) |
 | `registries.json.template` | `registries.json` | Reference only — bootstrap runs `registry_tool.py init`, which writes the file from the conventions your repo already has |
 | `registry.mk` | `registry.mk` | The registry and graph targets; `include registry.mk` from an existing Makefile and add the gates to your `lint` prerequisites |
 | `gitattributes.template` | `.gitattributes` | Use as-is — built-in `merge=union` only, so nothing needs `git config`. An existing file gets the block appended under a marker, idempotently |
@@ -107,6 +108,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade and hook suites test the installer and the Claude Code hook, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
+| `skills/rule-load-check/SKILL.md` | `.claude/skills/rule-load-check/SKILL.md` | Which rules Claude Code really loaded, and when each arrives. Run it in a new session after installing, upgrading or editing a rule or its header |
 | `rules/_rule-template.md` | `docs/agent-templates/_rule-template.md` | Template — copy per new domain rule file (installed by bootstrap; never loaded) |
 | `skills/common-catalog.md` | — (reference doc) | Enable the listed generic skills at setup |
 | `skills/prompt-enhancer/SKILL.md` | `.claude/skills/prompt-enhancer/SKILL.md` | Ready-to-use helper skill (installed by bootstrap on Claude Code) |
@@ -213,12 +215,18 @@ whichever version you started from. For why a file changed, search the kit's
    diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
    diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
    ```
-3. **Update the rule files.** List the rules that differ from the kit's:
+3. **Update the rule files.** List the rules whose text differs from the
+   kit's:
    ```bash
-   diff -rq "$KIT"/starter-kit/rules .claude/rules | grep '^Files'
+   "$KIT"/starter-kit/upgrade-rules.sh
    diff -rq "$KIT"/starter-kit/rules/reference docs/rule-reference | grep '^Files'
    ```
-   (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.)
+   `upgrade-rules.sh` finds your rules directory (`.claude/rules/`, or
+   `docs/agent-rules/` on the other tools) and prints `same`, `differs` or
+   `missing` for each rule the kit ships. On Claude Code a rule may carry a
+   `paths:` header ([Load classes](#load-classes-of-the-rules-claude-code));
+   the comparison is of the text under it, so a rule is not reported for a
+   header you or the installer gave it, and taking the kit's text keeps it.
    - **`comments-and-annotations.md`: move your rows out, once — or keep
      merging it by hand.** Kits up to 3.0.1 had you fill a table and four
      pointers inside this rule, so it could never be copied. Your half now
@@ -241,21 +249,28 @@ whichever version you started from. For why a file changed, search the kit's
      pointer values: put each into `project-annotations.md`
      ([how](#adopting-the-comments-and-annotations-rule)), re-reading them as
      you go — they describe the project as it was on the day of the install.
-     Then copy the kit's `comments-and-annotations.md` over yours, and its
-     reference file over `docs/rule-reference/comments-and-annotations.md`;
-     if you had filled pointers into the reference, they are in your file now.
-     Run `make constitution`: it names every `<fill in: …>` still open. From
-     the next upgrade on, this rule is copied like the others. A line for
+     Then take the kit's rule
+     (`"$KIT"/starter-kit/upgrade-rules.sh --apply comments-and-annotations`)
+     and copy its reference file over
+     `docs/rule-reference/comments-and-annotations.md`; if you had filled
+     pointers into the reference, they are in your file now. Run
+     `make constitution`: it names every `<fill in: …>` still open. From the
+     next upgrade on, this rule is taken like the others. A line for
      `project-annotations.md` in your constitution's rule index helps a
      reader find it and is yours to add or leave: the rule names the file
      either way.
 
      *Not moving.* Your filled-in rule keeps working. Merge the kit's changes
-     into it by hand, as before, at this upgrade and the next; a copy would
-     reset your rows.
-   - **The other rules are used as shipped**, so for one that no commit of
-     yours has changed, copying the kit's file is the whole merge. One you
-     did change is merged by hand, the same way.
+     into it by hand, as before, at this upgrade and the next; `--apply`
+     would reset your rows, which is why it replaces only rules you name.
+   - **The other rules are used as shipped.** For each one that differs and
+     that no commit of yours has changed (`git log --oneline -- <file>`),
+     take the kit's text — naming them, because nothing is replaced that you
+     did not name:
+     ```bash
+     "$KIT"/starter-kit/upgrade-rules.sh --apply working-principles documentation versioning-and-changelog shared-registries
+     ```
+     One you did change is merged by hand.
 4. **Leave what is yours.** The constitution (`CLAUDE.md`, `AGENTS.md` or
    `.github/copilot-instructions.md`), `Makefile`, `registries.json`, the CI
    workflow, the workspace changelog, and every changelog fragment,
@@ -297,6 +312,63 @@ byte for byte as it went in.
 Commit the upgrade on its branch, like any other change. It needs no
 changelog fragment — your changelog describes your project, not its agent
 workspace — and, where you keep one, a line in the workspace changelog.
+
+## Load classes of the rules (Claude Code)
+
+Claude Code loads a rule file with no header into every session. A rule whose
+file opens with a `paths:` header is loaded when a file matching one of its
+patterns is read or edited. Three of the kit's rules are about particular
+files, so the installer writes that header — on Claude Code, and onto rules
+it installs in that run, never onto a file that was already there:
+
+| Rule | Loads | Bound to |
+|---|---|---|
+| `working-principles`, `documentation`, `project-annotations` | every session | — |
+| `shared-registries` | on a registry file | every fragment directory and artifact `registries.json` declares, and `registries.json`, `registry.mk`, `.gitattributes`, `.registry-id-duplicate-allowlist` |
+| `versioning-and-changelog` | with `--source-paths`: on source and changelog files. Without: every session | your source globs, and the changelog's fragment directory and artifact |
+| `comments-and-annotations` | with `--source-paths`: on source and build files. Without: every session | your source globs, and `.github/**`, `.claude/hooks/**`, `Makefile`, `registry.mk` |
+
+```bash
+./starter-kit/bootstrap.sh --target /path/to/your-repo --tool claude --source-paths 'src/**,scripts/**'
+```
+
+Where a project's source is, the installer does not guess: without
+`--source-paths` the last two load into every session. One glob per comma,
+relative to the repository root; write a brace alternative out as two globs.
+
+The header is yours once written. This is what one looks like — add it by
+hand to bind a rule later, or to bring an existing install to these classes:
+
+```markdown
+---
+paths:
+  - "src/**"
+  - "changelog.d/**"
+  - "CHANGELOG.md"
+---
+
+# Versioning & Changelog Rules
+```
+
+Three things to know before relying on it:
+
+- **A bound rule arrives after the first matching access**, not before it.
+  What holds until then is the rule's one line in the constitution's
+  Non-Negotiable Rules table, so keep that line for every rule you bind.
+- **Binding the comments rule narrows when its full text is in context, not
+  where it applies.** The rule covers documents and prompts as well as
+  source. In a session that touches only documents the constitution's line is
+  what the agent has; if your project's main work product is prose, bind the
+  rule to those paths too, or leave it unbound.
+- **A header Claude Code cannot parse is ignored without a message**, and the
+  rule then loads into every session. A session that is already running
+  keeps the rules it started with. So check in a **new** session, with the
+  `rule-load-check` skill: it lists what is in context before anything is
+  read, reads one file per load class, and backs each claim with a quoted
+  last line that is then compared with the file.
+
+The other tools read a rule when the constitution links to it; there is no
+load class to set, and `--source-paths` does nothing there.
 
 ## Declining what the kit installs
 

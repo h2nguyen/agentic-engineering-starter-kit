@@ -110,7 +110,12 @@ ambiguity that changes what you will write. Nothing else pauses the work.
 
 ## Phase 2 — Install the core (Level 1)
 
-Create, at the locations your detected tool expects (Appendix A.1):
+Create, at the locations your detected tool expects (Appendix A.1). With the
+kit on Claude Code, give `bootstrap.sh` the source directories found in Phase
+1 as `--source-paths '<glob>,<glob>'`: it binds the rules that are about
+source to those paths, so they load when such a file is touched and not into
+every session. Each bound rule keeps its one line in the constitution — that
+line is what holds before the rule arrives.
 
 1. **The constitution** — always-loaded contract, ≤ ~200 lines, per the outline
    in Appendix A.2. Every claim in it must be true today.
@@ -256,7 +261,12 @@ Appendix A.7 — the sequence:
    (`.claude/hooks/workspace-graph.py`, two entries in `settings.json`), which
    needs nothing filled in: leave it registered, and say in the handoff that
    the agent is now told what cites a file it edits.
-7. Commit on the feature branch with a clear message and propose the PR. Leave
+7. On Claude Code, the handoff says which rules are bound to which paths, and
+   that what really loads must be checked **in a new session** — the
+   `rule-load-check` skill where the kit is present. This session cannot do
+   it: it keeps the rules it started with, and a header the tool cannot parse
+   fails without a message.
+8. Commit on the feature branch with a clear message and propose the PR. Leave
    a `starter-kit/` directory out of the commit: it is the installer, nothing
    installed refers back to it, and it can be deleted once the setup is done.
 
