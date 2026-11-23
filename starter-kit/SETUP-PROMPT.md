@@ -8,7 +8,8 @@ a fresh session of your AI coding agent, started at the root of the target repo.
   is required.
 - Works **better with the kit** — if this repo contains the guide
   (`AGENTIC-ENGINEERING-GUIDE.md`) and/or the `starter-kit/` directory, the agent
-  detects and uses them instead of re-deriving everything.
+  detects and uses them instead of re-deriving everything; if not, and it can
+  reach GitHub, it clones the kit outside the repo and runs its installer.
 - In tools that support packaged workflows (e.g. skills or slash commands) you
   can install this file as one; pasting it works everywhere else.
 
@@ -56,7 +57,15 @@ memory — all encoded as files under version control.
    `scripts/check-kb-shape.sh`, `scripts/registry_tool.py`,
    `scripts/graph_tool.py`, `registries.json.template`). If found, the guide is your design authority
    and the kit your template source — prefer running `bootstrap.sh` over
-   hand-copying. If absent, build from Appendix A.
+   hand-copying. If absent, get the kit: clone it **outside** this repository
+   and use that clone as the materials, with this repository as the target:
+   ```bash
+   KIT="$(mktemp -d)/kit" && git clone --depth 1 https://github.com/h2nguyen/agentic-engineering-starter-kit "$KIT"
+   ```
+   Then read `$KIT/AGENTS.md`, section "Installing the kit into a project",
+   for the installer's steps. Never clone into this repository: the installer
+   refuses a kit inside its target. Only where the clone is not possible (no
+   network, refused), build from Appendix A.
 3. **Existing setup.** If any agent config exists, note it — Phases 2–3 will be
    replaced by the Harmonize track. Also detect **resident improvement
    machinery**: a workspace-audit skill or command, a meta-agent that reviews
@@ -224,7 +233,9 @@ Appendix A.7 — the sequence:
    the ledger exists to prevent.
 6. **Plan → approval → apply.** Present the full change plan (including the
    ledger items each change touches) and wait for explicit approval before
-   editing any pre-existing file. Apply as small, one-concern commits. Remediate
+   editing any pre-existing file. The installer stops at an existing workspace
+   until it is told otherwise: run it with `--alongside-existing` once the
+   approved plan includes installing the kit's files beside the existing ones. Apply as small, one-concern commits. Remediate
    losslessly (relocate → split → compress) before ever deleting; deletions
    need written justification per Appendix A.7.
 7. **Record.** Where the repository already keeps a workspace changelog of

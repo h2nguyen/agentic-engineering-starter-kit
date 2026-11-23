@@ -101,7 +101,9 @@ cause; none of these has a quiet override.
 
 Four invariants every such change keeps, each with a test behind it:
 
-- **The installer never overwrites a file and is safe to re-run.** That
+- **The installer never overwrites a file and is safe to re-run**, and a
+  first install stops before writing at a workspace the target already has,
+  until `--alongside-existing` (ADR-0025). That
   includes `.starter-kit-version`: a first install writes it, a re-run leaves
   it, and only `kit-status.sh --record` moves it (ADR-0024). A re-run
   adds what is missing, except a path the adopter listed in

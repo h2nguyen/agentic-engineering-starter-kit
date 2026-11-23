@@ -12,7 +12,17 @@
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
 #                  [--source-paths <glob>[,<glob>...]]
-#                  [--with-coach-schedule] [--with-upgrade-notice]
+#                  [--with-coach-schedule] [--with-upgrade-notice] [--alongside-existing]
+#
+# A first install into a repository that already has agent instructions,
+# rules or skills of its own stops before it writes anything and points at
+# the Harmonize track in SETUP-PROMPT.md. --alongside-existing says that track
+# was followed and the user approved installing beside what is there; the
+# existing files are still never overwritten.
+#
+# Run it from a checkout of the kit outside the project. A clone of the kit's
+# repository inside the project is refused: committed with the project, it
+# becomes an embedded repository nobody else can check out.
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
 #   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver, rule-load-check)
@@ -68,6 +78,7 @@ WITH_SCHEDULE=0
 WITH_NOTICE=0
 TARGET_GIVEN=0
 SOURCE_PATHS=""
+ALONGSIDE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -76,6 +87,7 @@ while [ $# -gt 0 ]; do
     --with-meta) WITH_META=1; shift ;;
     --with-coach-schedule) WITH_SCHEDULE=1; shift ;;
     --with-upgrade-notice) WITH_NOTICE=1; shift ;;
+    --alongside-existing) ALONGSIDE=1; shift ;;
     --source-paths) SOURCE_PATHS="${2:?--source-paths needs a value, e.g. 'src/**,scripts/**'}"; shift 2 ;;
     -h|--help) sed -n '2,/^set -euo pipefail/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
@@ -93,6 +105,29 @@ if [ "$TARGET_GIVEN" -eq 0 ] && [ -f "$TARGET/AGENTIC-ENGINEERING-GUIDE.md" ] \
   echo "Name the repository the kit should be installed into:" >&2
   echo "    $0 --target /path/to/your-repo" >&2
   exit 1
+fi
+
+# An agent handed only the kit's URL clones it where it stands, which is the
+# project. Installed from there, everything lints green and `git add -A` then
+# commits the clone as an embedded repository. A copy of starter-kit/ alone at
+# the project's root stays allowed: that is the documented copy-and-delete path.
+_kit_repo="$(cd "$KIT_DIR/.." && pwd -P)"
+_target_real="$(cd "$TARGET" && pwd -P)"
+if [ -f "$_kit_repo/AGENTIC-ENGINEERING-GUIDE.md" ] && [ "$_kit_repo" != "$_target_real" ]; then
+  case "$_kit_repo/" in
+    "$_target_real"/*)
+      {
+        echo "ERROR: this kit is inside the project it would install into:"
+        echo "    ${_kit_repo#"$_target_real"/}/"
+        echo "Committed with the project, it becomes an embedded repository nobody else can check"
+        echo "out. Nothing was written. Clone the kit outside the project and run it from there:"
+        echo "    KIT=\"\$(mktemp -d)/kit\" && git clone --depth 1 <kit url> \"\$KIT\""
+        echo "    \"\$KIT/starter-kit/bootstrap.sh\" --target $TARGET --tool <tool>"
+        echo "Then remove the copy inside the project; it is not part of it."
+      } >&2
+      exit 1
+      ;;
+  esac
 fi
 
 # Every tool whose files the target already has: one line each, the tool's
@@ -191,6 +226,47 @@ if [ -n "$SOURCE_PATHS" ] && [ "$TOOL" = claude ]; then
     fi
     SOURCE_GLOBS+=("$_glob")
   done
+fi
+
+# What the project already has in the way of agent instructions, rules and
+# skills: one target-relative path per line. Tool-independent, because a
+# workspace for one tool is still a workspace the kit's files would sit beside.
+# Settings alone (.claude/settings.json) are not instructions.
+existing_workspace() {
+  local f d
+  for f in CLAUDE.md AGENTS.md .cursorrules .github/copilot-instructions.md; do
+    if [ -f "$TARGET/$f" ]; then echo "$f"; fi
+  done
+  for d in .claude/rules .claude/skills .claude/agents .claude/commands .cursor/rules \
+           .github/instructions docs/agent-rules; do
+    if [ -d "$TARGET/$d" ]; then
+      ( cd "$TARGET" && find "$d" -type f | sort | head -5 )
+    fi
+  done
+  return 0
+}
+
+# A first install beside a workspace nobody has reviewed keeps every file and
+# reconciles nothing: the kit's constitution is not installed, and on every
+# tool but Claude Code its rules are reached only through constitution links
+# that the existing constitution does not have. So the run stops here, before
+# anything is written, until --alongside-existing says the user approved it.
+if [ ! -e "$TARGET/scripts/registry_tool.py" ] && [ "$ALONGSIDE" -eq 0 ]; then
+  EXISTING="$(existing_workspace)"
+  if [ -n "$EXISTING" ]; then
+    {
+      echo "STOP: $TARGET already has an agent workspace of its own:"
+      printf '%s\n' "$EXISTING" | sed 's/^/    /'
+      echo "Nothing was written. Installed beside it unreviewed, these files would be kept and"
+      echo "nothing reconciled: the kit's constitution would not be installed, and its rules would"
+      echo "stand next to instructions that may contradict them."
+      echo "Follow the Harmonize track first — $KIT_DIR/SETUP-PROMPT.md, section"
+      echo "\"Harmonize track\": it inventories what is there, keeps what works, and needs the"
+      echo "user's approval for every change to these files. Once the user has approved"
+      echo "installing beside them, run the same command with --alongside-existing added."
+    } >&2
+    exit 1
+  fi
 fi
 
 INSTALLED=()
@@ -672,6 +748,26 @@ if [ ${#SKIPPED[@]} -gt 0 ]; then
 fi
 echo ""
 echo "Next steps:"
+if [ "$RERUN" -eq 0 ] && [ -f "$_kit_repo/AGENTS.md" ]; then
+  echo "  Run by an agent? What this install still owes — the questions to ask, what to fill"
+  echo "  in, the checks and the report — is in $_kit_repo/AGENTS.md,"
+  echo "  section 'Installing the kit into a project'. Read it before you go on."
+fi
+if [ "$ALONGSIDE" -eq 1 ] && [ "$TOOL" != claude ] && [ -f "$TARGET/$CONSTITUTION" ]; then
+  # Off Claude Code a rule is read because the constitution links it. One the
+  # project already had does not link the kit's, so nothing would read them.
+  _unlinked=""
+  for _r in "$TARGET/$RULES_DIR"/*.md; do
+    [ -f "$_r" ] || continue
+    grep -qF "agent-rules/$(basename "$_r")" "$TARGET/$CONSTITUTION" || _unlinked="$_unlinked $(basename "$_r")"
+  done
+  if [ -n "$_unlinked" ]; then
+    echo "  $CONSTITUTION was already here and links none of these rules, so no session reads them:"
+    for _n in $_unlinked; do echo "      $RULES_DIR/$_n"; done
+    echo "  Link each from $CONSTITUTION, with the user's approval: it is their file. The kit's"
+    echo "  constitution.md.template shows the index. 'make constitution' fails until it links them."
+  fi
+fi
 if [ "$RERUN" -eq 1 ]; then
   # A re-run is read by someone adding the Level-4 layer or moving to a newer
   # kit. The first-install steps are done, and repeating them hides the one

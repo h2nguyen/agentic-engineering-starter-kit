@@ -117,7 +117,9 @@ git -C "$R" add -A; git -C "$R" commit -q -m "existing brownfield repository"
 before_sha="$(git -C "$R" rev-parse HEAD)"
 
 echo "=== brownfield: existing workspace + populated registries ==="
-"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/bootstrap.log" 2>&1 || { bad "bootstrap exited non-zero"; cat "$WORK/bootstrap.log"; }
+# A workspace of the project's own: the Harmonize track has been followed and
+# installing beside it approved, which is what --alongside-existing says.
+"$BOOTSTRAP" --tool claude --alongside-existing --target "$R" > "$WORK/bootstrap.log" 2>&1 || { bad "bootstrap exited non-zero"; cat "$WORK/bootstrap.log"; }
 # This repository had a constitution and no kit. It is a first install, and
 # its reader needs the first-install steps — not to be told that the kit was
 # already here and that the way forward is the upgrade procedure.

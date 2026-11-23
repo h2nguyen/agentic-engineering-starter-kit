@@ -266,7 +266,7 @@ git -C "$R6" checkout -q -- .
 echo "=== a first install beside files of the project's own ==="
 R7="$WORK/brownfield"; fresh_repo "$R7"
 mkdir -p "$R7/.claude/rules"; printf '# Documentation, our way\n' > "$R7/.claude/rules/documentation.md"
-"$K/starter-kit/bootstrap.sh" --tool claude --target "$R7" > "$WORK/brownfield.log" 2>&1 < /dev/null
+"$K/starter-kit/bootstrap.sh" --tool claude --alongside-existing --target "$R7" > "$WORK/brownfield.log" 2>&1 < /dev/null
 [ "$(field "$R7" version)" = 9.1.0 ] \
   && sed -n '/kit files that were already here/,/^  [0-9]/p' "$WORK/brownfield.log" | q '^ *\.claude/rules/documentation\.md$' \
   && ok "the record is written, and the run names the kit file it kept as yours and that kit-status lists it" \
