@@ -47,6 +47,11 @@ usually starts, so a command that leaves the path out writes here.
    ```bash
    ./starter-kit/bootstrap.sh --target /path/to/project --tool <tool>
    ```
+   Before you run it, ask the user whether they want the weekly feedback digest
+   (a scheduled workflow that posts the week's `Agent-Feedback:` lines to an
+   issue, with the coach's proposals when an API key is set). Add
+   `--with-coach-schedule` only on a yes: run from you, the installer has
+   nobody to ask, and leaves it out.
    Read what it prints: which kit it is (the `Kit:` line), what it installed,
    what it skipped because it already existed, and the next steps for this
    particular project.

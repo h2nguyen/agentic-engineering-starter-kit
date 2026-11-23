@@ -91,6 +91,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | `docs/DEBUGGING-KNOWLEDGE-BASE.d/` | One file per entry — the authored source of the KB |
 | `Makefile.template` | `Makefile` | Greenfield only — includes `registry.mk`. An existing Makefile is never touched; bootstrap prints the two lines to add, and says whether `make lint` reaches the gates yet (run it again after the edit to confirm) |
 | `ci/lint.yml.template` | `.github/workflows/lint.yml` | Adapt the runner; keep the step that invokes the aggregate target |
+| `ci/agent-feedback.yml.template` | `.github/workflows/agent-feedback.yml` | **Opt-in** — only with `bootstrap.sh --with-coach-schedule`, or a yes to the installer's question. Every Monday it posts the week's `Agent-Feedback:` lines as a digest on an issue labelled `agent-feedback`. With an `ANTHROPIC_API_KEY` secret and the Claude GitHub App, the coach's proposals follow on the same issue. It reads code and writes to issues only: no push, no branch, no pull request |
 | `registry-id-duplicate-allowlist.template` | `.registry-id-duplicate-allowlist` | Starts empty; entries name a filename **pair** |
 | `ci-lint-coverage-allowlist.template` | `.ci-lint-coverage-allowlist` | Starts empty; shrink-only |
 | `scripts/python.sh` | `scripts/python.sh` | Starts Python under whatever name the machine gives it (`python3`, `python`, `py -3`); every make target, gate, test and hook of the kit goes through it |
@@ -163,7 +164,8 @@ whichever version you started from. For why a file changed, search the kit's
 `CHANGELOG.md` for its name.
 
 1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
-   layer (`agent-coach`, the workspace-audit skill).
+   layer (`agent-coach`, the workspace-audit skill), and `--with-coach-schedule`
+   to add the weekly feedback digest.
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```

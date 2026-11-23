@@ -11,6 +11,7 @@
 #
 # Usage:
 #   ./bootstrap.sh [--tool claude|agents|cursor|copilot] [--target <repo-root>] [--with-meta]
+#                  [--with-coach-schedule]
 #
 # Tool mapping (guide § 3.10 — conventions move fast; your tool's docs win):
 #   claude  → CLAUDE.md, .claude/rules/ (DEFAULT_RULES + shared-registries), .claude/settings.json, .claude/hooks/ (workspace-graph), .claude/skills/ (prompt-enhancer, semver)
@@ -27,6 +28,10 @@
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
+#   --with-coach-schedule (opt-in, any tool): .github/workflows/agent-feedback.yml,
+#             a weekly digest of the Agent-Feedback lines on an issue, plus the
+#             coach's proposals there when an ANTHROPIC_API_KEY secret is set.
+#             Asked at a terminal on a first install; never installed unasked.
 #
 # Placeholder templates (rule, check script, skill, reviewer agent, command,
 # SessionStart hook) install to docs/agent-templates/ — unloaded, and where a
@@ -43,6 +48,7 @@ KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$(pwd)"
 TOOL=""
 WITH_META=0
+WITH_SCHEDULE=0
 TARGET_GIVEN=0
 
 while [ $# -gt 0 ]; do
@@ -50,7 +56,8 @@ while [ $# -gt 0 ]; do
     --tool)   TOOL="${2:?--tool needs a value}"; shift 2 ;;
     --target) TARGET="$(cd "${2:?--target needs a value}" && pwd)"; TARGET_GIVEN=1; shift 2 ;;
     --with-meta) WITH_META=1; shift ;;
-    -h|--help) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --with-coach-schedule) WITH_SCHEDULE=1; shift ;;
+    -h|--help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 1 ;;
   esac
 done
@@ -160,6 +167,19 @@ declined() { # $1 = target-relative path: is it listed, or inside a listed direc
   done
   return 1
 }
+
+# The weekly digest runs with nobody watching and posts to the issue tracker,
+# so it is installed only when the adopter chooses it: the flag, or yes to this
+# question. Asked at a terminal, on a first install, when the workflow is not
+# already there and not declined; run from an agent there is nobody to ask, and
+# it stays out unless the flag says otherwise.
+SCHEDULE_WORKFLOW=.github/workflows/agent-feedback.yml
+if [ "$WITH_SCHEDULE" -eq 0 ] && [ -t 0 ] && [ ! -e "$TARGET/$SCHEDULE_WORKFLOW" ] \
+   && [ ! -f "$TARGET/scripts/registry_tool.py" ] && ! declined "$SCHEDULE_WORKFLOW"; then
+  printf "Install a weekly agent-feedback digest (%s)? It posts the week's\nAgent-Feedback lines to an issue; with an ANTHROPIC_API_KEY secret it adds the coach's\nproposals. It never changes the repository. [y/N]: " "$SCHEDULE_WORKFLOW"
+  read -r _answer || _answer=""
+  case "$_answer" in y|Y|yes|YES|Yes|j|J|ja|Ja) WITH_SCHEDULE=1 ;; esac
+fi
 
 install_file() { # $1 = kit-relative src, $2 = target-relative dst, $3 = "x" for executable
   local src="$KIT_DIR/$1" dst="$TARGET/$2"
@@ -276,6 +296,9 @@ install_file registry-id-duplicate-allowlist.template .registry-id-duplicate-all
 install_file ci-lint-coverage-allowlist.template .ci-lint-coverage-allowlist || true
 install_file registry.mk registry.mk || true
 install_file ci/lint.yml.template .github/workflows/lint.yml || true
+if [ "$WITH_SCHEDULE" -eq 1 ]; then
+  install_file ci/agent-feedback.yml.template "$SCHEDULE_WORKFLOW" || true
+fi
 # The registry tool is the kit's own file and nothing else's, so finding it
 # already here is what tells a re-run from a first install. An existing
 # constitution does not: a repository can have one and never have seen the kit.
@@ -545,6 +568,14 @@ if [ -f "$TARGET/.agent-feedback-authors" ] \
   echo "     Agent-Feedback lines. List the commit emails and comment logins of the people whose"
   echo "     review you would accept for a rule change, one per line — ask, never infer them from"
   echo "     the history (the documentation rule, section 'Feedback to an agent')."
+fi
+if [ -f "$TARGET/$SCHEDULE_WORKFLOW" ]; then
+  echo "     $SCHEDULE_WORKFLOW posts a weekly digest of the Agent-Feedback lines to an issue."
+  echo "     GitHub runs it from the default branch only. For the coach's proposals on that issue,"
+  echo "     add an ANTHROPIC_API_KEY repository secret and install the Claude GitHub App."
+elif ! declined "$SCHEDULE_WORKFLOW"; then
+  echo "     Optional: a weekly digest of the Agent-Feedback lines on an issue, with the coach's"
+  echo "     proposals when an API key is set — re-run with --with-coach-schedule to add it."
 fi
 if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"

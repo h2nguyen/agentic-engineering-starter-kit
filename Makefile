@@ -77,7 +77,7 @@ graph-coverage:
 ## grouped by the kit artifact it names; only .agent-feedback-authors count.
 ## A report for the next change to that artifact, never a gate.
 agent-feedback:
-	@$(KIT)/scripts/python.sh $(KIT)/scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)")
+	@$(KIT)/scripts/python.sh $(KIT)/scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)") $(if $(FORMAT),--format "$(FORMAT)")
 
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:

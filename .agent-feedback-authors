@@ -2,6 +2,7 @@
 # identity per line: a commit author email, or a login as a comment export
 # names it. Case does not matter; everything after # is a comment.
 # The kit ships this file naming nobody (starter-kit/agent-feedback-authors.template);
-# this repository lists its maintainer.
+# this repository lists its maintainer: commit email, noreply address, login.
+me@viethainguyen.de
 h2nguyen@users.noreply.github.com
 h2nguyen

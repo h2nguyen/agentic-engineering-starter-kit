@@ -81,7 +81,10 @@ class FeedbackTestCase(unittest.TestCase):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = ft.main(["collect", *args])
-        report = json.loads(out.getvalue()) if code == 0 and out.getvalue().strip() else None
+        try:
+            report = json.loads(out.getvalue()) if code == 0 and out.getvalue().strip() else None
+        except ValueError:
+            report = None  # --format markdown
         return code, report, out.getvalue(), err.getvalue()
 
     def targets(self, report):
@@ -266,6 +269,26 @@ class Failures(FeedbackTestCase):
         code, _, _, err = self.run_tool("--out", os.path.join(self.root, "no", "such", "dir", "r.json"))
         self.assertEqual(code, 1)
         self.assertIn("FAIL:", err)
+
+
+class Markdown(FeedbackTestCase):
+    """The digest a scheduled workflow posts: readable, and as careful as the JSON."""
+
+    def test_the_digest_lists_points_by_artifact_and_never_an_unlisted_authors_text(self):
+        self.commit("a\n\nAgent-Feedback: RULE:testing — mocked the database, because the fake hid a bug", TRUSTED)
+        self.commit("b\n\nAgent-Feedback: RULE:testing — SECRET stranger text", STRANGER)
+        code, _, out, _ = self.run_tool("--format", "markdown")
+        self.assertEqual(code, 0)
+        self.assertIn("`RULE:testing`", out)
+        self.assertIn("mocked the database, because the fake hid a bug", out)
+        self.assertIn("1 excluded", out)
+        self.assertIn(STRANGER, out)
+        self.assertNotIn("SECRET", out)
+
+    def test_an_empty_digest_says_so_in_one_line(self):
+        code, _, out, _ = self.run_tool("--format", "markdown", "--since", "2000-01-01")
+        self.assertEqual(code, 0)
+        self.assertIn("No Agent-Feedback lines", out)
 
 
 class CollectFromExport(FeedbackTestCase):

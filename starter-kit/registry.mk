@@ -77,8 +77,9 @@ constitution:
 ## lists only. Input for the next change to that artifact; a report, never a gate.
 ##     make agent-feedback SINCE=2026-11-01
 ##     make agent-feedback FROM=pr-comments.json   (a comment export, as JSON)
+##     make agent-feedback FORMAT=markdown          (a digest a person reads)
 agent-feedback:
-	@./scripts/python.sh scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)")
+	@./scripts/python.sh scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)") $(if $(FORMAT),--format "$(FORMAT)")
 
 ## registry-test — the registry layer's own suites. -B: the kit installs no
 ## .gitignore, so its tools must not leave a __pycache__ in your repository.

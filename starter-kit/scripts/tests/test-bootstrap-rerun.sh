@@ -188,6 +188,37 @@ printf '.claude/skills\n' > "$R/.starter-kit-declined"
   && ok "and the install without the kit's skills lints green" \
   || { bad "an install with the skills declined fails its lint:"; grep -E '^FAIL|Error' "$WORK/declined-first-lint.log" | head -3 | sed 's/^/         /'; }
 
+echo "=== the weekly feedback digest is installed only when asked for ==="
+# A scheduled workflow runs with nobody watching and posts to the issue
+# tracker, so it is the adopter's choice, made at install: --with-coach-schedule,
+# or yes to the installer's question at a terminal. Run from an agent there is
+# no terminal, and it is not installed unless the flag says so.
+grep -q 'with-coach-schedule' "$WORK/run1.log" \
+  && [ ! -e "$WORK/greenfield/.github/workflows/agent-feedback.yml" ] \
+  && ok "without the flag, no digest workflow is installed, and the next steps say how to add one" \
+  || bad "the digest workflow was installed unasked, or the next steps never mention --with-coach-schedule"
+for tool in claude copilot; do
+  R="$WORK/schedule-$tool"; fresh_repo "$R"
+  "$BOOTSTRAP" --tool "$tool" --target "$R" --with-coach-schedule > "$WORK/schedule-$tool.log" 2>&1 \
+    || bad "$tool: bootstrap --with-coach-schedule exited non-zero"
+  W="$R/.github/workflows/agent-feedback.yml"
+  if [ -f "$W" ]; then
+    ok "$tool: --with-coach-schedule installs .github/workflows/agent-feedback.yml"
+    grep -q 'schedule:' "$W" && grep -q 'workflow_dispatch:' "$W" && grep -q 'make -s agent-feedback' "$W" \
+      && ok "$tool: it runs on a schedule and by hand, through make agent-feedback" \
+      || bad "$tool: the workflow lacks its schedule, its manual trigger or the make target"
+    # It proposes; it never changes the repository. No write access to code or pull requests.
+    ! grep -qE 'contents: write|pull-requests: write' "$W" \
+      && ok "$tool: the workflow cannot push or open a pull request — it only comments on an issue" \
+      || bad "$tool: the workflow asks for write access to contents or pull requests"
+    ( cd "$R" && ./scripts/check-ci-lint-coverage.sh > "$WORK/schedule-$tool-cov.log" 2>&1 ) \
+      && ok "$tool: the CI-coverage gate still passes beside the scheduled workflow" \
+      || { bad "$tool: the CI-coverage gate fails with the digest workflow installed:"; tail -3 "$WORK/schedule-$tool-cov.log" | sed 's/^/         /'; }
+  else
+    bad "$tool: --with-coach-schedule did not install the digest workflow"
+  fi
+done
+
 echo "=== the installer says which kit it is ==="
 # Nothing in the repository records the kit an install came from (ADR-0011),
 # so the one place the answer exists is the run itself: the handoff copies it.
