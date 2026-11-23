@@ -8,6 +8,9 @@
 
 <The core imperative(s), stated first, unhedged.>
 
+**Why:** <What goes wrong without it, in a sentence or two. The reason is what lets an
+agent apply the rule to a case no example shows.>
+
 ## Canonical Example
 
 ```

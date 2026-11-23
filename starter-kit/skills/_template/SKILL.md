@@ -11,6 +11,9 @@ description: >
 <One paragraph: the workflow this skill owns, and the end state that counts
 as done.>
 
+**Why:** <Why it runs this way where that is not obvious — what breaks if a step
+is skipped or reordered. It lets an agent adapt a step instead of dropping it.>
+
 ## Phase 1 — <Preparation>
 
 1. <step>
