@@ -733,17 +733,19 @@ R="$WORK/no-tool"; fresh_repo "$R"; before="$(tree "$R")"
 # With a terminal there is someone to ask. A pseudo-terminal stands in for
 # one; where the platform has none (Windows) the case is skipped, and says so.
 R="$WORK/asked"; fresh_repo "$R"; mkdir -p "$R/.claude" "$R/.cursor"
-"$PY" -B - "$BOOTSTRAP" "$R" cursor > "$WORK/asked.log" 2>&1 <<'PTY'
+"$PY" -B - "$BOOTSTRAP" "$R" cursor,y > "$WORK/asked.log" 2>&1 <<'PTY'
 import os, sys
 try:
     import pty
 except ImportError:
     print("NO-PTY"); sys.exit(0)
-bootstrap, target, answer = sys.argv[1:4]
+# One answer per question, in the order asked. A question with no answer left
+# gets an empty line — the default — so a new question can never hang the run.
+bootstrap, target, answers = sys.argv[1], sys.argv[2], sys.argv[3].split(",")
 pid, fd = pty.fork()
 if pid == 0:
     os.execv(bootstrap, [bootstrap, "--target", target])
-seen, answered = b"", False
+seen, asked = b"", 0
 while True:
     try:
         chunk = os.read(fd, 4096)
@@ -752,18 +754,23 @@ while True:
     if not chunk:
         break
     seen += chunk
-    if not answered and b"]: " in seen:
-        os.write(fd, answer.encode() + b"\n"); answered = True
+    while seen.count(b"]: ") > asked:
+        os.write(fd, (answers[asked] if asked < len(answers) else "").encode() + b"\n")
+        asked += 1
 status = os.waitpid(pid, 0)[1]
 sys.stdout.write(seen.decode("utf-8", "replace"))
-print("\nASKED=%s EXIT=%s" % (answered, os.WEXITSTATUS(status) if os.WIFEXITED(status) else "signal"))
+print("\nASKED=%s EXIT=%s" % (asked, os.WEXITSTATUS(status) if os.WIFEXITED(status) else "signal"))
 PTY
 if grep -q 'NO-PTY' "$WORK/asked.log"; then
   echo "  skip — no pseudo-terminal on this platform: the interactive question is not exercised here"
 else
-  grep -q 'ASKED=True EXIT=0' "$WORK/asked.log" && [ -f "$R/AGENTS.md" ] && [ ! -e "$R/CLAUDE.md" ] \
+  grep -q 'ASKED=2 EXIT=0' "$WORK/asked.log" && [ -f "$R/AGENTS.md" ] && [ ! -e "$R/CLAUDE.md" ] \
     && ok "at a terminal, several detected tools are a question, and the answer is the layout installed" \
     || { bad "at a terminal the installer did not ask, or did not install what was answered:"; tail -3 "$WORK/asked.log" | cut -c1-160 | sed 's/^/         /'; }
+  # The weekly digest is the second question on a first install at a terminal.
+  grep -q 'weekly agent-feedback digest' "$WORK/asked.log" && [ -f "$R/.github/workflows/agent-feedback.yml" ] \
+    && ok "at a terminal, the weekly digest is asked about, and a yes installs it" \
+    || bad "at a terminal the digest question was not asked, or a yes did not install the workflow"
 fi
 
 echo "=== the Level-4 artifacts' links resolve once installed ==="
