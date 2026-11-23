@@ -73,7 +73,7 @@ instead: it works without the kit.
    ([Load classes](starter-kit/README.md#load-classes-of-the-rules-claude-code)).
    Before you run it, ask the user whether they want the weekly feedback digest
    (a scheduled workflow that posts the week's `Agent-Feedback:` lines to an
-   issue, with the coach's proposals when an API key is set). Add
+   issue, with the coach's proposals when an API key or a Claude subscription token is set). Add
    `--with-coach-schedule` only on a yes: run from you, the installer has
    nobody to ask, and leaves it out. Ask the same about the weekly check for
    a newer kit (`--with-upgrade-notice`): it opens an issue when the kit has a

@@ -9,10 +9,14 @@
 # (`make agent-feedback`) and posts them as a digest on one open issue labelled
 # `agent-feedback`. A week with no lines posts nothing.
 #
-# With an ANTHROPIC_API_KEY repository secret, and the Claude GitHub App
-# installed on the repository, it also runs one cycle of the agent coach on
-# that feedback and posts the coach's proposals as a comment on the same issue.
-# Without the secret, or without the coach's file, that part is skipped.
+# With an ANTHROPIC_API_KEY repository secret, or else a CLAUDE_CODE_OAUTH_TOKEN
+# one (a Claude Pro, Max, Team or Enterprise subscription: `claude setup-token`),
+# and the Claude GitHub App installed on the repository, it also runs one cycle
+# of the agent coach on that feedback and posts the coach's proposals as a
+# comment on the same issue. The API key wins where both are set. Without a
+# secret, or without the coach's file, that part is skipped, and the log says why.
+# The subscription token belongs to the person who made it: its usage limit is
+# theirs, and the coach stops when their access does. For a team, prefer a key.
 #
 # It proposes; it never changes the repository. The job can read the code and
 # write to issues, and nothing else: no push, no branch, no pull request. A
@@ -94,23 +98,33 @@ jobs:
         id: coach
         if: steps.collect.outputs.total != '0'
         env:
-          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
         run: |
-          if [ "$HAS_KEY" = true ] && [ -f "$COACH_AGENT" ]; then
+          if [ ! -f "$COACH_AGENT" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Coach skipped: $COACH_AGENT is not there."
+          elif [ "$HAS_API_KEY" = true ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "auth=api-key" >> "$GITHUB_OUTPUT"
+            echo "The coach runs on the ANTHROPIC_API_KEY secret."
+          elif [ "$HAS_OAUTH_TOKEN" = true ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "auth=subscription" >> "$GITHUB_OUTPUT"
+            echo "The coach runs on the Claude subscription of CLAUDE_CODE_OAUTH_TOKEN."
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Coach skipped: it needs an ANTHROPIC_API_KEY secret and $COACH_AGENT."
+            echo "Coach skipped: set an ANTHROPIC_API_KEY secret, or a CLAUDE_CODE_OAUTH_TOKEN secret (from 'claude setup-token')."
           fi
 
-      # To use a Claude subscription instead of an API key, replace
-      # anthropic_api_key with claude_code_oauth_token (from `claude setup-token`)
-      # and test for that secret in the step above.
+      # The action is given the one credential the step above chose, so which one
+      # it prefers when it has both never matters.
       - name: Coach proposals
         if: steps.coach.outputs.run == 'true'
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ steps.coach.outputs.auth == 'api-key' && secrets.ANTHROPIC_API_KEY || '' }}
+          claude_code_oauth_token: ${{ steps.coach.outputs.auth == 'subscription' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           prompt: |
             You are running one cycle of the agent coach defined in ${{ env.COACH_AGENT }},
             unattended, in a scheduled GitHub Actions run. Read that file and follow its

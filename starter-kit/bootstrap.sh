@@ -43,7 +43,8 @@
 #             + workspace-changelog directory (Claude Code; others: that directory only)
 #   --with-coach-schedule (opt-in, any tool): .github/workflows/agent-feedback.yml,
 #             a weekly digest of the Agent-Feedback lines on an issue, plus the
-#             coach's proposals there when an ANTHROPIC_API_KEY secret is set.
+#             coach's proposals there when an ANTHROPIC_API_KEY secret, or else a
+#             CLAUDE_CODE_OAUTH_TOKEN one (a Claude subscription), is set.
 #             Asked at a terminal on a first install; never installed unasked.
 #   --with-upgrade-notice (opt-in, any tool): .github/workflows/kit-upgrade-notice.yml,
 #             which once a week lists the kit's release tags over the network and
@@ -304,7 +305,7 @@ declined() { # $1 = target-relative path: is it listed, or inside a listed direc
 SCHEDULE_WORKFLOW=.github/workflows/agent-feedback.yml
 if [ "$WITH_SCHEDULE" -eq 0 ] && [ -t 0 ] && [ ! -e "$TARGET/$SCHEDULE_WORKFLOW" ] \
    && [ ! -f "$TARGET/scripts/registry_tool.py" ] && ! declined "$SCHEDULE_WORKFLOW"; then
-  printf "Install a weekly agent-feedback digest (%s)? It posts the week's\nAgent-Feedback lines to an issue; with an ANTHROPIC_API_KEY secret it adds the coach's\nproposals. It never changes the repository. [y/N]: " "$SCHEDULE_WORKFLOW"
+  printf "Install a weekly agent-feedback digest (%s)? It posts the week's\nAgent-Feedback lines to an issue; with an ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN\nsecret it adds the coach's proposals. It never changes the repository. [y/N]: " "$SCHEDULE_WORKFLOW"
   read -r _answer || _answer=""
   case "$_answer" in y|Y|yes|YES|Yes|j|J|ja|Ja) WITH_SCHEDULE=1 ;; esac
 fi
@@ -882,7 +883,9 @@ fi
 if [ -f "$TARGET/$SCHEDULE_WORKFLOW" ]; then
   echo "     $SCHEDULE_WORKFLOW posts a weekly digest of the Agent-Feedback lines to an issue."
   echo "     GitHub runs it from the default branch only. For the coach's proposals on that issue,"
-  echo "     add an ANTHROPIC_API_KEY repository secret and install the Claude GitHub App."
+  echo "     install the Claude GitHub App and add an ANTHROPIC_API_KEY repository secret — or, to use a"
+  echo "     Claude subscription instead, a CLAUDE_CODE_OAUTH_TOKEN secret from 'claude setup-token'. The"
+  echo "     key wins where both are set. That token is the person's who made it: its usage limit is theirs."
 elif ! declined "$SCHEDULE_WORKFLOW"; then
   echo "     Optional: a weekly digest of the Agent-Feedback lines on an issue, with the coach's"
   echo "     proposals when an API key is set — re-run with --with-coach-schedule to add it."
