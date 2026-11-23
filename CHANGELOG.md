@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [4.0.0] — 2026-11-23
+
+<!-- category: Added -->
 ### Added
 
 - The repository's README opens with a note for an AI agent given only the kit's URL ("apply this kit to my project"). It says to clone the kit outside the project, follow `AGENTS.md` in that clone, and fetch `SETUP-PROMPT.md` raw where `git clone` is blocked. `AGENTS.md` says how to get the kit before its first step. ADR-0025.
@@ -45,8 +61,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The installer refuses to run from a copy of the kit's repository inside the project it installs into. Run from there, everything installed and linted green, and `git add -A` then committed the copy as an embedded repository. A copy of `starter-kit/` alone at the project's root still works.
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [3.1.0] — 2026-11-23
 
