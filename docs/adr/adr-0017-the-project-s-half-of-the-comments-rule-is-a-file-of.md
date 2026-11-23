@@ -58,8 +58,8 @@ For the decision records, two.
 **The project's half is `project-annotations.md`**, in the rules directory of
 each tool. It holds what the rule's pointers stand for in this project and
 the marker shapes the project's own tooling reads. The installer leaves it as
-a template on a first install; it is the project's from then on, and no
-upgrade step replaces it.
+a template together with the rule that names it; it is the project's from
+then on, and no upgrade step replaces it.
 
 The comments-and-annotations rule and its reference are used as shipped. Their
 pointers stay, as notation that `project-annotations.md` resolves. The rule's
@@ -75,11 +75,22 @@ placeholders in prose, and names the pointers in backticks. The rules the kit
 ships and the rule references are still not read. This also supersedes the
 part of ADR-0005 that keeps the adopter's tables inside the rule.
 
-**An install that already has the kit does not get the template from a
-re-run.** Its rows are in its comments rule, and an unfilled file beside them
-would be loaded into every session and would fail a `constitution` check the
-adopter chained into their lint. Upgrade step 3 creates the file as part of
-moving the rows, once.
+**Where the comments rule was already in the repository, a run of the
+installer does not add the template.** That rule may have the adopter's rows
+in it, and an unfilled file beside them would be loaded into every session
+and would fail a `constitution` check the adopter chained into their lint.
+Upgrade step 3 creates the file as part of moving the rows, with a command
+that does nothing where the file exists. The test is the rule, not the kit:
+a repository that has had the kit since before the rule existed, or has it in
+another tool's layout, gets the rule and its project half in the same run —
+keyed on "the kit is installed", a first review found three such shapes left
+with a rule pointing at a file that was not there.
+
+**The move is the adopter's choice.** A filled-in rule keeps working and can
+be merged by hand at every upgrade, as before; the line for the new file in
+the constitution's index is theirs to add or leave. Nothing in the upgrade
+makes an adopter edit a file of their own, which is what would make this a
+MAJOR change under ADR-0008.
 
 **The documentation rule's ADR section applies where `registries.json`
 declares an `adr` registry**, and says so in its first paragraph: with none
@@ -98,9 +109,10 @@ sentence; no rule needs overruling.
 
 **Harder.** One more file on a first install, in the always-loaded set on
 Claude Code — about thirty lines when filled in. An adopter on an older kit
-has a one-time move to make, by hand; the upgrade steps describe it and
-`test-upgrade.sh` runs it. Until they make it, their filled-in rule keeps
-working and keeps being a hand merge.
+who wants the rule copied from now on has a one-time move to make, by hand;
+the upgrade steps describe it, and `test-upgrade.sh` runs the README's own
+command for it, twice — the second time on the filled-in file. Until they
+make it, their filled-in rule keeps working and keeps being a hand merge.
 
 **Not checked.** That `project-annotations.md` is true: a pointer filled with
 a shape the project does not use passes. And nothing links the rule to the

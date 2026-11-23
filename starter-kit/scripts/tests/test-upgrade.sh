@@ -5,10 +5,13 @@
 # The steps under "Upgrading an existing install" had never been run end to
 # end by anything but a reader. The contract they state, and this holds:
 #   1. what is the adopter's is byte-for-byte what it was — the constitution,
-#      settings.json, a rule they wrote, the rule they filled in, registries.json,
-#      their changelog fragment, knowledge-base entry and decision record, the
-#      CI workflow, their tests — except the two edits the steps ask for by
-#      name: the `lint:` line, and a check script's `# Enforces:` header;
+#      settings.json, a rule they wrote, registries.json, their changelog
+#      fragment, knowledge-base entry and decision record, the CI workflow,
+#      their tests — except the two edits the steps ask for by name: the
+#      `lint:` line, and a check script's `# Enforces:` header. The comments
+#      rule they filled in stays theirs until they choose step 3's one-time
+#      move, which takes their rows into a file of their own and is run here
+#      from the README's own command;
 #   2. what is the kit's is the newer kit's, byte for byte, and nothing that
 #      belongs only in the kit is left behind in the repository;
 #   3. the gates that are new since the install run, and say what the README
@@ -17,8 +20,9 @@
 #   4. at the end `make lint` is green, the project's own check and tests ran
 #      in it, and running step 1 again changes nothing.
 #
-# The commands for steps 1 and 2 are read out of the README, not retyped here,
-# so the test runs what a reader would paste. If that section stops containing
+# The commands for steps 1 and 2, and the command of step 3 that creates
+# project-annotations.md, are read out of the README, not retyped here, so
+# the test runs what a reader would paste. If that section stops containing
 # them, the test fails rather than quietly running its own idea of the steps.
 #
 # Two older installs. One is built here to the shape 1.x left behind, so the
@@ -63,7 +67,19 @@ block() {
     on && inside && n == want { sub(/^ +/, ""); print }
   ' "$README"
 }
-STEP1="$(block 1)"; STEP2="$(block 2)"
+# block_with <text> — the ```bash block of that section containing the text.
+block_with() {
+  awk -v want="$1" '
+    /^## Upgrading an existing install/ { on = 1; next }
+    on && /^## / { exit }
+    on && /^ *```bash/ { inside = 1; buf = ""; next }
+    on && inside && /^ *```/ { inside = 0; if (index(buf, want)) { printf "%s", buf; exit } next }
+    on && inside { sub(/^ +/, ""); buf = buf $0 "\n" }
+  ' "$README"
+}
+STEP1="$(block 1)"; STEP2="$(block 2)"; STEP3MOVE="$(block_with 'project-annotations.md.template')"
+case "$STEP3MOVE" in *'project-annotations.md.template'*'project-annotations.md'*) ok "the README's step 3 has the command that creates project-annotations.md" ;;
+  *) bad "the upgrade section no longer has a command block that creates project-annotations.md" ;; esac
 case "$STEP1" in *'bootstrap.sh --target .'*) ok "the README's step 1 is the installer, run on the repository itself" ;;
   *) bad "the upgrade section's first command block is no longer the installer: '$STEP1'" ;; esac
 case "$STEP2" in *'cp "$KIT"/starter-kit/scripts/'*'registry.mk'*) ok "the README's step 2 copies the kit's scripts and registry.mk" ;;
@@ -285,12 +301,15 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
   done
   [ -z "$out" ] && ok "$name: step 3 — the rules used as shipped are the newer kit's" || bad "$name: rules not updated:$out"
   git -C "$R" diff --quiet "$pre" -- .claude/rules/comments-and-annotations.md && grep -q 'ledger:frozen' "$R/.claude/rules/comments-and-annotations.md" \
-    && ok "$name: control — the rule the adopter filled in is not copied over blindly: their rows are still there" \
+    && ok "$name: up to here the rule the adopter filled in is untouched, and their rows are still in it" \
     || bad "$name: the adopter's rows in comments-and-annotations.md were lost"
   # The one-time move step 3 describes: the project's rows and pointers leave
   # the kit's rule for a file of the project's own, and from then on the rule
   # is copied like the others.
-  cp "$KIT_DIR/rules/project-annotations.md.template" "$R/.claude/rules/project-annotations.md"
+  ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP3MOVE" ) > "$WORK/$name-step3move.log" 2>&1; rc=$?
+  [ "$rc" -eq 0 ] && [ -f "$R/.claude/rules/project-annotations.md" ] \
+    && ok "$name: step 3 — the README's command creates project-annotations.md from the kit's template" \
+    || { bad "$name: the README's step-3 command exited $rc:"; tail -2 "$WORK/$name-step3move.log" | sed 's/^/         /'; }
   ( cd "$R" && make constitution > "$WORK/$name-annotations.log" 2>&1 ); rc=$?
   [ "$rc" -ne 0 ] && grep -q '^FAIL: .claude/rules/project-annotations.md:[0-9]* — unfilled placeholder' "$WORK/$name-annotations.log" \
     && ok "$name: step 3 — until it is filled in, 'make constitution' names the new file's placeholders" \
@@ -303,6 +322,12 @@ upgrade() { # $1 = scenario name, $2 = dir: an older install, customized and com
     && grep -q 'ledger:frozen' "$R/.claude/rules/project-annotations.md" \
     && ok "$name: with their rows moved, the comments rule is the kit's byte for byte, their marker is in project-annotations.md, and 'make constitution' passes" \
     || { bad "$name: after the move (constitution exit $rc):"; grep -E '^FAIL' "$WORK/$name-annotations.log" | head -3 | cut -c1-150 | sed 's/^/         /'; }
+  # The same command at the NEXT upgrade, pasted by someone whose file is
+  # filled in: it must not put the template back over their rows.
+  ( cd "$R" && KIT="$KIT_ROOT" bash -e -c "$STEP3MOVE" ) >/dev/null 2>&1
+  grep -q 'ledger:frozen' "$R/.claude/rules/project-annotations.md" && ! grep -q '<fill in:' "$R/.claude/rules/project-annotations.md" \
+    && ok "$name: run again on a filled-in file, the README's command leaves it as it is" \
+    || bad "$name: the README's step-3 command overwrote a filled-in project-annotations.md with the template"
 
   # Before step 5 the coverage gate says which gate lint does not reach.
   ( cd "$R" && make lint > "$WORK/$name-before5.log" 2>&1 ); rc=$?

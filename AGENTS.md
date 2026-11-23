@@ -75,7 +75,8 @@ usually starts, so a command that leaves the path out writes here.
    has from elsewhere — an organisation plugin, a user-level skill — say so,
    and with their approval delete the kit's copy and list its path in the
    target's `.starter-kit-declined`. A later run of the installer puts back
-   whatever is missing and not listed there.
+   what is missing and not listed there. (One file it holds back beside a
+   comments rule that was already there: `project-annotations.md`.)
 8. **Verify.** In the target, `make constitution` and then `make lint` must
    each exit 0. `make constitution` is the check on step 6: it names every
    template placeholder still in the constitution or in

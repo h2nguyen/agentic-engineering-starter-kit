@@ -103,7 +103,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `scripts/feedback_tool.py` | `scripts/feedback_tool.py` | `make agent-feedback` — every `Agent-Feedback: <token> — <what and why>` line in the commit history (and, with `FROM=<file>`, in a JSON export of comments), grouped by the artifact it names, as JSON. A report for the next change to that artifact, never a gate. The convention is in the documentation rule § Feedback to an agent |
 | `agent-feedback-authors.template` | `.agent-feedback-authors` | Whose feedback counts: one commit email or comment login per line. **Ships naming nobody**, and the installer says so until you fill it in — until then every line is counted, but no one's text reaches the report |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
-| `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist or still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
+| `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist, or it or `project-annotations.md` still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
 | `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade and hook suites test the installer and the Claude Code hook, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
@@ -135,7 +135,8 @@ until it stops naming placeholders and links to files that do not exist, run
    of the comments-and-annotations rule —
    [how](#adopting-the-comments-and-annotations-rule).
 3. Run `make constitution`. It lists, by line, every template placeholder
-   still in the constitution and every link to a file that does not exist —
+   still in the constitution or in `project-annotations.md`, and every link
+   in the constitution to a file that does not exist —
    the template links two example rules, `testing.md` and `security.md`, that
    no install has. It passes when step 2 is really done; `make lint` does not
    look at either.
@@ -212,36 +213,46 @@ whichever version you started from. For why a file changed, search the kit's
    diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
    diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
    ```
-3. **Update the rule files — merge the one you filled in, copy the rest.**
-   List the rules that differ from the kit's:
+3. **Update the rule files.** List the rules that differ from the kit's:
    ```bash
    diff -rq "$KIT"/starter-kit/rules .claude/rules | grep '^Files'
    diff -rq "$KIT"/starter-kit/rules/reference docs/rule-reference | grep '^Files'
    ```
    (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.)
-   - **`comments-and-annotations.md`: move your rows out, once.** Kits up to
-     3.0.1 had you fill a table and four pointers inside this rule, so it
-     could never be copied. Your half now has a file of its own,
-     `project-annotations.md`, which the installer does not add to an existing
-     install — unfilled, it would be loaded into every session. Create it,
-     move what you filled in, then take the kit's rule:
+   - **`comments-and-annotations.md`: move your rows out, once — or keep
+     merging it by hand.** Kits up to 3.0.1 had you fill a table and four
+     pointers inside this rule, so it could never be copied. Your half now
+     has a file of its own, `project-annotations.md`, and the rule is used as
+     shipped. The installer does not put that file beside a comments rule
+     that was already there — unfilled, it would be loaded into every
+     session.
+
+     *The move.* If you already have a `project-annotations.md`, there is
+     nothing to move: the file is yours and no step replaces it. Otherwise
+     create it — the command does nothing where the file exists:
      ```bash
-     cp "$KIT"/starter-kit/rules/project-annotations.md.template .claude/rules/project-annotations.md
+     [ -e .claude/rules/project-annotations.md ] || cp "$KIT"/starter-kit/rules/project-annotations.md.template .claude/rules/project-annotations.md
+     ```
+     Then look at what you had filled in:
+     ```bash
      diff -u "$KIT"/starter-kit/rules/comments-and-annotations.md .claude/rules/comments-and-annotations.md
      ```
-     The diff shows your rows and pointer values: put each into
-     `project-annotations.md`
+     Among the lines the kit itself changed, the diff shows your rows and
+     pointer values: put each into `project-annotations.md`
      ([how](#adopting-the-comments-and-annotations-rule)), re-reading them as
      you go — they describe the project as it was on the day of the install.
      Then copy the kit's `comments-and-annotations.md` over yours, and its
      reference file over `docs/rule-reference/comments-and-annotations.md`;
      if you had filled pointers into the reference, they are in your file now.
-     Add `project-annotations.md` to your constitution's rule index, and run
-     `make constitution`: it names every `<fill in: …>` still open. From the
-     next upgrade on, this rule is copied like the others.
+     Run `make constitution`: it names every `<fill in: …>` still open. From
+     the next upgrade on, this rule is copied like the others. A line for
+     `project-annotations.md` in your constitution's rule index helps a
+     reader find it and is yours to add or leave: the rule names the file
+     either way.
 
-     If your `project-annotations.md` already exists, there is nothing to
-     move: the file is yours and is never replaced.
+     *Not moving.* Your filled-in rule keeps working. Merge the kit's changes
+     into it by hand, as before, at this upgrade and the next; a copy would
+     reset your rows.
    - **The other rules are used as shipped**, so for one that no commit of
      yours has changed, copying the kit's file is the whole merge. One you
      did change is merged by hand, the same way.
@@ -307,6 +318,10 @@ it. The installer reports each as "declined" under "Skipped", and never
 writes to the list. The list is yours and states an intent — it is not a
 record of what is installed (the kit keeps none, ADR-0011 in its repository).
 
+One file is held back without being listed: `project-annotations.md`, where
+the comments rule it belongs to was already in the repository. That rule may
+carry your rows, and upgrade step 3 creates the file as part of moving them.
+
 Declining a file that other installed files depend on is yours to reconcile:
 a rule that a `Related:` line names makes `make graph-links` fail on that
 line, and a gate script that `registry.mk` runs makes its target fail. Both
@@ -319,7 +334,7 @@ say which file is missing.
 | `<file>:<line> — … link 'RULE:x' resolves to nothing` | A typed link names an artifact that was renamed, deleted or never written | Fix the citing line; the message lists the names that exist. `make graph-impact NODE=RULE:x` shows what cites an artifact *before* you rename it |
 | `check-<gate>.sh is installed but 'lint' never runs it` | Your own Makefile does not chain a gate the kit installed. All five are held: `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` | Add the target the message names to the `lint:` prerequisites |
 | `more than one agentic tool is set up … no --tool was given` | The installer found the files of several agent tools and nobody to ask | Re-run with `--tool` naming the one to install for. Nothing was written |
-| `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
+| `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or it or `project-annotations.md` still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
 | `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
 | `… is named by date, and this registry numbers its records` | A fragment was named `YYYY-MM-DD-<slug>.md` where `registries.json` declares `"id_scheme": "numeric"`. At width 4 it would be read as record number `<year>` | Rename it to the numbered form the message shows; `registry_tool.py new --registry <name> --title "…"` allocates the number. If the records really are date-named and the declaration is wrong — an install made before this was fixed — set `"id_scheme": "slug"` for that registry |

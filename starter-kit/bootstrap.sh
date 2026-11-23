@@ -248,18 +248,26 @@ if [ -e "$TARGET/scripts/registry_tool.py" ]; then HAD_KIT=1; fi
 if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
   retarget_rule_links "$CONSTITUTION"
 fi
+# Was the comments rule here before this run? That, not the kit having been
+# installed, is what decides about its project half below: the rule can be
+# new to a repository that has had the kit for years, or has it in another
+# tool's layout.
+HAD_COMMENTS_RULE=0
+if [ -e "$TARGET/$RULES_DIR/comments-and-annotations.md" ]; then HAD_COMMENTS_RULE=1; fi
 for rule in "${DEFAULT_RULES[@]}"; do
   install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
 done
 # The project's half of the comments rule: what its pointers stand for here,
 # and the markers this project's own tooling reads. A file of the project's,
-# so that the rule itself stays the kit's and an upgrade can copy it. A first
-# install gets the template to fill in. An install that already has the kit
-# does not: its rows are inside its comments rule, and an unfilled template
-# beside them would be loaded into every session and fail a `constitution`
-# check the adopter chained into lint. The upgrade steps create the file.
-if [ "$HAD_KIT" -eq 1 ] && [ ! -e "$TARGET/$RULES_DIR/project-annotations.md" ]; then
-  SKIPPED+=("$RULES_DIR/project-annotations.md (not added to an existing install — 'Upgrading an existing install', step 3, creates it)")
+# so that the rule itself stays the kit's and an upgrade can copy it. It is
+# installed together with the rule that names it. Where the rule was already
+# here, it is held back: that rule may have the adopter's rows inside it, and
+# an unfilled template beside them would be loaded into every session and
+# fail a `constitution` check the adopter chained into lint. The upgrade
+# steps create the file there, as part of moving the rows.
+if [ "$HAD_COMMENTS_RULE" -eq 1 ] && [ ! -e "$TARGET/$RULES_DIR/project-annotations.md" ] \
+   && ! declined "$RULES_DIR/project-annotations.md"; then
+  SKIPPED+=("$RULES_DIR/project-annotations.md (not added beside a comments rule that was already here — 'Upgrading an existing install', step 3, creates it)")
 else
   install_file rules/project-annotations.md.template "$RULES_DIR/project-annotations.md" || true
 fi

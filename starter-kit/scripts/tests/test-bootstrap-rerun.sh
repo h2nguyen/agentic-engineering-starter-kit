@@ -110,10 +110,38 @@ grep -qi 'delete' "$WORK/run1.log" \
 rm -f "$R/.claude/rules/project-annotations.md"
 "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run3.log" 2>&1
 [ ! -e "$R/.claude/rules/project-annotations.md" ] \
-  && grep -q 'project-annotations.md (not added to an existing install' "$WORK/run3.log" \
+  && grep -q 'project-annotations.md (not added beside a comments rule that was already here' "$WORK/run3.log" \
   && ok "a re-run does not add an unfilled project-annotations.md to an existing install, and says where the upgrade steps create it" \
   || bad "a re-run installed the project-annotations.md template into an existing install, or skipped it without saying why"
 git -C "$R" checkout -q -- . 2>/dev/null
+# The reason to hold the file back is the comments rule that was already
+# there, with the adopter's rows in it — not the kit having been installed.
+# Where the rule itself is new to the repository (an install from before the
+# rule existed, a second tool layout, a repository that had the registry tool
+# for another reason), it names project-annotations.md "beside this file",
+# and a run that installed the rule without the file left a pointer to nothing.
+rm -f "$R/.claude/rules/project-annotations.md" "$R/.claude/rules/comments-and-annotations.md"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run4.log" 2>&1
+[ -f "$R/.claude/rules/comments-and-annotations.md" ] && [ -f "$R/.claude/rules/project-annotations.md" ] \
+  && ok "where the comments rule is new to the repository too, a re-run installs its project half with it" \
+  || bad "a re-run installed comments-and-annotations.md and held back the project-annotations.md it names"
+git -C "$R" checkout -q -- . 2>/dev/null
+T="$WORK/second-layout"; fresh_repo "$T"
+"$BOOTSTRAP" --tool copilot --target "$T" >/dev/null 2>&1
+"$BOOTSTRAP" --tool claude --target "$T" > "$WORK/second-layout.log" 2>&1
+[ -f "$T/.claude/rules/comments-and-annotations.md" ] && [ -f "$T/.claude/rules/project-annotations.md" ] \
+  && ( cd "$T" && ./scripts/check-constitution.sh CLAUDE.md 2>&1 | grep -q "project-annotations.md' names a file that does not exist" ); rc=$?
+[ -f "$T/.claude/rules/project-annotations.md" ] && [ "$rc" -ne 0 ] \
+  && ok "a second tool layout added to a repository that has the kit gets the rule and its project half, and its constitution links nothing that is missing" \
+  || bad "adding --tool claude to a copilot install left .claude/rules/ without project-annotations.md"
+# Declined is declined, and says so — not "an existing install".
+rm -f "$R/.claude/rules/project-annotations.md"
+printf '.claude/rules/project-annotations.md   # our markers are in the constitution\n' > "$R/.starter-kit-declined"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/run5.log" 2>&1
+grep -q 'project-annotations.md (declined in .starter-kit-declined)' "$WORK/run5.log" \
+  && ok "a declined project-annotations.md is reported as declined" \
+  || bad "a declined project-annotations.md is reported as: $(grep 'project-annotations.md (' "$WORK/run5.log" | head -1 | cut -c1-120)"
+rm -f "$R/.starter-kit-declined"; git -C "$R" checkout -q -- . 2>/dev/null
 
 echo "=== run without --target: a project is installed into, the kit's own repository is not ==="
 # The kit's repository carries agent instructions of its own now, so tool
@@ -256,8 +284,8 @@ for tool in claude agents cursor copilot; do
     && grep -q 'project-annotations\.md' "$rules_dir/comments-and-annotations.md" \
     && ok "$tool: the comments rule asks the project to edit nothing in it, and names the file that holds the project's half" \
     || bad "$tool: the comments rule still has a part to fill in, or names testing.md: $(grep -ciE 'fill-in|complete the second table|testing\.md' "$rules_dir/comments-and-annotations.md") line(s)"
-  grep -q "${c#"$R"/}.*project-annotations\|project-annotations" "$c" \
-    && ok "$tool: the constitution's rule index lists it" || bad "$tool: the constitution does not link project-annotations.md"
+  grep -qF "(${rules_dir#"$R"/}/project-annotations.md)" "$c" \
+    && ok "$tool: the constitution's rule index links it, at this layout's path" || bad "$tool: the constitution does not link ${rules_dir#"$R"/}/project-annotations.md"
   # The documentation rule prescribed docs/adr/ and `--registry adr` whether
   # or not the repository keeps decision records there. A project that
   # records decisions elsewhere had to overrule it in its constitution.
@@ -368,9 +396,11 @@ for tool in claude agents cursor copilot; do
   ( cd "$R" && make constitution > "$WORK/constitution-$tool.log" 2>&1 ); rc=$?
   [ "$rc" -ne 0 ] && ok "$tool: 'make constitution' fails on a constitution nobody has filled in" \
     || bad "$tool: 'make constitution' passed on the untouched template"
-  grep -q "^FAIL: ${pa#"$R"/}:[0-9]* — unfilled placeholder" "$WORK/constitution-$tool.log" \
-    && ok "$tool: and on the project-annotations.md nobody has filled in" \
-    || bad "$tool: 'make constitution' does not report the unfilled project-annotations.md"
+  want="$(grep -c '<fill in:' "$KIT_DIR/rules/project-annotations.md.template")"
+  got="$(grep -c "^FAIL: ${pa#"$R"/}:[0-9]* — unfilled placeholder '<fill in:" "$WORK/constitution-$tool.log")"
+  [ "$want" -gt 0 ] && [ "$got" -eq "$want" ] \
+    && ok "$tool: and reports every one of the $want placeholders of the project-annotations.md nobody has filled in" \
+    || bad "$tool: 'make constitution' reports $got of the $want placeholders in project-annotations.md"
   unreported=""
   for n in $(awk '/^## Debugging/ {exit} /</ {print NR}' "$c"); do
     grep -q "^FAIL: ${c#"$R"/}:$n — " "$WORK/constitution-$tool.log" || unreported="$unreported $n"
