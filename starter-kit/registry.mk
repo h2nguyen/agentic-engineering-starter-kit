@@ -19,7 +19,7 @@
 
 .PHONY: registry-generate registry-list registry-drift registry-ids kb-shape \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        registry-test
+        agent-feedback registry-test
 
 ## registry-generate — assemble every registry artifact from its fragments.
 registry-generate:
@@ -71,6 +71,14 @@ ci-lint-coverage:
 ## pull request, add `constitution` to your lint line.
 constitution:
 	./scripts/check-constitution.sh
+
+## agent-feedback — every Agent-Feedback line in the commit history, grouped
+## by the artifact it names, as JSON — from the authors .agent-feedback-authors
+## lists only. Input for the next change to that artifact; a report, never a gate.
+##     make agent-feedback SINCE=2026-11-01
+##     make agent-feedback FROM=pr-comments.json   (a comment export, as JSON)
+agent-feedback:
+	@./scripts/python.sh scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)")
 
 ## registry-test — the registry layer's own suites. -B: the kit installs no
 ## .gitignore, so its tools must not leave a __pycache__ in your repository.

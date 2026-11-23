@@ -20,7 +20,7 @@ KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        guide-templates rule-budget documented-commands kit-smoke
+        guide-templates rule-budget documented-commands kit-smoke agent-feedback
 
 ## lint — everything CI runs.
 lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands test
@@ -72,6 +72,12 @@ graph-impact:
 ## graph-coverage — which shipped rules a script enforces and an agent reviews.
 graph-coverage:
 	@$(KIT)/scripts/python.sh $(KIT)/scripts/graph_tool.py coverage
+
+## agent-feedback — every Agent-Feedback line in this repository's history,
+## grouped by the kit artifact it names; only .agent-feedback-authors count.
+## A report for the next change to that artifact, never a gate.
+agent-feedback:
+	@$(KIT)/scripts/python.sh $(KIT)/scripts/feedback_tool.py collect $(if $(SINCE),--since "$(SINCE)") $(if $(FROM),--from "$(FROM)")
 
 ## ci-lint-coverage — every sub-target above actually runs in CI.
 ci-lint-coverage:

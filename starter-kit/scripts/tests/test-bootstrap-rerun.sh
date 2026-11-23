@@ -277,6 +277,22 @@ for tool in claude agents cursor copilot; do
       || bad "$tool: a re-run rewrote a template that already existed"
     grep -v 'legacy\.md' "$tdir/_rule-template.md" > "$WORK/tpl" && cp "$WORK/tpl" "$tdir/_rule-template.md"
   fi
+  # Feedback to an agent is written down from the first commit, whatever tool
+  # the project uses, so the collector and the list of whose feedback counts
+  # land in every layout — and a fresh install's list names nobody, so no
+  # one's text is read until the adopter says whose is.
+  [ -x "$R/scripts/feedback_tool.py" ] && [ -f "$R/.agent-feedback-authors" ] \
+    && ok "$tool: the feedback collector and its authors list are installed" \
+    || bad "$tool: scripts/feedback_tool.py or .agent-feedback-authors is missing"
+  ( cd "$R" && make -s agent-feedback > "$WORK/feedback-$tool.json" 2> "$WORK/feedback-$tool.err" ) \
+    && "$PY" -c 'import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r["authors_listed"] == 0 and r["counts"]["accepted"] == 0 else 1)' "$WORK/feedback-$tool.json" \
+    && ok "$tool: 'make agent-feedback' runs on a fresh install and reads nobody's feedback" \
+    || { bad "$tool: 'make agent-feedback' failed on a fresh install:"; head -3 "$WORK/feedback-$tool.err" | sed 's/^/         /'; }
+  # The list ships naming nobody, so until it is filled in the channel is
+  # inert — and nothing used to say so: the next steps have to.
+  grep -q '\.agent-feedback-authors names nobody' "$WORK/boot-$tool.out" \
+    && ok "$tool: the next steps say the authors list names nobody yet" \
+    || bad "$tool: the next steps never mention filling in .agent-feedback-authors"
   # The gates cite the rules they enforce by token, not by path, so the same
   # header has to resolve whether the rules landed in .claude/rules/ or in
   # docs/agent-rules/. A link that only works for one tool is not tool-agnostic.

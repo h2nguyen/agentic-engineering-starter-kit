@@ -5,7 +5,7 @@ architectural decision updates its documentation in the same PR — not "later".
 These rules are project-agnostic defaults; add project-specific doc locations
 as the project grows.
 
-**Related:** RULE:comments-and-annotations, RULE:shared-registries, RULE:versioning-and-changelog
+**Related:** RULE:comments-and-annotations, RULE:shared-registries, RULE:versioning-and-changelog, SCRIPT:feedback_tool.py
 
 ## What to update when
 
@@ -19,9 +19,45 @@ as the project grows.
 | Documented rule violated anyway | Check script, started from `docs/agent-templates/check-convention.sh.template` — its header names the rule (`# Enforces: RULE:<name>`) — chained into the lint target. Then name the new rule or script on the `Related:` line of the incident that prompted it |
 | Same workflow walked through twice, or the same review comment on a second PR | Skill (or playbook) from `_skill-template.md`, reviewer agent (or review checklist) from `_agent-template.md`, both in `docs/agent-templates/` |
 | Renaming, deleting or rewriting a rule, skill, agent, command or script | Every artifact that cites it — `make graph-impact NODE=<KIND:name>` lists them |
+| A person corrects what a rule, skill, agent or command made you do, and the correction applies next time | An `Agent-Feedback:` line naming that artifact — [below](#feedback-to-an-agent) |
 
 The "same PR" clause is load-bearing: the author of the change is the only one
 who knows what to write, and the knowledge decays within days.
+
+## Feedback to an agent
+
+A correction made in a chat session ends with the session. Written where the
+work is reviewed — a commit message, a pull-request or issue comment — it
+lasts, and it reaches the artifact behind the mistake when it names it:
+
+```text
+Agent-Feedback: SKILL:registry-entry — typed the date by hand; the tool derives it, so a typed date drifts from the filename
+```
+
+- One point per line, `Agent-Feedback:` at the start of the line, then the
+  artifact's typed-link token, then what went wrong **and why**. The why is
+  what lets the next change be a principle instead of one more special case.
+- When a person corrects your output and the correction would hold next time,
+  offer to put the line in the commit message of the fix. Write what they
+  said, not your reading of it, and let them change it.
+- Quoted lines (`> …`), fenced and indented examples are not feedback, and
+  neither is the body of a merge commit: it is the pull request's text, under
+  the identity of whoever merged it.
+- The line counts under its commit's author. Where you commit as a bot, put
+  it in the person's own review comment instead; never list a bot identity,
+  which would make every session — a misled one too — a trusted author.
+
+`make agent-feedback` collects the lines from the commit history — and, with
+`FROM=<file>`, from a JSON export of comments — into one report grouped by
+artifact. Only identities listed in `.agent-feedback-authors` count: of
+anyone else's line the report keeps a count, an identity-shaped author and a
+resolved target, never the text, because what reaches it can become an
+instruction every later session follows. A commit's author is only as
+trustworthy as the review its metadata got; run it on the default branch. The report is input
+for a proposed change, reviewed like any other; it never edits anything.
+
+**Litmus test:** does `make agent-feedback` list this artifact under
+`targets`, not under `unresolved`?
 
 ## Decision rationale lives in ADRs, not in code comments
 

@@ -23,7 +23,7 @@
 #             registry.mk + Makefile (kept if present), .github/workflows/lint.yml,
 #             scripts/ (python.sh, registry_tool.py, graph_tool.py, check-kb-shape.sh,
 #             check-registry-*.sh, check-graph-links.sh, check-ci-lint-coverage.sh,
-#             check-constitution.sh)
+#             check-constitution.sh, feedback_tool.py), .agent-feedback-authors
 #   --with-meta (Level-4 opt-in, NOT part of a day-1 install): agent-coach
 #             subagent + workspace-audit skill/command + workspace-graph skill
 #             + workspace-changelog skeleton (Claude Code; others: changelog only)
@@ -341,6 +341,13 @@ install_file scripts/check-graph-links.sh scripts/check-graph-links.sh x || true
 # (`make constitution`), not a prerequisite of `lint`: it would fail a
 # constitution that passed before, and that is the adopter's call to make.
 install_file scripts/check-constitution.sh scripts/check-constitution.sh x || true
+# Feedback to an agent, written where the work is reviewed and naming the
+# artifact by its token, and the collector that groups it for the next change
+# to that artifact. Day 1, every tool: a correction nobody wrote down cannot
+# be recovered later, so waiting for the signal means never seeing it. The
+# authors list ships naming nobody — the adopter says whose feedback counts.
+install_file scripts/feedback_tool.py scripts/feedback_tool.py x || true
+install_file agent-feedback-authors.template .agent-feedback-authors || true
 install_tree scripts/tests scripts/tests || true
 
 # The templates a workspace grows from. They used to stay in the kit, and a
@@ -530,6 +537,15 @@ for _kept in CHANGELOG.md docs/DEBUGGING-KNOWLEDGE-BASE.md; do
     echo "     identifier, and installs the generated region. The drift gate fails until then."
   fi
 done
+# An authors list with no entry makes the feedback channel inert, on a first
+# install and on the re-run that brought the list in. Said while it is empty.
+if [ -f "$TARGET/.agent-feedback-authors" ] \
+   && ! grep -qv '^[[:space:]]*\(#.*\)\{0,1\}$' "$TARGET/.agent-feedback-authors"; then
+  echo "     .agent-feedback-authors names nobody yet, so 'make agent-feedback' reads no one's"
+  echo "     Agent-Feedback lines. List the commit emails and comment logins of the people whose"
+  echo "     review you would accept for a rule change, one per line — ask, never infer them from"
+  echo "     the history (the documentation rule, section 'Feedback to an agent')."
+fi
 if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
   echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
