@@ -41,6 +41,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - With an `ANTHROPIC_API_KEY` repository secret and the Claude GitHub App installed, the same run has the agent coach read that feedback and post its proposals as a comment on the issue. The job can read code and write to issues only: it never pushes, branches or opens a pull request. A person decides.
 - To add it to an existing install, re-run the installer with `--with-coach-schedule` (upgrade step 1). To keep it out, list `.github/workflows/agent-feedback.yml` in `.starter-kit-declined`; the installer then stops asking.
 - `make agent-feedback FORMAT=markdown` (`feedback_tool.py collect --format markdown`) prints the report as a digest a person reads. Like the JSON, it never contains an unlisted author's text. You get the target with `registry.mk` in upgrade step 2.
+- The Claude Code hook `workspace-graph.py` takes `--tool <path>` after its event: `… workspace-graph.py post-edit --tool tools/kit/graph_tool.py`. It runs `scripts/graph_tool.py` as before when the option is absent. Use it in a repository that keeps the kit's scripts somewhere other than `scripts/`, where the hook found no tool and stayed silent. The path is relative to the checkout and must stay inside it: an absolute path, one that leaves the checkout, or a symbolic link that does, is refused in silence, so the hook still runs only the project's own file. You get the hook by copying it in upgrade step 2; an install that keeps the tool in `scripts/` needs no change.
 
 <!-- category: Changed -->
 ### Changed
@@ -77,6 +78,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The workspace-audit skill, its command and the agent-coach read the directory and write each run as a new file in it. The setup prompt's Harmonize track records its run the same way, whether or not the meta layer is installed.
 - A file is written once: a later pull request of the same run adds a file of its own, under a name no other branch would choose. Two edits of one entry conflict like two entries in one file.
 - **If you have a `WORKSPACE_CHANGELOG.md`, keep it.** Nothing migrates it and nothing fails: it is the archive, read for history and not written to. You get the directory at your next installer run with `--with-meta`, and the new wording when you copy the kit's skill, command and coach in upgrade step 2; until then they keep writing to the single file.
+- The kit's own repository now runs on its kit: its rules, skills, `agent-coach` and hook are applied there by links into `starter-kit/`, held by a gate (ADR-0022). Nothing changes in an installed project.
 
 <!-- category: Deprecated -->
 

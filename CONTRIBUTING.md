@@ -50,6 +50,7 @@ name your machine gives it — the make targets find it through
    | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
    | `scripts/tests/test-eval-run.sh` | `scripts/eval-run.sh`, this repository's evaluation recorder (below) |
+| `scripts/tests/test-self-application.sh` | `check-self-application.sh`: a kit rule with no link here, a link that became a copy or points elsewhere, and a hook that cannot find the graph tool each fail |
 
 3. **Make the change.**
 4. **Add a changelog fragment**, written for the adopter — what they will
@@ -79,17 +80,18 @@ cause; none of these has a quiet override.
 | `documented-commands` | No command the kit or this repository writes down for someone to type starts Python as `python3 …`; each goes through `scripts/python.sh` or a make target (ADR-0013) |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
 | `ci-lint-coverage` | Every check in `make lint` is invoked by a CI workflow step. It reads the workflow files; that a run completed is seen on the pull request, not here (ADR-0019) |
+| `self-application` | Every rule, skill, agent and command the kit ships is linked under `.claude/`, never copied, and the workspace-graph hook is registered there with `--tool` (ADR-0022). The failure prints the `ln -s` to run |
 | `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
 
 ## Adding to what the installer ships
 
 | You add | Also change |
 |---|---|
-| A default rule | If it is about particular files, its `bind_rule` line in `bootstrap.sh` and its row in the README's load-class table; `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table |
+| A default rule | If it is about particular files, its `bind_rule` line in `bootstrap.sh` and its row in the README's load-class table; `DEFAULT_RULES` in `bootstrap.sh`; the index and table in `constitution.md.template` (and the guide's embedded copy); the `starter-kit/README.md` table; its link under `.claude/rules/` (the `self-application` gate prints the command) |
 | A gate | The script, with an `# Enforces: RULE:<name>` header; a target in `registry.mk`; the `lint:` line in `Makefile.template` and in this repository's `Makefile`; an install line in `bootstrap.sh`; the gate list in `check-ci-lint-coverage.sh` and in the installer's "does not reach" message; an acceptance test with a control case; the `starter-kit/README.md` table; the `lint:` line `test-upgrade.sh` edits in step 5. A gate that is on by default is a MAJOR release (ADR-0008) — ship it unchained first, as `constitution` was |
 | A suite that needs `bootstrap.sh` | The `find` exclusions in `install_tree`, and the `rm -f` line of the README's upgrade step 2 — `test-upgrade.sh` fails when one is missing from either |
 | A hook | The file under `starter-kit/hooks/`; its entry in `settings.json.template` and in the guide's embedded copy; an install line in `bootstrap.sh`, Claude Code only; a case for each thing it says and each way it stays silent in `test-graph-hooks.sh`; the README section. A hook that adds context never blocks, never edits and ends silent when it cannot run |
-| A skill or agent | A self-contained directory or file — no path into the rest of the kit; an install line in `bootstrap.sh`; `skills/common-catalog.md`; the README tables |
+| A skill or agent | A self-contained directory or file — no path into the rest of the kit; an install line in `bootstrap.sh`; `skills/common-catalog.md`; the README tables; its link under `.claude/` (the `self-application` gate prints the command) |
 | A template | The kit file and the guide's embedded copy, together |
 
 Four invariants every such change keeps, each with a test behind it:

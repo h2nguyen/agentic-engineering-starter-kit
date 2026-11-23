@@ -20,10 +20,11 @@ KIT := starter-kit
 
 .PHONY: lint test registry-generate registry-list registry-drift registry-ids \
         graph-links graph-impact graph-coverage ci-lint-coverage constitution \
-        guide-templates rule-budget documented-commands kit-smoke agent-feedback
+        guide-templates rule-budget documented-commands kit-smoke agent-feedback \
+        self-application
 
 ## lint — everything CI runs.
-lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands test
+lint: registry-drift registry-ids graph-links ci-lint-coverage constitution guide-templates rule-budget documented-commands self-application test
 
 ## test — unit tests plus the parallel-merge acceptance test.
 test:
@@ -38,6 +39,7 @@ test:
 	$(KIT)/scripts/tests/test-upgrade.sh
 	$(KIT)/scripts/tests/test-graph-hooks.sh
 	scripts/tests/test-eval-run.sh
+	scripts/tests/test-self-application.sh
 
 ## registry-generate — rebuild CHANGELOG.md from changelog.d/.
 registry-generate:
@@ -102,6 +104,12 @@ rule-budget:
 ## starts Python through scripts/python.sh, as everything it runs does.
 documented-commands:
 	scripts/check-documented-commands.sh
+
+## self-application — this repository applies the agent side of its own kit:
+## every shipped rule, skill, agent and command is linked under .claude/, never
+## copied, and the workspace-graph hook is registered (ADR-0022).
+self-application:
+	scripts/check-self-application.sh
 
 ## kit-smoke — bootstrap into a throwaway repo and run its gates there.
 kit-smoke:
