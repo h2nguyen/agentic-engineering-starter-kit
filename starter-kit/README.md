@@ -173,7 +173,8 @@ whichever version you started from. For why a file changed, search the kit's
 `CHANGELOG.md` for its name.
 
 1. **Add what is new.** Pass `--with-meta` if your repository has the Level-4
-   layer (`agent-coach`, the workspace-audit skill).
+   layer (`agent-coach`, the workspace-audit skill) or keeps a workspace
+   changelog.
    ```bash
    "$KIT"/starter-kit/bootstrap.sh --target .
    ```
@@ -293,9 +294,11 @@ whichever version you started from. For why a file changed, search the kit's
    diff -u docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md "$KIT"/starter-kit/docs/DEBUGGING-KNOWLEDGE-BASE.d/README.md
    diff -u .claude/hooks/session-start.sh "$KIT"/starter-kit/hooks/session-start.sh.template
    diff -u .claude/settings.json "$KIT"/starter-kit/settings.json.template
+   diff -u .claude/workspace-changelog/README.md "$KIT"/starter-kit/workspace-changelog/README.md
    ```
-   (The last two on Claude Code only, and the hook only if your install has
-   one: kits up to 3.0.1 installed and registered that skeleton, and it is
+   (The workspace-changelog README only with the Level-4 layer, and under
+   `docs/` on the other tools. The two before it on Claude Code only, and the
+   hook only if your install has one: kits up to 3.0.1 installed and registered that skeleton, and it is
    yours to keep, fill in or remove together with its `SessionStart` entry.
    Newer kits ship it as a template in `docs/agent-templates/` and register
    nothing.) Three more came from a kit template:

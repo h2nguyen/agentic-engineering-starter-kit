@@ -29,7 +29,9 @@ Four shapes were weighed.
 
 - **Keep the file and say "one entry per run, not per pull request".** That
   is what happened by accident, and two pull requests amending the same entry
-  still meet on the same lines.
+  still meet on the same lines. The same holds for a file per run that later
+  pull requests of the run edit: a first draft of this decision said so, and
+  a review merged two such branches into a conflict.
 - **`merge=union` on the file.** It needs a drift gate to be safe
   (`.gitattributes` says why), and there is nothing to regenerate this file
   from.
@@ -43,9 +45,11 @@ Four shapes were weighed.
 
 We will keep the workspace changelog as a directory with one file per run:
 `.claude/workspace-changelog/` on Claude Code, `docs/workspace-changelog/` on
-the other tools, files named `<YYYY-MM-DD>-<what>.md`. A sorted listing is
-the history. A later pull request that belongs to the same run edits that
-run's file.
+the other tools, files named `<YYYY-MM-DD>-<what>.md`. The dated files,
+sorted, are the history. A file is written once, by the pull request that
+adds it: a later pull request of the same run adds a file of its own, and
+`<what>` is chosen so that no other branch would pick it — a bare
+`coach-cycle` is a name two branches share.
 
 `--with-meta` installs the directory's `README.md`, which states the naming,
 the reason, and the entry format; the format gains a `Kit:` field for the
@@ -63,7 +67,8 @@ as the archive and write nothing new into it.
 ## Consequences
 
 **Easier.** Two runs recorded on two branches merge without a conflict; the
-installer suite holds that, with the old shape as its control. The record of
+installer suite holds that, with the old shape as its control, and holds as a
+second control that two edits of one entry do conflict. The record of
 a setup can note which kit it came from.
 
 **Harder.** The history is a directory listing instead of one page. Reading
@@ -76,8 +81,12 @@ the meta layer picks up the directory at its next installer run and the new
 wording when it copies the kit's skill and coach (upgrade step 2); until then
 its skill keeps writing to the single file, as before.
 
-**Not done.** No tool creates the entry file; the format is a block to copy.
-A `new` command would mean declaring a registry, which was weighed above.
+**Not done.** No tool creates the entry file or checks that its name is
+unused on other branches; the format is a block to copy and the naming is a
+convention. A `new` command would mean declaring a registry, which was
+weighed above. A repository that already keeps a workspace changelog of its
+own keeps writing to it: the setup prompt records there and proposes this
+layout, since an existing convention that works beats the kit's default.
 
 **Trigger to revisit.** If entries start being cited from rules or decision
 records, they need stable identifiers, and the directory becomes a declared

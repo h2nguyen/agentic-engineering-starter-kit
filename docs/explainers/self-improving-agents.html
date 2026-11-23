@@ -265,8 +265,8 @@ octocat</textarea>
       kit: { de: "<code>agent-coach</code> (mit <code>--with-meta</code>, Claude Code): OBSERVE → DIAGNOSE → PROPOSE. Liest jetzt den Feedback-Bericht.", en: "<code>agent-coach</code> (with <code>--with-meta</code>, Claude Code): OBSERVE → DIAGNOSE → PROPOSE. Now reads the feedback report." } },
     { short: { de: "Merge", en: "Merge" }, state: "have",
       title: { de: "5. Ein Mensch prüft, merged und es wird protokolliert", en: "5. A person reviews, merges, and it is logged" },
-      body: { de: "Nur nach Freigabe wird geändert, als normaler PR. Das <code>WORKSPACE_CHANGELOG.md</code> hält fest, was angenommen, abgelehnt und bewusst nicht geändert wurde. Der nächste Lauf misst, ob es geholfen hat.",
-              en: "Nothing changes without approval, and the change is an ordinary PR. <code>WORKSPACE_CHANGELOG.md</code> records what was accepted, rejected and deliberately left alone. The next cycle measures whether it helped." },
+      body: { de: "Nur nach Freigabe wird geändert, als normaler PR. Das Workspace-Protokoll (<code>.claude/workspace-changelog/</code>, eine Datei je Durchgang) hält fest, was angenommen, abgelehnt und bewusst nicht geändert wurde. Der nächste Lauf misst, ob es geholfen hat.",
+              en: "Nothing changes without approval, and the change is an ordinary PR. The workspace changelog (<code>.claude/workspace-changelog/</code>, one file per run) records what was accepted, rejected and deliberately left alone. The next cycle measures whether it helped." },
       idea: { de: "Ein Mensch schließt die Schleife und behält die Kontrolle.", en: "A person closes the loop and stays in control." },
       kit: { de: "„Propose, never silently change“ (Prinzip P7) + Workspace-Changelog als Tagebuch.", en: "\"Propose, never silently change\" (principle P7) + the workspace changelog as the log." } }
   ];
@@ -285,7 +285,7 @@ octocat</textarea>
     { part: { de: "Mensch merged per PR", en: "A person merges the PR" },
       kit: { de: "PR-only, Prinzip P7", en: "PR-only, principle P7" }, state: "have" },
     { part: { de: "Protokoll der Verbesserungen", en: "A log of improvements" },
-      kit: { de: "<code>WORKSPACE_CHANGELOG.md</code>", en: "<code>WORKSPACE_CHANGELOG.md</code>" }, state: "have" },
+      kit: { de: "<code>workspace-changelog/</code>", en: "<code>workspace-changelog/</code>" }, state: "have" },
     { part: { de: "Verbesserer läuft nach Zeitplan", en: "Improver runs on a schedule" },
       kit: { de: "Braucht Zugangsdaten und einen neuen ADR, der ADR-0006 ablöst", en: "Needs credentials and a new record superseding ADR-0006" }, state: "plan" },
     { part: { de: "Ein Verbesserer für viele Agenten", en: "One improver shared by many agents" },

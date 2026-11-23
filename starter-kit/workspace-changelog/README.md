@@ -8,14 +8,22 @@ stops the next run from re-litigating what an earlier one settled: the
 
 ## One file per run
 
-Name each file `<YYYY-MM-DD>-<what>.md`: `2026-11-21-harmonize-setup.md`,
-`2026-12-02-quick-audit.md`, `2026-12-09-coach-cycle.md`. A sorted listing of
-this directory is the history, oldest first; read the newest files first.
+Name each file `<YYYY-MM-DD>-<what>.md`, where `<what>` says what the run
+was and is not shared with another branch: `2026-11-21-harmonize-setup.md`,
+`2026-12-02-full-audit.md`, `2026-12-09-coach-reviewer-escapes.md`. The dated
+files, sorted by name, are the history, oldest first; read the newest first.
 
 Not one file with the newest entry on top. Every run would insert at the same
 line, and two pull requests open at once then conflict on it — and a day of
-setup work is easily three pull requests. Two files cannot conflict. A later
-pull request that belongs to the same run edits that run's file.
+setup work is easily three pull requests. Two files with different names
+cannot conflict.
+
+So a file is written once, by the pull request that adds it. A later pull
+request that belongs to the same run adds a file of its own, with a `<what>`
+that says what it adds (`2026-11-21-harmonize-setup-ci.md`), and names the
+earlier file in its headline. Editing a file that another open pull request
+may also be editing is the conflict again; so is a name two branches would
+both choose, which is why a bare `coach-cycle` or `audit` is not enough.
 
 A repository that still has a single `WORKSPACE_CHANGELOG.md` from an earlier
 setup keeps it as the archive: read it for history, write nothing new into it.

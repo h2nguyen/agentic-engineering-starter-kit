@@ -222,13 +222,17 @@ Appendix A.7 — the sequence:
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
    losslessly (relocate → split → compress) before ever deleting; deletions
    need written justification per Appendix A.7.
-7. **Record.** Write a workspace-changelog entry as a file of its own —
+7. **Record.** Where the repository already keeps a workspace changelog of
+   its own (Phase 0.3), record there, in its form — the existing convention
+   wins — and put the layout below into the change plan as a proposal if its
+   form is one shared file. Otherwise write the entry as a file of its own —
    `.claude/workspace-changelog/<date>-<what>.md`, or under
    `docs/workspace-changelog/` where the tool has no `.claude/`; create the
-   directory if missing. One file per run, never an entry added to a shared
-   file: a setup is easily three pull requests in a day, and each would
-   insert at the same line. A later pull request of the same run edits that
-   run's file. In it:
+   directory if missing. A setup is easily three pull requests in a day, and
+   in one shared file each would insert at the same line. So each pull
+   request that has something to record adds a file of its own, with a
+   `<what>` no other branch would choose; none edits a file another open pull
+   request may be editing. In it:
    which kit was installed (the installer's `Kit:` line — nothing else records
    it), what changed, what was **deliberately NOT changed and why**, ladder
    rungs used, ledger items affected. If the repo has resident improvement machinery

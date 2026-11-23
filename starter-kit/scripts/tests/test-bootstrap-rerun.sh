@@ -761,8 +761,10 @@ out=""
 for f in .claude/skills/ai-engineering-workspace-audit/SKILL.md .claude/agents/agent-coach.md .claude/commands/ai-engineering-workspace-audit.md; do
   grep -q 'workspace-changelog/' "$R/$f" || out="$out $f"
 done
-[ -z "$out" ] && ok "the audit skill, its command and the agent-coach write their record into that directory" \
-  || bad "still pointing at the single file:$out"
+[ -z "$out" ] && ! grep -q 'Append to' "$R/.claude/skills/ai-engineering-workspace-audit/SKILL.md" \
+  && ! grep -rq 'WORKSPACE_CHANGELOG.md. (create it if missing)' "$R/.claude" \
+  && ok "the audit skill, its command and the agent-coach write their record into that directory, and none still says to append to the single file" \
+  || bad "still pointing at the single file, or still saying 'Append to':$out"
 git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "bootstrap with meta" 2>/dev/null
 entry() { printf '# 2026-11-21 — %s\n\n## Headline result\n\n%s\n\n## Changes applied\n\n## Deliberately NOT changed (with reasons)\n\n## Follow-ups\n' "$1" "$2"; }
 for b in audit coach; do
@@ -774,7 +776,29 @@ git -C "$R" checkout -q main
 git -C "$R" merge -q --no-edit wc-audit >/dev/null 2>&1 && git -C "$R" merge -q --no-edit wc-coach >/dev/null 2>&1 \
   && [ -f "$wc/2026-11-21-audit.md" ] && [ -f "$wc/2026-11-21-coach.md" ] \
   && ok "two branches that each record a run merge with no conflict, and both entries are there" \
-  || { bad "two workspace-changelog entries conflicted on merge"; git -C "$R" merge --abort 2>/dev/null; }
+  || { bad "two branches that each added a file to the directory did not merge, or the directory is not there"; git -C "$R" merge --abort 2>/dev/null; }
+# One run is often several pull requests — the day that prompted this had
+# three. If each edits the run's file they meet on the same lines again, so
+# each adds a file of its own, and the installed README has to say that.
+readme_text="$(tr '\n' ' ' < "$wc/README.md" 2>/dev/null | tr -s ' ')"
+case "$readme_text" in
+  *"adds a file of its own"*) ok "the directory's README tells a later pull request of the same run to add a file of its own" ;;
+  *) bad "the README lets a second pull request of one run edit the first one's file" ;;
+esac
+case "$readme_text" in
+  *"edits that run's file"*) bad "the README still says a later pull request edits the run's file" ;;
+  *) ok "and nowhere to edit a file another open pull request may be editing" ;;
+esac
+for b in pr2 pr3; do
+  git -C "$R" checkout -q -b "wc-same-$b" main
+  printf '\n- a follow-up from %s\n' "$b" >> "$wc/2026-11-21-audit.md"
+  git -C "$R" add -A >/dev/null; git -C "$R" commit -q -m "amend the audit entry from $b"
+done
+git -C "$R" checkout -q main; git -C "$R" merge -q --no-edit wc-same-pr2 >/dev/null 2>&1
+git -C "$R" merge -q --no-edit wc-same-pr3 >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "control — two pull requests of one run that edit the same entry do conflict, which is why they do not" \
+  || bad "control: two edits of one entry merged cleanly"
+git -C "$R" merge --abort 2>/dev/null
 # Control: the shape it replaces, on the same two branches.
 C="$WORK/meta-control"; fresh_repo "$C"
 printf '# AI Workspace Changelog\n\nOne entry per run, newest first.\n\n## 2026-11-01 — setup\n\nThe first entry.\n' > "$C/WORKSPACE_CHANGELOG.md"
