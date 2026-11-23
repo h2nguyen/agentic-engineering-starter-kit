@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Enforces: RULE:shared-registries § A Makefile target is not a CI step —
-# every check chained into the umbrella lint target actually runs in CI.
+# every check chained into the umbrella lint target is invoked by a CI
+# workflow step.
 #
 # The failure this prevents is not hypothetical and not loud. A repository
 # gains checks by adding them to `make lint`, while its workflow enumerates
@@ -373,7 +374,7 @@ runs_target() { # $1 = make target name
 if runs_target "$TARGET"; then
   if [ "$fail" -eq 0 ]; then
     echo "OK: CI invokes 'make $TARGET' directly — every sub-target is covered by construction."
-    echo "    (Read from the workflow files — not that a run completed. 'gh run list --limit 5' shows whether one did.)"
+    echo "    (Read from the workflow files — not that a run completed. In this repository, 'gh run list --limit 5' shows whether one did.)"
   fi
   exit "$fail"
 fi
@@ -441,4 +442,4 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 echo "OK: every '$TARGET' sub-target is invoked by a CI workflow step"
-echo "    (Read from the workflow files — not that a run completed. 'gh run list --limit 5' shows whether one did.)"
+echo "    (Read from the workflow files — not that a run completed. In this repository, 'gh run list --limit 5' shows whether one did.)"

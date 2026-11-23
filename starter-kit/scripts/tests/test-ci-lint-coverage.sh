@@ -61,6 +61,16 @@ fi
 
 scenario "enumerating every sub-target individually passes" 0 \
   "$MAKEFILE" "${HEADER}      - run: make alpha\n      - run: make beta\n"
+# The other way to pass says the same about itself, and no longer "runs in CI".
+dir="$(mktemp -d "$WORK/case.XXXXXX")"; mkdir -p "$dir/.github/workflows"; git -C "$dir" init -q -b main
+printf '%b' "$MAKEFILE" > "$dir/Makefile"
+printf '%b' "${HEADER}      - run: make alpha\n      - run: make beta\n" > "$dir/.github/workflows/lint.yml"
+out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ] && [[ "$out" == *"is invoked by a CI workflow step"* ]] && [[ "$out" != *"runs in CI"* ]] && [[ "$out" == *"not that a run"* ]]; then
+  ok "a gate that passes on enumerated steps says they are invoked by a workflow step, not that they ran"
+else
+  bad "the enumerated success path still claims the checks run in CI (exit $rc): $(printf '%s' "$out" | tail -2 | tr '\n' ' ')"
+fi
 
 scenario "a sub-target missing from every workflow fails" 1 \
   "$MAKEFILE" "${HEADER}      - run: make alpha\n"

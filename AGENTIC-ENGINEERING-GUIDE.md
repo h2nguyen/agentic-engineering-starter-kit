@@ -773,7 +773,7 @@ The third tier deserves its demotion for a specific reason. An agent resolving t
 | drift check | regenerate and compare what the artifact *says* to its fragments — same entries, same content, any order — so a union merge that only reorders is green, and one that mangles an entry is not |
 | identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
 | `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
-| coverage check | proves every check in that target actually runs in CI |
+| coverage check | proves every check in that target is invoked by a CI workflow step — not that a run completed, which only the hosting platform shows |
 | two skills | authoring the entry; triaging a conflict — deliberately separate |
 
 **Granularity is a separate decision from layout, and it is easy to get wrong.**
@@ -991,7 +991,7 @@ Run quarterly (or as the quick-audit report):
 - [ ] KB entry count growing (bugs are being converted, not just fixed)?
 - [ ] No rule file contradicts current code reality (spot-check the three oldest)?
 - [ ] No command duplicates a skill's body?
-- [ ] Every gate in the lint target actually runs in CI (not just present in the Makefile)?
+- [ ] Every gate in the lint target is invoked by CI (not just present in the Makefile), and a recent run of that workflow completed with success?
 - [ ] No shared file that many PRs append to has escaped the fragment layout?
 - [ ] Agents' violation lists match the current rule files they enforce? `make graph-impact NODE=RULE:<name>` names the agents holding each rule.
 - [ ] `.graph-link-allowlist` absent or empty — or every entry still an immutable decision record citing something retired?

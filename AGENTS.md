@@ -92,9 +92,15 @@ usually starts, so a command that leaves the path out writes here.
    line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.
 9. **Commit on the branch.** Do not push or open a pull request unless asked.
-   If you are asked to push, look at the CI run that follows
-   (`gh run list --limit 5`): it must complete with success. A workflow file
-   is not a run, and no gate in `make lint` can tell the difference.
+   If you are asked to push and open the pull request, look at the run that
+   follows — the installed workflow starts on a pull request, not on the push
+   of a branch. Ask for the target's runs, not this repository's, which has a
+   workflow of the same name:
+   ```bash
+   gh run list --repo <owner>/<repo> --workflow lint.yml --limit 5
+   ```
+   It must show a completed run that succeeded. A workflow file is not a
+   run, and no gate in `make lint` can tell the difference.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
    out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.

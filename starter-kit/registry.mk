@@ -60,7 +60,8 @@ graph-impact:
 graph-coverage:
 	@./scripts/python.sh scripts/graph_tool.py coverage
 
-## ci-lint-coverage — every lint sub-target actually runs in CI, and the
+## ci-lint-coverage — every lint sub-target is invoked by a CI workflow step
+## (whether a run completed is not something a local check can see), and the
 ## registry and link gates are actually reached by lint.
 ci-lint-coverage:
 	./scripts/check-ci-lint-coverage.sh

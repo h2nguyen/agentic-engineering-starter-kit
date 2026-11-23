@@ -78,7 +78,7 @@ cause; none of these has a quiet override.
 | `rule-budget` | Every rule file the kit ships stays under 250 lines; worked examples go to `starter-kit/rules/reference/` |
 | `documented-commands` | No command the kit or this repository writes down for someone to type starts Python as `python3 …`; each goes through `scripts/python.sh` or a make target (ADR-0013) |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
-| `ci-lint-coverage` | Every check in `make lint` really runs in CI |
+| `ci-lint-coverage` | Every check in `make lint` is invoked by a CI workflow step. It reads the workflow files; that a run completed is seen on the pull request, not here (ADR-0019) |
 | `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
 
 ## Adding to what the installer ships

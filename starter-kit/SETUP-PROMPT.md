@@ -247,13 +247,16 @@ Appendix A.7 — the sequence:
    project never wrote — and every typed link (Appendix A.10): `make
    graph-links` where the kit is present, by hand otherwise.
 4. The umbrella lint target passes, and every check chained into it is reachable
-   from a CI workflow step. Reachable is not run: once the branch is pushed,
-   confirm that a run of that workflow completed with success
-   (`gh run list --limit 5`; one that ends within seconds, before any step,
-   checked nothing). Where you were not asked to push, or cannot see the runs,
-   the handoff says "CI not confirmed" and why — never "CI green" from a
-   workflow file. The handoff also names the step that makes it binding: the
-   lint check as a required status check on the default branch.
+   from a CI workflow step. Reachable is not run: a workflow starts on the
+   events it names — the kit's on a pull request and on a push to the default
+   branch, not on the push of a feature branch. Once the pull request is
+   open, confirm that a run of that workflow completed with success
+   (`gh run list --workflow <file> --limit 5`, in this repository; none at
+   all, or one that ends within seconds before any step, checked nothing).
+   Where you were not asked to push and open it, or cannot see the runs, the
+   handoff says "CI not confirmed" and why — never "CI green" from a workflow
+   file. Separately, the handoff names the step that makes the check binding:
+   the lint check as a required status check on the default branch.
 5. Harmonize-track runs only: cross-check the ledger — every item is preserved
    in place, preserved elsewhere (relocated/merged), or its removal is
    justified in writing. Zero silent losses.

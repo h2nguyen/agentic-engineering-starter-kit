@@ -86,6 +86,21 @@ A target named in a comment, an `echo`, a step name or another directory's
 Makefile covers nothing. A rules file claiming mechanical enforcement is only
 as true as the workflow step behind it.
 
+### A CI step is not a CI run
+
+The coverage check reads the workflow files in the checkout. It cannot see
+the hosting platform, so a workflow that is right on disk and has never
+completed a run passes it on every lint. That happened: every run of a
+repository's lint workflow ended within seconds, before its first step — a
+billing stop — while the coverage check printed `OK` and four pull requests
+were merged on a default branch that required no check. Each stage has its
+own evidence: the Makefile says a check is chained, the workflow file says a
+step invokes it, and only a completed run says it ran. Look at one on the
+first pull request, and make the lint check a required status check on the
+default branch, so that a pull request no run has checked cannot be merged.
+Remember what starts a run: a workflow that triggers on pull requests and on
+pushes to the default branch does nothing when a feature branch is pushed.
+
 ### Custom merge drivers do not travel with the repository
 
 `merge=union` is built into git and needs nothing in any clone. A **custom**
