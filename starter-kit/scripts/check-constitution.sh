@@ -9,7 +9,9 @@
 # Markdown links, and nothing read the placeholders. The file every session
 # loads first was the one file no gate opened.
 #
-# Two checks, on the constitution and on nothing else:
+# Two checks, on the constitution and on the one file a project fills in
+# beside its rules — project-annotations.md, the project's half of the
+# comments-and-annotations rule — and on nothing else:
 #   1. every relative Markdown link names a file or directory that exists;
 #   2. no `<placeholder like this>` is left outside code.
 #
@@ -20,8 +22,11 @@
 # `RULE:<name>` in backticks, `<br>`, `Option<T>` and `<https://…>` all stay.
 # A placeholder-like phrase you want to keep goes in backticks.
 #
-# Rule files and docs/rule-reference/ are never read: their `<IDENTIFIER>`
-# shapes and WRONG/CORRECT examples are the point of those documents.
+# The rules the kit ships and docs/rule-reference/ are never read: their
+# `<IDENTIFIER>` shapes and WRONG/CORRECT examples are the point of those
+# documents. project-annotations.md is read because it is not one of them: it
+# starts as a template, like the constitution, and names the rule's pointers
+# in backticks.
 #
 # Not chained into `lint` by the kit: run it when the constitution is filled
 # in or edited (`make constitution`). To hold it on every pull request, add
@@ -30,6 +35,7 @@
 #
 # Usage: check-constitution.sh [file...]
 #        default: CLAUDE.md, AGENTS.md and .github/copilot-instructions.md,
+#        and project-annotations.md in .claude/rules/ or docs/agent-rules/ —
 #        whichever exist
 set -euo pipefail
 # Python under whatever name this machine gives it; the fallback is for a
@@ -42,8 +48,10 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 import os, re, sys
 from urllib.parse import unquote
 
-files = sys.argv[1:] or [f for f in ("CLAUDE.md", "AGENTS.md", ".github/copilot-instructions.md")
-                         if os.path.isfile(f)]
+CONSTITUTIONS = ("CLAUDE.md", "AGENTS.md", ".github/copilot-instructions.md")
+# The project's half of the comments rule, wherever this layout keeps rules.
+PROJECT_FILES = (".claude/rules/project-annotations.md", "docs/agent-rules/project-annotations.md")
+files = sys.argv[1:] or [f for f in CONSTITUTIONS + PROJECT_FILES if os.path.isfile(f)]
 if not files:
     print("SKIP: no constitution found (CLAUDE.md, AGENTS.md, .github/copilot-instructions.md).")
     sys.exit(0)

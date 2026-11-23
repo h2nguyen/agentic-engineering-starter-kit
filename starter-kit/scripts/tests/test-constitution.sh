@@ -114,6 +114,28 @@ printf '# Comments\n\nPoint at <DECISION-RECORD-ID> or <KB-ENTRY-ID>, never at <
 ( cd "$dir" && "$GATE" >/dev/null 2>&1 ) \
   && ok "rule files and rule references are not read: their identifier shapes and examples stay" \
   || bad "the check read a file that is not the constitution"
+# One file beside the rules IS read: project-annotations.md, the project's
+# half of the comments rule. It is filled in by the project like the
+# constitution, and used to be a table inside a kit rule that no check opened.
+for rules in docs/agent-rules .claude/rules; do
+  dir="$(repo)"; mkdir -p "$dir/$rules"
+  printf '# Project\n' > "$dir/AGENTS.md"
+  printf '# Project Annotations\n\n| In the rule | Here |\n|---|---|\n| `<TICKET-ID>` | <fill in: the shape of a tracker reference> |\n' \
+    > "$dir/$rules/project-annotations.md"
+  out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+  [ "$rc" -eq 1 ] && [[ "$out" == *"$rules/project-annotations.md:5 — unfilled placeholder '<fill in: the shape of a tracker reference>'"* ]] \
+    && ok "$rules/project-annotations.md is read with the constitution: an unfilled row fails, with file and line" \
+    || bad "an unfilled $rules/project-annotations.md was not reported (exit $rc): $(printf '%s' "$out" | head -1)"
+  printf '# Project Annotations\n\n| In the rule | Here |\n|---|---|\n| `<TICKET-ID>` | `#123` |\n' > "$dir/$rules/project-annotations.md"
+  out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+  [ "$rc" -eq 0 ] && [[ "$out" == *"project-annotations.md"* ]] \
+    && ok "filled in, it passes — the pointer name in backticks is not a placeholder — and the OK line names the file" \
+    || bad "a filled-in $rules/project-annotations.md fails or is not named (exit $rc): $(printf '%s' "$out" | head -1)"
+done
+dir="$(repo)"; printf '# <fill in: x y>\n' > "$dir/docs/agent-rules/project-annotations.md"
+out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+[ "$rc" -eq 1 ] && ok "it is read in a repository whose constitution is missing, too" \
+  || bad "project-annotations.md without a constitution: exit $rc, '$(printf '%s' "$out" | head -1)'"
 dir="$(repo)"
 printf '# Project\n' > "$dir/CLAUDE.md"; printf '# <Project Name>\n' > "$dir/AGENTS.md"
 out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?

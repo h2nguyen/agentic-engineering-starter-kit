@@ -48,12 +48,12 @@ installs runs on `ubuntu-latest`.
 
 ## After installing
 
-1. Fill in the constitution's `<placeholders>` and the project rows of the
-   comments-and-annotations rule —
+1. Fill in the constitution's `<placeholders>` and `project-annotations.md`,
+   the project's half of the comments-and-annotations rule —
    [how](starter-kit/README.md#adopting-the-comments-and-annotations-rule).
-2. Run `make constitution`. It names every template placeholder and every
-   link to a file that does not exist that step 1 left in the constitution,
-   and passes when there is none.
+2. Run `make constitution`. It names every template placeholder that step 1
+   left in either file and every link in the constitution to a file that does
+   not exist, and passes when there is none.
 3. Run `make lint`. A working install prints an `OK:` line for each of its five
    gates and no `FAIL`. If your repository already had a Makefile, the
    installer left it alone and printed the two lines to add.

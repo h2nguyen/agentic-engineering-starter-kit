@@ -237,15 +237,40 @@ case "$TOOL" in
   copilot)       CONSTITUTION=.github/copilot-instructions.md; RULES_DIR=docs/agent-rules ;;
 esac
 DEFAULT_RULES=(working-principles documentation comments-and-annotations versioning-and-changelog)
+# The registry tool is the kit's own file and nothing else's, so finding it
+# already here is what tells a re-run from a first install. An existing
+# constitution does not: a repository can have one and never have seen the kit.
+HAD_KIT=0
+if [ -e "$TARGET/scripts/registry_tool.py" ]; then HAD_KIT=1; fi
 
 # The constitution links its rules as .claude/rules/…; every other layout keeps
 # them under docs/agent-rules/, so the links are rewritten on those tools.
 if install_file constitution.md.template "$CONSTITUTION" && [ "$TOOL" != claude ]; then
   retarget_rule_links "$CONSTITUTION"
 fi
+# Was the comments rule here before this run? That, not the kit having been
+# installed, is what decides about its project half below: the rule can be
+# new to a repository that has had the kit for years, or has it in another
+# tool's layout.
+HAD_COMMENTS_RULE=0
+if [ -e "$TARGET/$RULES_DIR/comments-and-annotations.md" ]; then HAD_COMMENTS_RULE=1; fi
 for rule in "${DEFAULT_RULES[@]}"; do
   install_file "rules/$rule.md" "$RULES_DIR/$rule.md" || true
 done
+# The project's half of the comments rule: what its pointers stand for here,
+# and the markers this project's own tooling reads. A file of the project's,
+# so that the rule itself stays the kit's and an upgrade can copy it. It is
+# installed together with the rule that names it. Where the rule was already
+# here, it is held back: that rule may have the adopter's rows inside it, and
+# an unfilled template beside them would be loaded into every session and
+# fail a `constitution` check the adopter chained into lint. The upgrade
+# steps create the file there, as part of moving the rows.
+if [ "$HAD_COMMENTS_RULE" -eq 1 ] && [ ! -e "$TARGET/$RULES_DIR/project-annotations.md" ] \
+   && ! declined "$RULES_DIR/project-annotations.md"; then
+  SKIPPED+=("$RULES_DIR/project-annotations.md (not added beside a comments rule that was already here — 'Upgrading an existing install', step 3, creates it)")
+else
+  install_file rules/project-annotations.md.template "$RULES_DIR/project-annotations.md" || true
+fi
 # A rule file is loaded into every session, so the two long ones keep only
 # their imperative there and point at these for the worked examples and the
 # gotcha write-ups. One location for every tool, outside the rules directory:
@@ -276,11 +301,8 @@ install_file registry-id-duplicate-allowlist.template .registry-id-duplicate-all
 install_file ci-lint-coverage-allowlist.template .ci-lint-coverage-allowlist || true
 install_file registry.mk registry.mk || true
 install_file ci/lint.yml.template .github/workflows/lint.yml || true
-# The registry tool is the kit's own file and nothing else's, so finding it
-# already here is what tells a re-run from a first install. An existing
-# constitution does not: a repository can have one and never have seen the kit.
-RERUN=1
-if install_file scripts/registry_tool.py scripts/registry_tool.py x; then RERUN=0; fi
+RERUN="$HAD_KIT"
+install_file scripts/registry_tool.py scripts/registry_tool.py x || true
 # Everything the kit runs starts Python through this launcher, never by a
 # fixed name: `python3` is not Python on every machine (Windows has `python`
 # and `py`, and a Store alias called python3 that is neither).
@@ -464,12 +486,11 @@ else
   echo "     The template shows example rows, commands and links. Keep what your project has,"
   echo "     and delete the rest: a command that does not run, a stack row with nothing in it,"
   echo "     a link to a rule file that was not installed. Run a command before you keep it."
-  echo "     Then the project rows of the comments-and-annotations rule: the second half of"
-  echo "     its protected-shapes table, and its <DECISION-RECORD-ID>, <KB-ENTRY-ID>, <TICKET-ID>"
-  echo "     and <tool-or-gate> pointers — see 'Adopting the comments-and-annotations rule' in"
-  echo "     $KIT_DIR/README.md."
-  echo "     The same pointers appear in its examples, docs/rule-reference/comments-and-annotations.md."
-  echo "     ('make registry-list' prints the identifier shapes this repo declares.)"
+  echo "     Then $RULES_DIR/project-annotations.md, the project's half of the comments rule:"
+  echo "     every '<fill in: …>' in it — what the rule's pointers stand for here, and the markers"
+  echo "     your own tooling reads out of comments. The rule itself is used as shipped; edit"
+  echo "     nothing in it. ('make registry-list' prints the identifier shapes this repo declares;"
+  echo "     see 'Adopting the comments-and-annotations rule' in $KIT_DIR/README.md.)"
   echo "  2. Optional: enable further generic skills — the catalog is $KIT_DIR/skills/common-catalog.md"
   echo "     (in the kit, not in this repository)."
   if [ "$TOOL" = claude ]; then
@@ -482,8 +503,9 @@ else
     echo "     document linked from $CONSTITUTION. Skipping this step leaves nothing broken."
   fi
   echo "  3. Run 'make constitution'. It fails, naming the line, for as long as $CONSTITUTION"
-  echo "     links to a file that does not exist or still carries a template <placeholder> —"
-  echo "     'make lint' does not check either, so a green lint does not mean step 1 is done."
+  echo "     links to a file that does not exist, or it or project-annotations.md still carries a"
+  echo "     template <placeholder> — 'make lint' does not check either, so a green lint does not"
+  echo "     mean step 1 is done."
   echo "     Then run 'make lint' — the registry gates, the knowledge-base shape check, the"
   echo "     typed-link gate and the CI-coverage check are already chained into it, and"
   echo "     the installed workflow invokes that same target so nothing can fall out of CI."

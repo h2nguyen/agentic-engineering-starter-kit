@@ -6,9 +6,10 @@ it when you are about to add, shorten or review an annotation and want the
 worked shape. Nothing here adds to the rule or relaxes it.
 
 The examples name decision records, knowledge-base entries, tickets and
-evaluation records by the same project pointers the rule file carries
-(`<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<EVAL-RECORD-ID>`
-until a project fills them in). Fill them here when you fill them there.
+evaluation records by the same pointers the rule file uses
+(`<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<EVAL-RECORD-ID>`).
+What each one is in this project is in `project-annotations.md`, beside the
+rule. Nothing in this file is filled in: it is used as shipped.
 
 ## Worked examples
 

@@ -96,7 +96,8 @@ Four invariants every such change keeps, each with a test behind it:
 
 - **The installer never overwrites a file and is safe to re-run.** A re-run
   adds what is missing, except a path the adopter listed in
-  `.starter-kit-declined` (ADR-0014).
+  `.starter-kit-declined` (ADR-0014), and except `project-annotations.md`
+  beside a comments rule that was already there (ADR-0017).
 - **Every artifact lands for all four tools**, or the installer says why not.
 - **Bash and the Python standard library only.** No packages, no network.
 - **Python is never started by a fixed name.** A make target, a gate, a test,

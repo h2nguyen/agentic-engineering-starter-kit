@@ -1,0 +1,33 @@
+# Project Annotations
+
+The project's half of the comments-and-annotations rule. That rule is the
+kit's and is used as shipped; what only this project can say about it is here:
+what the rule's pointers stand for, and which marker shapes this project's own
+tooling reads. This file is the project's. A newer kit never replaces it.
+
+**Related:** RULE:comments-and-annotations
+
+## Pointers
+
+The rule and its worked examples name a decision record, a knowledge-base
+entry, a ticket and a gate by a pointer in angle brackets. Here is what each
+one is in this project.
+
+| Pointer | In this project |
+|---|---|
+| `<DECISION-RECORD-ID>` | <fill in: the identifier shape that make registry-list prints for decision records, or where this project records decisions> |
+| `<KB-ENTRY-ID>` | <fill in: the identifier shape that make registry-list prints for the debugging knowledge base> |
+| `<TICKET-ID>` | <fill in: the shape of a tracker reference, such as an issue number> |
+| `<tool-or-gate>` | <fill in: the gate that reads this project's markers, or make lint while only the kit's gates do> |
+| `<EVAL-RECORD-ID>` | <fill in: where evaluation evidence for prompts is recorded, or the word none> |
+
+## Protected shapes of this project
+
+A marker is anything a linter, a build step, a test runner, a template engine
+or a CI script matches on. One row per marker this project's own tooling reads
+out of comments; the kit's own markers are in the rule already.
+
+<fill in: delete this line once the table has a row, or replace it with the sentence that this project has none yet and adds a row when a tool starts reading a comment>
+
+| Kind | Shape, with an example | Read by |
+|---|---|---|

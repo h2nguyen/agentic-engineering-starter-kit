@@ -116,15 +116,16 @@ Create, at the locations your detected tool expects (Appendix A.1):
    in Appendix A.2. Every claim in it must be true today.
 2. **The universal rule files** — working principles (Appendix A.3) plus the
    documentation, comments-and-annotations and versioning-and-changelog
-   defaults (Appendix A.8) — project-agnostic, used verbatim. The
-   comments-and-annotations rule has two project-specific parts: fill the
-   second half of its protected-shapes table from the lint, test and CI tooling
-   found in Phase 1, and resolve its `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`,
-   `<TICKET-ID>` and `<tool-or-gate>` pointers to the identifier shapes and
-   gates this repo actually uses (`<EVAL-RECORD-ID>` too, if the repo keeps
-   prompt-evaluation evidence). The documentation rule's "Feedback to an
-   agent" section reads `.agent-feedback-authors`, which starts naming nobody:
-   ask the user whose feedback counts, and never infer it from the history.
+   defaults (Appendix A.8) — project-agnostic, used verbatim, the
+   comments-and-annotations rule included. Its project-specific half is a
+   file of the project's own beside it, `project-annotations.md` (the kit
+   installs a template; kit-less, write it): what the rule's
+   `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>`
+   and `<EVAL-RECORD-ID>` pointers stand for in this repo, and the marker
+   shapes its own lint, test and CI tooling reads, from Phase 1. The
+   documentation rule's "Feedback to an agent" section reads
+   `.agent-feedback-authors`, which starts naming nobody: ask the user whose
+   feedback counts, and never infer it from the history.
 3. **The debugging knowledge base** — per Appendix A.4 (graph-ready conventions
    included), empty except for the protocol header; the discipline starts now.
 4. **The shared-registry layer** — per Appendix A.9. Fragment directories for
@@ -201,6 +202,16 @@ Appendix A.7 — the sequence:
    the umbrella target never reaches is green and checks nothing. Never
    renumber an existing record to fit a convention; change the config to fit
    the record.
+   **Decisions that already live somewhere `init` cannot see** — a register
+   table in a document, a wiki, a tracker label — stay there. `init` declares
+   an `adr` registry whenever it finds no decision-record directory: delete
+   that registry from `registries.json`, say in the constitution where
+   decisions are recorded and how one is cited, and give that as
+   `<DECISION-RECORD-ID>` in `project-annotations.md`. The documentation
+   rule's ADR section steps back by its own wording when no `adr` registry is
+   declared; nothing in the rule needs overruling. Do not start `docs/adr/`
+   beside a register that works: two homes for decisions is the duplication
+   the ledger exists to prevent.
 6. **Plan → approval → apply.** Present the full change plan (including the
    ledger items each change touches) and wait for explicit approval before
    editing any pre-existing file. Apply as small, one-concern commits. Remediate
@@ -216,13 +227,14 @@ Appendix A.7 — the sequence:
 ## Phase 4 — Verify and hand off
 
 1. No leftover placeholders: search the new files for `<` markers. For the
-   constitution, where the kit is present, `make constitution` does this
-   search and exits non-zero until it is clean. The
-   comments-and-annotations rule is the one exception — its
-   `<DECISION-RECORD-ID>`, `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>` and
-   `<EVAL-RECORD-ID>` are pointers to resolve, and the other angle-bracket
-   tokens inside its examples are illustrative and stay; never rewrite its
-   examples to make the search come back empty.
+   constitution and `project-annotations.md`, where the kit is present,
+   `make constitution` does this search and exits non-zero until both are
+   clean. The comments-and-annotations rule and its reference are the
+   exception, and are not edited — their `<DECISION-RECORD-ID>`,
+   `<KB-ENTRY-ID>`, `<TICKET-ID>`, `<tool-or-gate>` and `<EVAL-RECORD-ID>` are
+   pointers that `project-annotations.md` resolves, and the other
+   angle-bracket tokens inside the examples are illustrative and stay; never
+   rewrite either file to make the search come back empty.
 2. Every command documented in the constitution has been executed successfully
    in this session.
 3. Every internal link in the new files resolves — `make constitution`
@@ -379,6 +391,7 @@ silent. Non-trivial scripts get their own tests.
 - **working-principles** — the five directives in A.3.
 - **documentation** — docs are part of the change (same-PR updates); >30-minute
   bugs become KB entries; cross-file design decisions become decision records
+  — in the register the project already keeps, where it has one, else as ADRs
   (Michael Nygard format: Status → Context → Decision → Consequences, with
   rejected options recorded inside Context as part of the forces; immutable once accepted,
   superseded by number); decision rationale is routed to the ADR, the KB entry

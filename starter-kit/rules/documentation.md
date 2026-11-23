@@ -14,7 +14,7 @@ as the project grows.
 | New feature | Feature doc (or README section) + CHANGELOG `[Unreleased]` bullet |
 | Behaviour or API change | The affected doc + CHANGELOG bullet |
 | Bug fix that took >30 min to diagnose | Debugging-KB entry + CHANGELOG `Fixed` bullet — both as fragment files |
-| Architectural decision (affects multiple files or future choices) | New ADR |
+| Architectural decision (affects multiple files or future choices) | New decision record — an ADR, or what this project keeps in its place (see below) |
 | New convention agents must follow | Rule file, started from `docs/agent-templates/_rule-template.md` — the imperative and its why, a WRONG/CORRECT pair, a litmus test, and a `Related:` line citing the incident or decision behind it — + constitution index line |
 | Documented rule violated anyway | Check script, started from `docs/agent-templates/check-convention.sh.template` — its header names the rule (`# Enforces: RULE:<name>`) — chained into the lint target. Then name the new rule or script on the `Related:` line of the incident that prompted it |
 | Same workflow walked through twice, or the same review comment on a second PR | Skill (or playbook) from `_skill-template.md`, reviewer agent (or review checklist) from `_agent-template.md`, both in `docs/agent-templates/` |
@@ -75,10 +75,18 @@ lives in `comments-and-annotations.md`; this rule only routes the rationale.
 
 ## ADR format (Michael Nygard)
 
-One file per decision under `docs/adr/`. Create it with
-`registry_tool.py new --registry adr --title "..."` so the filename matches the
-convention declared in `registries.json` — the tool derives the name, and a
-hand-typed one is how a file ends up outside the grammar the gate enforces.
+This section applies where `registries.json` declares an `adr` registry. A
+fresh install does; `make registry-list` shows it. **No `adr` registry** means
+this project records its decisions somewhere else: the constitution says where
+and in what form, the rest of this section does not apply, and the routing
+above still does — the rationale goes to that record, not into the artifact.
+
+One file per decision, under the directory the registry declares (`docs/adr/`
+on a fresh install). Create it with
+`./scripts/python.sh scripts/registry_tool.py new --registry adr --title "..."`
+so the filename matches the convention declared in `registries.json` — the
+tool derives the name, and a hand-typed one is how a file ends up outside the
+grammar the gate enforces.
 
 Two naming conventions ship, and `registries.json` says which one this
 repository uses — `make registry-list` prints the exact shape. The
@@ -180,7 +188,7 @@ and fails once it is stale.
 
 - [ ] Every behaviour change in this PR has its doc updated in this PR?
 - [ ] Any >30-min bug got its knowledge-base entry?
-- [ ] Any cross-file design choice got an ADR — not a long comment?
+- [ ] Any cross-file design choice got a decision record — not a long comment?
 - [ ] Anything renamed or deleted: every citer changed in this PR, and
       `make graph-links` green?
 - [ ] No decision narrative or third-party references in shipped source?

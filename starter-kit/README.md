@@ -63,8 +63,8 @@ the typed-link gate run
 (+ the prompt-enhancer, semver, registry-entry and registry-conflict-triage
 skills on Claude Code, and the hook that hands the typed links to the agent —
 [below](#the-workspace-graph-hook-claude-code)) to that tool's locations, and
-never overwrites existing files. Then: fill in the constitution's `<placeholders>` and the project rows of
-the comments-and-annotations rule
+never overwrites existing files. Then: fill in the constitution's `<placeholders>` and
+`project-annotations.md`, the project's half of the comments-and-annotations rule
 ([how](#adopting-the-comments-and-annotations-rule)), run `make constitution`
 until it stops naming placeholders and links to files that do not exist, run
 `make lint` to confirm the gates pass, enable further common skills from
@@ -79,7 +79,8 @@ until it stops naming placeholders and links to files that do not exist, run
 | `constitution.md.template` | `CLAUDE.md` / `AGENTS.md` / tool equivalent | Fill in every `<placeholder>` |
 | `rules/working-principles.md` | `.claude/rules/working-principles.md` | Use as-is (project-agnostic, incl. plan-first/QRSPI) |
 | `rules/documentation.md` | `.claude/rules/documentation.md` | Use as-is (docs-with-the-change, ADR format (Michael Nygard), where rationale lives) |
-| `rules/comments-and-annotations.md` | `.claude/rules/comments-and-annotations.md` | Fill in the project half of its protected-shapes table and its four `<placeholders>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule) |
+| `rules/comments-and-annotations.md` | `.claude/rules/comments-and-annotations.md` | Use as-is. Its pointers and your project's own marker shapes are resolved in the next file |
+| `rules/project-annotations.md.template` | `.claude/rules/project-annotations.md` | Yours: fill in every `<fill in: …>` — see [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule). First installs only; an upgrade creates it in step 3 |
 | `rules/reference/` | `docs/rule-reference/` | The worked examples of the comments rule and the gotchas of the registries rule — read on demand, never loaded. Same location for every tool |
 | `rules/versioning-and-changelog.md` | `.claude/rules/versioning-and-changelog.md` | Use as-is (SemVer + Keep-a-Changelog discipline) |
 | `rules/shared-registries.md` | `.claude/rules/shared-registries.md` | Use as-is (fragment layout, identifier schemes, merge behaviour) |
@@ -102,7 +103,7 @@ until it stops naming placeholders and links to files that do not exist, run
 | `scripts/feedback_tool.py` | `scripts/feedback_tool.py` | `make agent-feedback` — every `Agent-Feedback: <token> — <what and why>` line in the commit history (and, with `FROM=<file>`, in a JSON export of comments), grouped by the artifact it names, as JSON. A report for the next change to that artifact, never a gate. The convention is in the documentation rule § Feedback to an agent |
 | `agent-feedback-authors.template` | `.agent-feedback-authors` | Whose feedback counts: one commit email or comment login per line. **Ships naming nobody**, and the installer says so until you fill it in — until then every line is counted, but no one's text reaches the report |
 | `scripts/check-graph-links.sh` | `scripts/check-graph-links.sh` | Chained into `make lint`; fails when a typed link names an artifact that does not exist (guide § 3.12) |
-| `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist or still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
+| `scripts/check-constitution.sh` | `scripts/check-constitution.sh` | `make constitution` — fails while the constitution links to a file that does not exist, or it or `project-annotations.md` still has a template `<placeholder>` in it. **Not** chained into `make lint`: run it after filling the constitution in and after editing it, or add `constitution` to your `lint:` line to hold it on every pull request ([below](#the-constitution-check)) |
 | `scripts/tests/` | `scripts/tests/` | Unit tests, the coverage-gate and constitution-check tests, and the parallel-merge and typed-link acceptance tests — the target `registry-test`, which the installed Makefile chains into `make lint`; with a Makefile of your own, add `registry-test` to its `lint:` line to run them. The brownfield-adoption, bootstrap re-run, upgrade and hook suites test the installer and the Claude Code hook, so they stay in the kit |
 | `skills/registry-entry/SKILL.md` | `.claude/skills/registry-entry/SKILL.md` | Authoring a registry entry (installed by bootstrap on Claude Code) |
 | `skills/registry-conflict-triage/SKILL.md` | `.claude/skills/registry-conflict-triage/SKILL.md` | Escalation only — resolving a registry conflict |
@@ -130,10 +131,12 @@ until it stops naming placeholders and links to files that do not exist, run
 1. Run `bootstrap.sh` (or copy manually per the table above).
 2. Fill in the constitution: identity, stack table (including the infrastructure,
    auth, and messaging/integration rows), commands, and the 3–5 rules you already
-   know are non-negotiable. Then the project rows of the comments-and-annotations
-   rule — next section.
+   know are non-negotiable. Then `project-annotations.md`, the project's half
+   of the comments-and-annotations rule —
+   [how](#adopting-the-comments-and-annotations-rule).
 3. Run `make constitution`. It lists, by line, every template placeholder
-   still in the constitution and every link to a file that does not exist —
+   still in the constitution or in `project-annotations.md`, and every link
+   in the constitution to a file that does not exist —
    the template links two example rules, `testing.md` and `security.md`, that
    no install has. It passes when step 2 is really done; `make lint` does not
    look at either.
@@ -210,25 +213,46 @@ whichever version you started from. For why a file changed, search the kit's
    diff -q "$KIT"/starter-kit/agents/agent-coach.md .claude/agents/agent-coach.md
    diff -q "$KIT"/starter-kit/commands/ai-engineering-workspace-audit.md .claude/commands/ai-engineering-workspace-audit.md
    ```
-3. **Update the rule files — merge the one you filled in, copy the rest.**
-   List the rules that differ from the kit's:
+3. **Update the rule files.** List the rules that differ from the kit's:
    ```bash
    diff -rq "$KIT"/starter-kit/rules .claude/rules | grep '^Files'
    diff -rq "$KIT"/starter-kit/rules/reference docs/rule-reference | grep '^Files'
    ```
    (`docs/agent-rules/` in place of `.claude/rules/` on the other tools.)
-   - **`comments-and-annotations.md` is merged, never copied.** It carries
-     your project's rows and pointers — the ones
-     [Adopting the comments-and-annotations rule](#adopting-the-comments-and-annotations-rule)
-     had you fill in. Take the kit's file, then put your second table and your
-     pointers back; a copy would reset them to placeholders. Its reference
-     file, `docs/rule-reference/comments-and-annotations.md`, carries the same
-     pointers and gets the same values.
+   - **`comments-and-annotations.md`: move your rows out, once — or keep
+     merging it by hand.** Kits up to 3.0.1 had you fill a table and four
+     pointers inside this rule, so it could never be copied. Your half now
+     has a file of its own, `project-annotations.md`, and the rule is used as
+     shipped. The installer does not put that file beside a comments rule
+     that was already there — unfilled, it would be loaded into every
+     session.
+
+     *The move.* If you already have a `project-annotations.md`, there is
+     nothing to move: the file is yours and no step replaces it. Otherwise
+     create it — the command does nothing where the file exists:
      ```bash
-     diff -u .claude/rules/comments-and-annotations.md "$KIT"/starter-kit/rules/comments-and-annotations.md
+     [ -e .claude/rules/project-annotations.md ] || cp "$KIT"/starter-kit/rules/project-annotations.md.template .claude/rules/project-annotations.md
      ```
-     While you are there, re-read your own rows: they describe the project as
-     it was on the day of the install.
+     Then look at what you had filled in:
+     ```bash
+     diff -u "$KIT"/starter-kit/rules/comments-and-annotations.md .claude/rules/comments-and-annotations.md
+     ```
+     Among the lines the kit itself changed, the diff shows your rows and
+     pointer values: put each into `project-annotations.md`
+     ([how](#adopting-the-comments-and-annotations-rule)), re-reading them as
+     you go — they describe the project as it was on the day of the install.
+     Then copy the kit's `comments-and-annotations.md` over yours, and its
+     reference file over `docs/rule-reference/comments-and-annotations.md`;
+     if you had filled pointers into the reference, they are in your file now.
+     Run `make constitution`: it names every `<fill in: …>` still open. From
+     the next upgrade on, this rule is copied like the others. A line for
+     `project-annotations.md` in your constitution's rule index helps a
+     reader find it and is yours to add or leave: the rule names the file
+     either way.
+
+     *Not moving.* Your filled-in rule keeps working. Merge the kit's changes
+     into it by hand, as before, at this upgrade and the next; a copy would
+     reset your rows.
    - **The other rules are used as shipped**, so for one that no commit of
      yours has changed, copying the kit's file is the whole merge. One you
      did change is merged by hand, the same way.
@@ -294,6 +318,10 @@ it. The installer reports each as "declined" under "Skipped", and never
 writes to the list. The list is yours and states an intent — it is not a
 record of what is installed (the kit keeps none, ADR-0011 in its repository).
 
+One file is held back without being listed: `project-annotations.md`, where
+the comments rule it belongs to was already in the repository. That rule may
+carry your rows, and upgrade step 3 creates the file as part of moving them.
+
 Declining a file that other installed files depend on is yours to reconcile:
 a rule that a `Related:` line names makes `make graph-links` fail on that
 line, and a gate script that `registry.mk` runs makes its target fail. Both
@@ -306,7 +334,7 @@ say which file is missing.
 | `<file>:<line> — … link 'RULE:x' resolves to nothing` | A typed link names an artifact that was renamed, deleted or never written | Fix the citing line; the message lists the names that exist. `make graph-impact NODE=RULE:x` shows what cites an artifact *before* you rename it |
 | `check-<gate>.sh is installed but 'lint' never runs it` | Your own Makefile does not chain a gate the kit installed. All five are held: `registry-drift`, `registry-ids`, `kb-shape`, `graph-links`, `ci-lint-coverage` | Add the target the message names to the `lint:` prerequisites |
 | `more than one agentic tool is set up … no --tool was given` | The installer found the files of several agent tools and nobody to ask | Re-run with `--tool` naming the one to install for. Nothing was written |
-| `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
+| `link '…' names a file that does not exist` or `unfilled placeholder '<…>'` (`make constitution`) | The constitution points at a rule that was never written — the template's `testing.md` and `security.md` are examples — or it or `project-annotations.md` still has template text in it | Write the file, fix the link or delete the line; replace the placeholder or delete the row. Angle brackets that are meant to stay go in backticks |
 | `CHANGELOG.md is out of date with changelog.d/` | A fragment was added, or the generated file was edited by hand | `make registry-generate`, and commit the result with the fragment |
 | `still contains the template placeholder` | A fragment created by `registry_tool.py new` was not filled in | Fill in the fields, or delete the fragment |
 | `… is named by date, and this registry numbers its records` | A fragment was named `YYYY-MM-DD-<slug>.md` where `registries.json` declares `"id_scheme": "numeric"`. At width 4 it would be read as record number `<year>` | Rename it to the numbered form the message shows; `registry_tool.py new --registry <name> --title "…"` allocates the number. If the records really are date-named and the declaration is wrong — an install made before this was fixed — set `"id_scheme": "slug"` for that registry |
@@ -317,13 +345,14 @@ say which file is missing.
 ## The constitution check
 
 `make constitution` reads the constitution — `CLAUDE.md`, `AGENTS.md` or
-`.github/copilot-instructions.md`, whichever the repository has — and fails,
-with the file and line, on two things:
+`.github/copilot-instructions.md`, whichever the repository has — and
+`project-annotations.md` beside the rules, and fails, with the file and line,
+on two things:
 
 | It reports | For instance |
 |---|---|
 | A relative Markdown link to a file or directory that does not exist | The template's `testing.md` and `security.md` lines, left in a project that never wrote those rules; a rule that was renamed without its index line |
-| A template placeholder nobody filled in: `<…>` that opens with a letter and contains a space, outside code | `<Project Name>`, `<language, framework, versions>`, `<add one line per rule file …>` |
+| A template placeholder nobody filled in: `<…>` that opens with a letter and contains a space, outside code | `<Project Name>`, `<language, framework, versions>`, `<add one line per rule file …>`, and every `<fill in: …>` of `project-annotations.md` |
 
 `make lint` checks neither. The typed-link gate resolves `Related:`,
 `Enforces:` and `Hands off to:` lines, not ordinary links, so a constitution
@@ -333,8 +362,10 @@ check was written after.
 What it leaves alone, on purpose: anything inside a fenced block or
 `backticks` (`--title "<symptom>"`, `RULE:<name>`), HTML tags and comments,
 autolinks, a single word in angle brackets (`Option<T>`), web links — and
-every file that is not the constitution. Rule files and `docs/rule-reference/`
-are full of `<IDENTIFIER>` shapes that are the point of those documents.
+every other file. The rules the kit ships and `docs/rule-reference/` are full
+of `<IDENTIFIER>` shapes that are the point of those documents. The one file
+read beside the constitution is `project-annotations.md`, because it starts as
+a template the project fills in, like the constitution itself.
 
 It ships **unchained**: `lint` does not run it. A check that is on by default
 and can fail a constitution that passed yesterday is a breaking change for
@@ -385,14 +416,34 @@ hook formats are verified (ADR-0006 in the kit's repository).
 
 ## Adopting the comments-and-annotations rule
 
-The rule installs as-is and is complete except for the rows only your project
-can fill. Two things to do once, right after bootstrap:
+The rule is used as shipped: edit nothing in it. What only your project can
+say about it goes into a file of your own beside it, `project-annotations.md`
+(`.claude/rules/` on Claude Code, `docs/agent-rules/` on the other tools),
+which the installer leaves as a template. Fill in every `<fill in: …>` once,
+right after bootstrap; `make constitution` names the ones still open.
 
-1. **Fill the project half of its "Protected shapes" table.** The first table
-   is already filled with the markers the kit's own tooling parses. For the
-   second, grep your own tooling once for the tokens it reads out of comments
-   and list each one — a marker is anything a linter, a build step, a test
-   runner, a template engine or a CI script matches on:
+1. **The pointers.** The rule and its on-demand examples
+   (`docs/rule-reference/comments-and-annotations.md`) name a decision record,
+   a knowledge-base entry, a ticket and a gate by a pointer in angle brackets.
+   The first table of `project-annotations.md` says what each one is here:
+
+   | Pointer | Fill with |
+   |---|---|
+   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `make registry-list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered). No `adr` registry, because decisions are recorded elsewhere: say where, and how one is cited |
+   | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
+   | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
+   | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence. None of your own yet: `make lint`, which runs the kit's gates |
+   | `<EVAL-RECORD-ID>` | wherever your project records evaluation evidence for prompts, or "none" |
+
+   Write a shape exactly as `make registry-list` prints it, in backticks. The
+   date-slug form ends in `<slug>`, and that angle-bracket token is part of
+   the shape, not something left to fill.
+2. **The protected shapes of your project.** The rule's first table holds the
+   markers the kit's own tooling parses, its second the kinds a project adds.
+   Which of those your project has goes into the second table of
+   `project-annotations.md`. Grep your own tooling once for the tokens it
+   reads out of comments and list each one — a marker is anything a linter, a
+   build step, a test runner, a template engine or a CI script matches on:
 
    ```bash
    # once, from the repo root: which comment tokens does my tooling read?
@@ -402,40 +453,20 @@ can fill. Two things to do once, right after bootstrap:
    ```
 
    Adapt the pattern and the file names to the tools you actually run; the
-   point is the list, not the command. Every shape that turns up is configuration, not commentary,
-   and goes into the table with the gate that reads it in the last column. The
-   kit's own markers will be among the hits; they are in the first table
-   already. **Nothing of your own turns up:** that is a valid answer for a
-   project with no linter directives yet. The second table's rows are examples
-   of kinds, so leave them, and add one line under the table saying so —
-   "none yet; add a row when a tool starts reading a comment" — instead of
-   inventing a marker.
-2. **Resolve the pointers.** Four placeholders stay in the rule — and in its
-   on-demand examples, `docs/rule-reference/comments-and-annotations.md` — on purpose,
-   because their value belongs to the adopting project:
+   point is the list, not the command. Every shape that turns up is
+   configuration, not commentary, and gets a row with the gate that reads it
+   in the last column. The kit's own markers will be among the hits; they are
+   in the rule already. **Nothing of your own turns up:** that is a valid
+   answer for a project with no linter directives yet. Write the sentence the
+   template offers — none yet, a row is added when a tool starts reading a
+   comment — instead of inventing a marker.
 
-   | Placeholder | Fill with |
-   |---|---|
-   | `<DECISION-RECORD-ID>` | the identifier shape `registries.json` declares for decision records — `./scripts/python.sh scripts/registry_tool.py list` prints it (the date-slug form on a fresh install, MADR numbering where existing records are numbered) |
-   | `<KB-ENTRY-ID>` | the identifier shape it declares for the debugging knowledge base |
-   | `<TICKET-ID>` | your tracker's reference shape (an issue number, a ticket key). No tracker yet: use your hosting platform's issue-number shape (`#123`), so a TODO still names something that can exist |
-   | `<tool-or-gate>` | the lint gate that parses your markers, and any gate that checks front-matter presence. None of your own yet: `make lint`, which runs the kit's gates |
-
-   Write a shape exactly as `registry_tool.py list` prints it. The date-slug
-   form ends in `<slug>`, and that angle-bracket token is part of the shape,
-   not something left to fill.
-
-   `<EVAL-RECORD-ID>` appears in the reference file's prompt-file example and survivors
-   table: fill it with wherever your project records evaluation evidence for
-   prompts, or leave it if you keep none. `<product>`, `<vendor>`,
-   `<regulation>` and `<TIER>`, like the other angle-bracket tokens inside the
-   examples, are illustrative and need no filling — so a leftover-placeholder
-   grep for `<` will still hit this file after it is filled in; read the hits
-   rather than counting them.
-
-Nothing else in the file is project-specific. The rule is deliberately
-ungated — its enforcement section says why — so there is no script to wire
-into `make lint`.
+The rule and its reference keep their angle-bracket tokens: the pointers are
+notation that `project-annotations.md` resolves, and `<product>`, `<vendor>`,
+`<regulation>` and `<TIER>` inside the examples are illustrative. A
+leftover-placeholder grep for `<` therefore still hits both files; neither is
+yours to clean. The rule is deliberately ungated — its enforcement section
+says why — so there is no script to wire into `make lint`.
 
 ## Conventions the templates assume
 
