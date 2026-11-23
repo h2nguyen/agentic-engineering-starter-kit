@@ -1,0 +1,9 @@
+# A workflow file is not a CI run and a deferred trigger needs an observer
+
+## Changed
+
+- `check-ci-lint-coverage.sh` says what it read. Its `OK:` line is followed by "(Read from the workflow files — not that a run completed. 'gh run list --limit 5' shows whether one did.)". The gate reads the workflow files in your checkout and cannot see the hosting platform: it reported `OK` in every lint of a repository whose CI runs all ended within seconds, before their first step, while pull requests were merged unchecked. Its second success message now reads "every 'lint' sub-target is invoked by a CI workflow step" instead of "runs in CI".
+- The installer's first-install steps end with a step 5: after the first push, look at a completed CI run, then make `lint` a required status check on the default branch — and say in the handoff that CI is not confirmed, and why, until both are done. The installed workflow file carries the same note in its header, and the shared-registries rule gains "A CI step is not a CI run" beside "A Makefile target is not a CI step".
+- The setup prompt, the kit's `AGENTS.md` and both READMEs name the confirmed run and the required check as the end of a setup. Where the installing agent was not asked to push, the handoff says "CI not confirmed", never "CI green" from a workflow file.
+- The setup prompt and the guide give a test for anything deferred "until a signal": would the signal be noticed while the deferred artifact does not exist? "Add the check when the rule is violated" fails it when the check is the only thing that would notice. The handoff names the observer — a reviewer's checklist line, the recurring audit, a command that fails — or the artifact is not deferred.
+- These are texts and messages. The workflow file and the rule are yours after the install or arrive through upgrade steps 2 and 3; nothing fails in a repository that leaves them.

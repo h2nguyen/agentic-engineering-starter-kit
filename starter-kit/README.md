@@ -148,7 +148,11 @@ until it stops naming placeholders and links to files that do not exist, run
 5. Enable the generic skills worth having from day one — see
    [`skills/common-catalog.md`](skills/common-catalog.md) (semver decisions,
    architecture review, architecture docs).
-6. Commit. The setup is live.
+6. Commit and push, then look at the CI run (`gh run list --limit 5`): it has
+   to complete with success. A workflow file is not a run — one that ends
+   within seconds, before any step, checked nothing, and every local gate
+   stays green meanwhile. Then make `lint` a required status check on the
+   default branch. With both done, the setup is live.
 7. Grow by signal, not speculation: rules when you repeat an instruction, skills
    when you repeat a workflow, agents when you repeat a review comment,
    enforcement scripts when a documented rule gets violated anyway. See the

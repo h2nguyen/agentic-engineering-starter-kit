@@ -698,6 +698,12 @@ if [ "$RERUN" -eq 0 ]; then
   echo "  4. Grow by signal: the templates for a new rule, check script, skill and"
   echo "     reviewer are in docs/agent-templates/ — copy one when the signal appears"
   echo "     (the documentation rule's table says which, and what each must carry)."
+  echo "  5. After the first push, see CI run. A workflow file is not a run, and no local check"
+  echo "     can tell: 'gh run list --limit 5' must show a completed run of the lint workflow"
+  echo "     that succeeded. One that ends within seconds, before any step, checked nothing."
+  echo "     Then make 'lint' a required status check on the default branch, so that a pull"
+  echo "     request CI did not check cannot be merged. Until both are done, say in the handoff"
+  echo "     that CI is not confirmed, and why."
 fi
 if [ "$TOOL" = claude ] && [ -n "$BOUND" ]; then
   echo "  Load classes: a rule with a 'paths:' header loads when a matching file is read or"

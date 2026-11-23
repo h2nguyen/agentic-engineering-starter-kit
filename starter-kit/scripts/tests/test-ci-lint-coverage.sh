@@ -44,6 +44,21 @@ scenario "a comment mentioning the target does not satisfy the gate" 1 \
 scenario "invoking the aggregate target covers every sub-target" 0 \
   "$MAKEFILE" "${HEADER}      # a comment that also says make lint\n      - run: make lint\n"
 
+# The gate reads the workflow FILE. Its "OK" stood in every lint run of a
+# repository whose workflow had never completed a single run — each one ended
+# after seconds, before any step. What a file says and what ran are different
+# facts, and a message that reads as the second while checking the first is
+# how four pull requests were merged unchecked.
+dir="$(mktemp -d "$WORK/case.XXXXXX")"; mkdir -p "$dir/.github/workflows"; git -C "$dir" init -q -b main
+printf '%b' "$MAKEFILE" > "$dir/Makefile"
+printf '%b' "${HEADER}      - run: make lint\n" > "$dir/.github/workflows/lint.yml"
+out="$( cd "$dir" && "$GATE" 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ] && [[ "$out" == OK:* ]] && [[ "$out" == *"not that a run"* ]] && [[ "$out" == *"gh run list"* ]]; then
+  ok "a passing gate says what it read — the workflow file — and how to see whether a run completed"
+else
+  bad "the OK line claims coverage without saying a run is not checked (exit $rc): $(printf '%s' "$out" | head -2 | tr '\n' ' ')"
+fi
+
 scenario "enumerating every sub-target individually passes" 0 \
   "$MAKEFILE" "${HEADER}      - run: make alpha\n      - run: make beta\n"
 

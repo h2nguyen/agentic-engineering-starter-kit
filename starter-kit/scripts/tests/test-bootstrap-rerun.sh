@@ -96,6 +96,14 @@ grep -q 'Upgrading an existing install' "$WORK/run2.log" \
 ! grep -q "Fill in the constitution" "$WORK/run2.log" \
   && ok "and a re-run does not repeat the first-install steps" \
   || bad "a re-run tells a repository that has the kit to fill in the constitution again"
+# A workflow file is not a run. An install was "finished" with lint green and
+# every CI run aborted before its first step, on an unprotected default
+# branch. The installer cannot see a run; it can say that one has to be seen.
+grep -q 'gh run list' "$WORK/run1.log" && grep -qi 'required' "$WORK/run1.log" \
+  && ok "the next steps say to confirm a completed CI run after the first push, and to make lint a required check" \
+  || bad "a first install never says that CI has to be seen running, or that the default branch needs the check required"
+! grep -q 'gh run list' "$WORK/run2.log" \
+  && ok "and a re-run does not repeat it" || bad "a re-run repeats the first-install CI step"
 # An agent filling in the constitution keeps whatever the template shows. The
 # next steps have to say that an example with no counterpart is deleted.
 grep -qi 'delete' "$WORK/run1.log" \

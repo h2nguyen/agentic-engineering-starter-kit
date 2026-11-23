@@ -641,7 +641,7 @@ fi
 **Design rules**
 
 1. One script per convention; exit non-zero with a **`file:line` trail and a pointer to the rule** it enforces ("see `.claude/rules/database.md § Baseline Cutover`"). Its header names the same rule as a typed link — `# Enforces: RULE:database § Baseline Cutover` — which the link gate resolves (§3.12), so a renamed rule cannot leave its script pointing at nothing.
-2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR.
+2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR. Then look at a run: a workflow file that never completed one enforces nothing, and no local gate can see that. Make the check required on the default branch.
 3. Design the escape hatch: a greppable commit-message marker (`[sanctioned-exception]`) for the rare legitimate violation — logged in history forever, never silent.
 4. Non-trivial check scripts get their own unit tests.
 
@@ -938,6 +938,8 @@ The single habit that separates a living setup from a decorative one — run the
 | Agents mis-retrieve from a grown KB/rules corpus | Graph-driven retrieval (§5.6) — load a node's neighbourhood instead of whole files; the links are already typed, resolved and queryable |
 
 The "same PR" clause matters: the author of the fix is the only one who knows what to write, and the knowledge decays within days.
+
+Every row needs an observer: someone or something that sees the left-hand side happen. That is the test for anything you defer with a trigger — *would the trigger be noticed while the deferred artifact does not exist?* "Add the check when the rule is violated" fails it when the check is the only thing that would notice a violation: nothing turns red, so the trigger never fires. Name the observer (a reviewer's checklist line, the recurring audit, a command that fails) or do not defer.
 
 ### 5.2 Workspace audits
 

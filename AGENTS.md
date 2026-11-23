@@ -92,16 +92,24 @@ usually starts, so a command that leaves the path out writes here.
    line and the fix;
    [Troubleshooting](starter-kit/README.md#troubleshooting) lists the common ones.
 9. **Commit on the branch.** Do not push or open a pull request unless asked.
+   If you are asked to push, look at the CI run that follows
+   (`gh run list --limit 5`): it must complete with success. A workflow file
+   is not a run, and no gate in `make lint` can tell the difference.
    Do not copy `starter-kit/` into the project; if a copy is there, leave it
    out of the commit. The install itself needs no changelog fragment: the
    project's changelog describes the project, not its agent workspace.
 10. **Report** which kit was installed (the installer's `Kit:` line — nothing
     in the project records it), what was installed, what you filled in and
-    what each fact came from, what you guessed and want confirmed, and what
-    the kit deliberately defers until the project shows a need for it. On
-    Claude Code, say which rules are bound to which paths, and that what
-    really loads has to be checked in a new session with the
-    `rule-load-check` skill: this session cannot see the rules it installed.
+    what each fact came from, and what you guessed and want confirmed. Then:
+    - what the kit deliberately defers until the project shows a need for it,
+      each with a signal that someone or something will notice while the
+      deferred artifact does not exist;
+    - whether a CI run was seen to succeed, or that CI is not confirmed and
+      why (nothing was pushed), and that the default branch needs `lint` as a
+      required status check;
+    - on Claude Code, which rules are bound to which paths, and that what
+      really loads has to be checked in a new session with the
+      `rule-load-check` skill: this session cannot see the rules it installed.
 
 Stop and ask the user, instead of deciding yourself, when: the tool is
 unknown, or the target has more than one; the target already has an agent workspace; a command you were going

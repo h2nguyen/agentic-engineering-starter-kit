@@ -58,6 +58,9 @@ installs runs on `ubuntu-latest`.
    gates and no `FAIL`. If your repository already had a Makefile, the
    installer left it alone and printed the two lines to add.
 4. Commit on a feature branch.
+5. After the first push, look at the CI run: it has to complete with success.
+   A workflow file is not a run, and `make lint` cannot tell the difference.
+   Then make `lint` a required status check on your default branch.
 
 Later, once the workspace has real mass, `--with-meta` adds the Level-4
 self-improvement loop. To move an existing install to a newer kit, see
