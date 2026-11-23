@@ -225,6 +225,37 @@ OUT="$(printf '%s' "$event" | ( unset CLAUDE_PROJECT_DIR; WORKSPACE_GRAPH_HOOK_D
   && ok "without \$CLAUDE_PROJECT_DIR it is silent, and the debug line names the hook's own location as the cause" \
   || bad "no project known: out=$OUT, debug=$(cat "$WORK/err")"
 
+echo "=== a project that keeps the graph tool elsewhere names it with --tool ==="
+# The hook runs scripts/graph_tool.py. A repository that keeps the tool under
+# another directory — the kit's own does, under starter-kit/ — had a hook that
+# found nothing and stayed silent. --tool names the path, inside the project.
+R2="$WORK/elsewhere"; cp -R "$R" "$R2"; mkdir -p "$R2/kit"
+mv "$R2/scripts/graph_tool.py" "$R2/scripts/registry_tool.py" "$R2/kit/"
+elsewhere_event="$(printf '{"session_id":"t1","cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$R2" "$R2/.claude/rules/testing.md")"
+OUT="$(printf '%s' "$elsewhere_event" | CLAUDE_PROJECT_DIR="$R2" WORKSPACE_GRAPH_HOOK_DEBUG=1 "$PY" "$R2/.claude/hooks/workspace-graph.py" post-edit 2>"$WORK/err")"
+[ -z "$OUT" ] && grep -q 'has no scripts' "$WORK/err" \
+  && ok "control — with the tool moved and no --tool, the hook finds nothing and is silent" \
+  || bad "control: the hook spoke without a graph tool where it looks: $OUT"
+OUT="$(printf '%s' "$elsewhere_event" | CLAUDE_PROJECT_DIR="$R2" "$PY" "$R2/.claude/hooks/workspace-graph.py" post-edit --tool kit/graph_tool.py 2>/dev/null)"
+case "$(field "$OUT" hookSpecificOutput.additionalContext)" in
+  *scripts/check-tests.sh:2*) ok "--tool kit/graph_tool.py runs the tool where the project keeps it" ;;
+  *) bad "--tool did not make the hook find the tool: $OUT" ;;
+esac
+# The path is the project's own file or nothing: not an absolute path, not one
+# that leaves the checkout, not a link that does. Each sentinel leaves a mark
+# if it is ever started.
+OUTSIDE="$WORK/outside-tool"; mkdir -p "$OUTSIDE"
+printf 'import pathlib, sys\npathlib.Path(r"%s/RAN").write_text("ran")\nsys.exit(0)\n' "$OUTSIDE" > "$OUTSIDE/graph_tool.py"
+ln -s "$OUTSIDE/graph_tool.py" "$R2/kit/linked_tool.py" 2>/dev/null || cp "$OUTSIDE/graph_tool.py" "$R2/kit/linked_tool.py"
+for candidate in "$OUTSIDE/graph_tool.py" "../outside-tool/graph_tool.py" "kit/linked_tool.py" "kit/missing.py"; do
+  [ -L "$R2/kit/linked_tool.py" ] || [ "$candidate" != "kit/linked_tool.py" ] || continue
+  OUT="$(printf '%s' "$elsewhere_event" | sed 's/t1/t2/' | CLAUDE_PROJECT_DIR="$R2" "$PY" "$R2/.claude/hooks/workspace-graph.py" post-edit --tool "$candidate" 2>/dev/null)"; rc=$?
+  [ "$rc" -eq 0 ] && [ -z "$OUT" ] && [ ! -e "$OUTSIDE/RAN" ] \
+    && ok "--tool ${candidate#"$WORK"/} is refused in silence, and nothing outside the project is run" \
+    || bad "--tool ${candidate#"$WORK"/} was accepted (rc=$rc, ran=$([ -e "$OUTSIDE/RAN" ] && echo yes || echo no)): $OUT"
+  rm -f "$OUTSIDE/RAN"
+done
+
 echo "=== a git that predates --path-format ==="
 # git before 2.31 does not know --path-format and does not reject it either:
 # rev-parse echoes the option and exits 0. The shim behaves that way.

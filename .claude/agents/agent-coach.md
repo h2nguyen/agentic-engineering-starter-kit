@@ -1,0 +1,1 @@
+../../starter-kit/agents/agent-coach.md

@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/starter-kit/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/starter-kit/hooks/workspace-graph.py post-edit --tool starter-kit/scripts/graph_tool.py",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/starter-kit/scripts/python.sh \"$CLAUDE_PROJECT_DIR\"/starter-kit/hooks/workspace-graph.py stop --tool starter-kit/scripts/graph_tool.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

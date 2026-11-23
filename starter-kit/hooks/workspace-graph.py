@@ -32,6 +32,12 @@ the project itself or one of its worktrees. A file in any other repository,
 a submodule included, is never handed to that repository's graph tool, which
 is code nobody here reviewed (ADR-0012).
 
+The tool it runs is scripts/graph_tool.py of that checkout. A project that
+keeps the tool somewhere else names it after the event: `… post-edit --tool
+tools/kit/graph_tool.py`. The path is relative to the checkout and has to stay
+inside it — an absolute path, one that leaves the checkout, or a link that
+does, is refused in silence like any other reason not to run.
+
 Registered in .claude/settings.json, where it is started through
 scripts/python.sh — Python under whatever name the machine gives it — and
 never as `python3 …`. To switch it off for a run, set
@@ -51,6 +57,7 @@ import tempfile
 import time
 
 TOOL = os.path.join("scripts", "graph_tool.py")
+TOOL_OVERRIDE = None       # --tool <path relative to the checkout>, from the registered command
 TOOL_TIMEOUT = 15          # seconds; the graph is rebuilt in well under one
 MARKS_KEPT_FOR = 2 * 86400  # seconds; a session's marks outlive it by two days
 REASON_LINES = 40
@@ -105,10 +112,26 @@ def repository(start):
     if common_dir(start) != own:
         debug(f"{root} is not this project or one of its worktrees")
         return None
-    if not os.path.isfile(os.path.join(root, TOOL)):
-        debug(f"{root} has no {TOOL}")
+    if tool_in(root) is None:
         return None
     return root
+
+
+def tool_in(root):
+    """The graph tool of the checkout `root`, as a path relative to it — else None."""
+    if TOOL_OVERRIDE is None:
+        if not os.path.isfile(os.path.join(root, TOOL)):
+            debug(f"{root} has no {TOOL}")
+            return None
+        return TOOL
+    # A path named in the registered command is still the project's own file
+    # (ADR-0012): relative, and after links are followed, inside the checkout.
+    base = os.path.realpath(root)
+    full = os.path.realpath(os.path.join(base, TOOL_OVERRIDE))
+    if os.path.isabs(TOOL_OVERRIDE) or os.path.commonpath([base, full]) != base or not os.path.isfile(full):
+        debug(f"--tool {TOOL_OVERRIDE} is not a file inside {root}")
+        return None
+    return TOOL_OVERRIDE
 
 
 def graph_tool(root, *argv):
@@ -117,7 +140,7 @@ def graph_tool(root, *argv):
     # works here, whatever it is called. UTF-8 both ways: the tool prints
     # dashes and arrows, which a Windows code page cannot encode.
     return subprocess.run(
-        [sys.executable, "-B", TOOL, *argv],
+        [sys.executable, "-B", tool_in(root), *argv],
         cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
         timeout=TOOL_TIMEOUT,
         env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONUTF8="1"),
@@ -213,6 +236,9 @@ def main():
     if os.environ.get("WORKSPACE_GRAPH_HOOK", "").lower() in ("off", "0", "false", "no"):
         return 0
     handler = {"post-edit": post_edit, "stop": stop}.get(sys.argv[1] if len(sys.argv) > 1 else "")
+    global TOOL_OVERRIDE
+    if len(sys.argv) > 3 and sys.argv[2] == "--tool":
+        TOOL_OVERRIDE = sys.argv[3]
     try:
         event = json.load(sys.stdin)
         if handler is not None and isinstance(event, dict):

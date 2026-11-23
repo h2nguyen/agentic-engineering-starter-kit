@@ -497,6 +497,7 @@ nothing. A submodule that carries the kit keeps its own `make lint` as the gate.
 | Remove it | Delete the `PostToolUse` and `Stop` entries that name `workspace-graph.py` from `.claude/settings.json` |
 | See why it said nothing | `WORKSPACE_GRAPH_HOOK_DEBUG=1`; the reason goes to the hook's stderr |
 | Run it on a machine where Python is not `python3` | Nothing: both entries start it through `scripts/python.sh` |
+| Use it where the kit's scripts are not in `scripts/` | Add `--tool <path to graph_tool.py>` after the event in both entries: `… workspace-graph.py post-edit --tool tools/kit/graph_tool.py`. The path is relative to the repository and must stay inside it |
 | Add it to a repository installed before it existed | Re-run `bootstrap.sh`: it adds the hook file and prints the two entries to put in your `settings.json`, which it never edits |
 
 Claude Code asks you to approve an edit to a file under `.claude/` — a rule,

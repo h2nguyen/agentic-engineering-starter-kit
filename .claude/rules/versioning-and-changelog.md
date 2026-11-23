@@ -1,0 +1,1 @@
+../../starter-kit/rules/versioning-and-changelog.md
