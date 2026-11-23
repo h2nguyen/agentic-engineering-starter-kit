@@ -274,6 +274,45 @@ for tool in claude copilot; do
   fi
 done
 
+echo "=== the coach runs on an API key, or else on a Claude subscription (ADR-0026) ==="
+# The decision step of the installed workflow, run as the runner would run it
+# with each combination of the two secrets. API key first; the subscription
+# token only where there is no key; and neither without the coach's file.
+W="$WORK/schedule-claude/.github/workflows/agent-feedback.yml"
+"$PY" -B - "$W" > "$WORK/coach-step.sh" <<'PY2'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"- name: Is the coach configured\?\n(?:.*\n)*?\s+run: \|\n((?:(?: {10}.*)?\n)+)", text)
+sys.stdout.write("".join(l[10:] if l.strip() else "\n" for l in m.group(1).splitlines(True)) if m else "exit 99\n")
+PY2
+mkdir -p "$WORK/coach-here/.claude/agents" "$WORK/coach-empty"; : > "$WORK/coach-here/.claude/agents/agent-coach.md"
+coach_decision() { # $1 = has api key, $2 = has oauth token, $3 = directory: prints "run=… auth=…"
+  : > "$WORK/coach-out"
+  ( cd "$3" && HAS_API_KEY="$1" HAS_OAUTH_TOKEN="$2" COACH_AGENT=.claude/agents/agent-coach.md \
+      GITHUB_OUTPUT="$WORK/coach-out" bash -e "$WORK/coach-step.sh" > "$WORK/coach-log" 2>&1 )
+  printf 'run=%s auth=%s' "$(sed -n 's/^run=//p' "$WORK/coach-out")" "$(sed -n 's/^auth=//p' "$WORK/coach-out")"
+}
+[ "$(coach_decision true false "$WORK/coach-here")" = "run=true auth=api-key" ] \
+  && ok "with an API key the coach runs on it" || bad "API key only: $(coach_decision true false "$WORK/coach-here")"
+[ "$(coach_decision false true "$WORK/coach-here")" = "run=true auth=subscription" ] \
+  && grep -q 'subscription' "$WORK/coach-log" \
+  && ok "with no API key and a subscription token, the coach runs on the subscription, and the log says so" \
+  || bad "subscription token only: $(coach_decision false true "$WORK/coach-here") / $(head -1 "$WORK/coach-log")"
+[ "$(coach_decision true true "$WORK/coach-here")" = "run=true auth=api-key" ] \
+  && ok "control — with both, the API key wins" || bad "both secrets: $(coach_decision true true "$WORK/coach-here")"
+[ "$(coach_decision false false "$WORK/coach-here")" = "run=false auth=" ] \
+  && grep -q 'CLAUDE_CODE_OAUTH_TOKEN' "$WORK/coach-log" && grep -q 'ANTHROPIC_API_KEY' "$WORK/coach-log" \
+  && ok "with neither, the coach is skipped and the log names both secrets" \
+  || bad "no secret: $(coach_decision false false "$WORK/coach-here") / $(head -1 "$WORK/coach-log")"
+[ "$(coach_decision true true "$WORK/coach-empty")" = "run=false auth=" ] \
+  && ok "control — without the coach's file nothing runs, whatever the secrets" \
+  || bad "no coach file: $(coach_decision true true "$WORK/coach-empty")"
+# The action gets exactly the credential the step chose, and never the other.
+grep -q "anthropic_api_key: \${{ steps.coach.outputs.auth == 'api-key' && secrets.ANTHROPIC_API_KEY || '' }}" "$W" \
+  && grep -q "claude_code_oauth_token: \${{ steps.coach.outputs.auth == 'subscription' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}" "$W" \
+  && ok "the action step passes only the credential the decision chose" \
+  || bad "the action step passes a credential the decision did not choose, or none"
+
 echo "=== the installer says which kit it is ==="
 # The run says which kit it is, and a first install records the same in
 # .starter-kit-version (ADR-0024; test-kit-status.sh holds the record).
