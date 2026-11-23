@@ -81,7 +81,7 @@ jobs:
             echo "- The upgrade: \"Upgrading an existing install\" in the kit's \`starter-kit/README.md\`. Its last step, \`kit-status.sh --record\`, updates the record; this issue can be closed then."
           } > notice.md
           gh label create "$NOTICE_LABEL" --force --description "A newer starter kit is available" >/dev/null
-          open="$(gh issue list --label "$NOTICE_LABEL" --state open --json number,title --jq '.[0] | "\(.number)\t\(.title)"')"
+          open="$(gh issue list --label "$NOTICE_LABEL" --state open --json number,title --jq '.[0] // empty | "\(.number)\t\(.title)"')"
           if [ -z "$open" ]; then
             gh issue create --title "$title" --label "$NOTICE_LABEL" --body-file notice.md
           elif [ "${open#*$'\t'}" != "$title" ]; then

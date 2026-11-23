@@ -279,16 +279,21 @@ def files_of(root):
 
 
 def content(path, rule):
-    """A file's bytes. A rule is its text: on Claude Code it may carry a
-    `paths:` header the installer or the adopter wrote, which is not the kit's."""
+    """A file's text, with LF line endings: a checkout with CRLF (Git Bash)
+    holds the same text. A rule is its text under its header: on Claude Code
+    it may carry a `paths:` header the installer or the adopter wrote, which
+    is not the kit's. A file with a NUL byte is compared as it is."""
     try:
         with open(path, "rb") as handle:
             data = handle.read()
     except OSError:
         return None
+    if b"\0" in data:
+        return data
+    data = data.replace(b"\r\n", b"\n")
     if not rule:
         return data
-    lines = data.replace(b"\r\n", b"\n").split(b"\n")
+    lines = data.split(b"\n")
     if lines and lines[0] == b"---" and b"---" in lines[1:]:
         lines = lines[lines.index(b"---", 1) + 1:]
         if lines and lines[0] == b"":
@@ -363,9 +368,11 @@ def another_releases(bench, target, tool, paths, skip=()):
 
 # --- the comparison ---------------------------------------------------------------
 
-def classify(target, tool, available, recorded, listed):
-    """Every file of the kit's, in one class."""
-    classes = {"current": [], "older": [], "changed": [], "missing": [], "declined": [],
+def classify(target, tool, available, recorded, listed, verifiable=True):
+    """Every file of the kit's, in one class. Without the recorded kit to
+    compare with (`verifiable` false), a file that is not this kit's cannot
+    be told apart as older or the adopter's, and is said to differ."""
+    classes = {"current": [], "older": [], "changed": [], "differs": [], "missing": [], "declined": [],
                "retired": [], "unclassified": [], "ahead": []}
     for rel in files_of(available):
         if not owned(rel, tool):
@@ -381,6 +388,8 @@ def classify(target, tool, available, recorded, listed):
                 classes["ahead"].append(rel)
         elif recorded and recorded != available and same(target, recorded, rel, tool):
             classes["older"].append(rel)
+        elif not verifiable:
+            classes["differs"].append(rel)
         else:
             classes["changed"].append(rel)
     if recorded and recorded != available:
@@ -544,6 +553,7 @@ def report(target, tool, record, bench, available, available_version, head, dirt
             print("checkout, or a shallow one). After the upgrade steps, --record writes the record.")
     elif recorded is None:
         holds = None
+        classes = classify(target, tool, available, None, listed, verifiable=False)
         print("\nThe record cannot be checked here: commit %s is not in this kit checkout%s." % (
             base_commit[:12] or "unknown",
             "" if checkout else " (it is not a git checkout)"))
@@ -560,7 +570,7 @@ def report(target, tool, record, bench, available, available_version, head, dirt
             print("    %s --record --as %s" % (os.path.join(KIT_DIR, "kit-status.sh"), most_common(foreign)))
             for rel in sorted(foreign):
                 print("    %s — %s" % (rel, foreign[rel]))
-    differing = classes["older"] + classes["changed"]
+    differing = classes["older"] + classes["changed"] + classes["differs"]
     if dirty:
         print("\nNote: this kit checkout has uncommitted changes under starter-kit/. \"This kit\" below is the")
         print("checkout as it is on disk, not its commit.")
@@ -577,9 +587,12 @@ def report(target, tool, record, bench, available, available_version, head, dirt
     elif older_kit:
         print("Verdict: this kit checkout is OLDER than what the repository records. Update the checkout")
         print("(git -C %s pull), then run this again." % KIT_ROOT)
-    elif same_kit or (recorded is not None and not classes["older"] and not classes["ahead"]
-                      and base_version == available_version and not classes["missing"]):
+    elif (same_kit or (recorded is not None and not classes["ahead"] and base_version == available_version)) \
+            and not classes["older"] and not classes["missing"] and not classes["differs"]:
         print("Verdict: up to date — this repository records the kit you are comparing with.")
+    elif same_kit:
+        print("Verdict: this repository records the kit you are comparing with, but not all of its files are")
+        print("that kit's: see 'missing' and 'older kit's' below. The installer adds what is missing.")
     elif classes["ahead"] and classes["older"]:
         print("Verdict: PARTIAL upgrade — %d of the kit's files here are already this kit's, %d are still the" % (
             len(classes["ahead"]), len(classes["older"])))
@@ -601,12 +614,13 @@ def report(target, tool, record, bench, available, available_version, head, dirt
     print("  current (%d)" % len(classes["current"]))
     list_class("older kit's", "as the recorded kit shipped them; the upgrade steps replace these", classes["older"])
     list_class("changed here", "neither kit's text: yours to merge by hand, or to keep", classes["changed"])
+    list_class("differs", "not this kit's text; without the recorded kit, not known to be yours or older", classes["differs"])
     list_class("missing", "the installer adds these, unless you list them in " + DECLINE_LIST, classes["missing"])
     list_class("declined", "listed in " + DECLINE_LIST, classes["declined"])
     list_class("retired", "the recorded kit shipped these and this one does not", classes["retired"])
     list_class("unclassified", "a defect in the kit: tell its maintainers", classes["unclassified"])
 
-    if not same_kit and not older_kit and (differing or classes["missing"] or holds is False or record is None):
+    if not older_kit and (classes["missing"] or (not same_kit and (differing or holds is False or record is None))):
         print("\nNext: the steps under 'Upgrading an existing install' in %s," % os.path.join(KIT_DIR, "README.md"))
         print("then  %s --record  — it writes the record once no file is still the older kit's." % (
             os.path.join(KIT_DIR, "kit-status.sh")))
@@ -639,9 +653,9 @@ def record_it(args, target, tool, record, bench, available, available_version, h
     foreign = another_releases(bench, target, tool, classes["changed"], skip=(commit,)) if checkout else {}
     if foreign:
         problems = True
-        print("Not recorded: %d of the kit's files here are still the text of an older release, not of" % len(foreign))
-        print("%s. The upgrade is not finished — steps 2 and 3 replace them. (To record the release" % label)
-        print("the files are instead:  %s --record --as %s)" % (
+        print("Not recorded: %d of the kit's files here are the text of another release, not of" % len(foreign))
+        print("%s. Bring them over (upgrade steps 2 and 3), or, to record the release" % label)
+        print("most of them are:  %s --record --as %s" % (
             os.path.join(KIT_DIR, "kit-status.sh"), most_common(foreign)))
         for rel in sorted(foreign):
             print("    %s — %s" % (rel, foreign[rel]))

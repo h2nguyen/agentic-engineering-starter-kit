@@ -799,6 +799,27 @@ elif ! declined "$NOTICE_WORKFLOW"; then
   echo "     Optional: a weekly check for a newer kit, as an issue when there is one — re-run with"
   echo "     --with-upgrade-notice to add it. Offline, at any time: make kit-status KIT=<kit checkout>."
 fi
+if [ "$RERUN" -eq 0 ] && [ -f "$TARGET/$VERSION_RECORD" ] && [ ${#SKIPPED[@]} -gt 0 ]; then
+  # Kit files that were here before the install stay the project's, and the
+  # record does not make them the kit's: kit-status lists them as changed here.
+  _kept_kit=""
+  for _s in "${SKIPPED[@]}"; do
+    case "$_s" in
+      *"already exists"*)
+        _p="${_s%% (*}"
+        case "$_p" in
+          scripts/*.py|scripts/check-*.sh|scripts/python.sh|scripts/tests/*|registry.mk|docs/agent-templates/*|docs/rule-reference/*|.claude/hooks/workspace-graph.py|.claude/skills/*|.claude/agents/agent-coach.md|.claude/commands/ai-engineering-workspace-audit.md|"$RULES_DIR"/*.md)
+            [ "$_p" = "$RULES_DIR/project-annotations.md" ] || _kept_kit="$_kept_kit $_p" ;;
+        esac ;;
+    esac
+  done
+  if [ -n "$_kept_kit" ]; then
+    echo "     $VERSION_RECORD names kit $KIT_RELEASE, but these kit files that were already here are"
+    echo "     yours, not the kit's — 'kit-status.sh' lists them as changed here:"
+    for _p in $_kept_kit; do echo "         $_p"; done
+    echo "     Merge the kit's version into each by hand if you want it."
+  fi
+fi
 if [ "$RECORD_NOTE" = unknown-kit ]; then
   echo "     $VERSION_RECORD was not written: this starter-kit/ is a copy without the kit's"
   echo "     CHANGELOG.md, so it cannot say which release it is. Install from a checkout of the kit"

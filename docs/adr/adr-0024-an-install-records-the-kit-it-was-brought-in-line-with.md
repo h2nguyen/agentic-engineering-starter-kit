@@ -74,6 +74,13 @@ We will record, in `.starter-kit-version` at the root of the target, the kit
 an install was brought in line with: the last release in the kit's changelog,
 the kit's commit, and the agent tool. On every tool.
 
+**It ships on day 1.** A record can be written truthfully only when the files
+are known to be the kit's: at the install, or at the end of an upgrade that
+`kit-status.sh` has checked. An install made while waiting for a signal has no
+record, and its version can afterwards only be estimated from its files — the
+signal, an adopter who needs to know, arrives exactly when the record can no
+longer be made exact.
+
 **Two things write it.** `bootstrap.sh`, on a first install. And
 `kit-status.sh --record`, the last step of an upgrade. A re-run of the
 installer never changes it — it adds files and upgrades none — and gives an
@@ -150,7 +157,9 @@ that the record could not be checked. It runs an installer per release it
 compares with — about half a second each, the twelve newest at most — when
 files match neither kit.
 
-**Not prevented.** A file the adopter changed and never merged with the
+**Not prevented.** A first install beside kit files the project already had
+records the kit all the same; the installer names those files, and the report
+lists them as changed here. A file the adopter changed and never merged with the
 kit's later changes is "changed here" before and after; the record accepts
 it, and only a person reading the diff knows whether the merge was done. A
 file kept at an older release's text on purpose blocks `--record` until it is

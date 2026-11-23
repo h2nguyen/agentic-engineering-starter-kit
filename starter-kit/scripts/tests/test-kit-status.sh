@@ -228,6 +228,50 @@ out="$( cd "$R3" && make -s kit-status KIT="$K" 2>&1 )"
 printf '%s\n' "$out" | grep '^Available: *9\.1\.0' >/dev/null \
   && ok "'make kit-status KIT=<checkout>' runs the kit's report" || bad "'make kit-status KIT=…' does not run the report"
 
+echo "=== what the report and --record say at the edges ==="
+R6="$WORK/edges"; fresh_repo "$R6"
+"$K/starter-kit/bootstrap.sh" --tool claude --target "$R6" >/dev/null 2>&1 < /dev/null; commit_all "$R6" "install 9.1.0"
+out="$("$STATUS" --target "$R6" 2>&1)"
+q -i 'up to date' <<< "$out" && ok "control — a fresh install of the checkout's own commit is up to date" || bad "a fresh install is not up to date"
+# A kit file checked out with CRLF line endings is the same text.
+f="$R6/scripts/check-registry-ids.sh"; sed $'s/$/\r/' "$f" > "$f.crlf" && mv "$f.crlf" "$f"
+out="$("$STATUS" --target "$R6" 2>&1)"
+[ -z "$(class "$out" "changed here")" ] \
+  && ok "a kit script checked out with CRLF line endings is the kit's text, not changed here" \
+  || bad "a CRLF checkout of a kit script is reported as: $(class "$out" "changed here" | tr '\n' ' ')"
+git -C "$R6" checkout -q -- .
+# A kit file deleted without declining it: not up to date.
+mv "$R6/.claude/skills/semver" "$WORK/semver-aside"
+out="$("$STATUS" --target "$R6" 2>&1)"
+! q -i 'up to date' <<< "$out" && class "$out" "missing" | q 'semver/SKILL.md' \
+  && ok "with a kit skill deleted and not declined, the verdict is not 'up to date', and the skill is missing" \
+  || bad "a missing kit file still reads as up to date: $(printf '%s\n' "$out" | grep '^Verdict')"
+mv "$WORK/semver-aside" "$R6/.claude/skills/semver"
+# A record whose commit this checkout does not have: differences are not the adopter's.
+printf 'version: 9.0.0\ncommit: %s\ntool: claude\n' 0123456789abcdef0123456789abcdef01234567 > "$R6/$RECORD"
+cp "$K0/starter-kit/scripts/graph_tool.py" "$R6/scripts/graph_tool.py"
+out="$("$STATUS" --target "$R6" 2>&1)"
+q 'cannot be checked' <<< "$out" && [ -z "$(class "$out" "changed here")" ] && class "$out" "differs" | q 'scripts/graph_tool.py' \
+  && ok "with a record this checkout cannot verify, a differing file is 'differs from this kit', not 'changed here'" \
+  || bad "an unverifiable record attributes differences to the adopter: $(printf '%s\n' "$out" | grep '^  [a-z]' | tr '\n' '|')"
+git -C "$R6" checkout -q -- .
+# --record --as an older release, over files some of which are a newer one's.
+cp "$K0/starter-kit/scripts/check-registry-ids.sh" "$R6/scripts/"
+"$STATUS" --target "$R6" --record --as v9.0.0 > "$WORK/edges-as.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ! q 'older release' "$WORK/edges-as.log" && q 'v9.1.0' "$WORK/edges-as.log" \
+  && ok "--record --as an older release refuses over a newer release's files, and names that release without calling it older" \
+  || bad "--record --as v9.0.0 over 9.1.0 files (exit $rc): $(head -2 "$WORK/edges-as.log" | tr '\n' ' ' | cut -c1-200)"
+git -C "$R6" checkout -q -- .
+
+echo "=== a first install beside files of the project's own ==="
+R7="$WORK/brownfield"; fresh_repo "$R7"
+mkdir -p "$R7/.claude/rules"; printf '# Documentation, our way\n' > "$R7/.claude/rules/documentation.md"
+"$K/starter-kit/bootstrap.sh" --tool claude --target "$R7" > "$WORK/brownfield.log" 2>&1 < /dev/null
+[ "$(field "$R7" version)" = 9.1.0 ] \
+  && sed -n '/kit files that were already here/,/^  [0-9]/p' "$WORK/brownfield.log" | q '^ *\.claude/rules/documentation\.md$' \
+  && ok "the record is written, and the run names the kit file it kept as yours and that kit-status lists it" \
+  || bad "a first install beside the project's own rule does not say what the record covers"
+
 echo "=== every file the installer ships is classified ==="
 for tool in claude agents; do
   R4="$WORK/all-$tool"; fresh_repo "$R4"
@@ -273,6 +317,41 @@ PY
   mv "$R5/$RECORD" "$WORK/set-aside-2"; : > "$WORK/gh-out"; r="$(notice "$R5")"
   case "$r" in 0:*"newer="*) bad "the compare step reports a release for a repository with no record: $r" ;;
     0:*) ok "and nothing where there is no record to compare" ;; *) bad "the compare step failed without a record: $r" ;; esac
+  # The step that writes the issue, with a stand-in for gh that answers
+  # `issue list --jq` as GitHub would on the given list, and logs the rest.
+  "$KIT_DIR/scripts/python.sh" -B - "$R5/$W" > "$WORK/issue.sh" <<'PY2'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"- name: Open or update the issue\n(?:.*\n)*?\s+run: \|\n((?:(?: {10}.*)?\n)+)", text)
+sys.stdout.write("".join(l[10:] if l.strip() else "\n" for l in m.group(1).splitlines(True)) if m else "exit 99\n")
+PY2
+  mkdir -p "$WORK/fakebin"
+  cat > "$WORK/fakebin/gh" <<'GH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$GH_LOG"
+if [ "$1 $2" = "issue list" ]; then
+  while [ $# -gt 0 ]; do [ "$1" = --jq ] && { printf '%s' "$GH_ISSUES" | jq -r "$2"; exit; }; shift; done
+fi
+exit 0
+GH
+  chmod +x "$WORK/fakebin/gh"
+  issue_step() { # $1 = the open issues, as GitHub's JSON list
+    : > "$WORK/gh.log"
+    ( cd "$R5" && PATH="$WORK/fakebin:$PATH" GH_LOG="$WORK/gh.log" GH_ISSUES="$1" NOTICE_LABEL=kit-upgrade \
+        RECORDED=9.0.0 NEWER=9.1.0 KIT_REPOSITORY="$K" bash -e "$WORK/issue.sh" >/dev/null 2>&1 ); echo "$?"
+  }
+  if command -v jq >/dev/null 2>&1; then
+    rc="$(issue_step '[]')"
+    [ "$rc" -eq 0 ] && q '^gh issue create ' "$WORK/gh.log" && ! q '^gh issue comment' "$WORK/gh.log" \
+      && ok "with no open notice issue, the step opens one" \
+      || bad "with no open notice issue the step exited $rc and ran: $(grep '^gh issue \(create\|comment\)' "$WORK/gh.log" | tr '\n' ' ')"
+    rc="$(issue_step '[{"number":7,"title":"Starter kit 9.0.5 is available (this repository records 9.0.0)"}]')"
+    [ "$rc" -eq 0 ] && q '^gh issue comment 7 ' "$WORK/gh.log" && ! q '^gh issue create' "$WORK/gh.log" \
+      && ok "control — with one open for an older release, it comments there and opens no second" \
+      || bad "with an open notice issue the step exited $rc and ran: $(grep '^gh issue \(create\|comment\)' "$WORK/gh.log" | tr '\n' ' ')"
+  else
+    echo "  skip — no jq on this machine: the issue step is not exercised here"
+  fi
 else
   bad "--with-upgrade-notice did not install $W"
 fi
