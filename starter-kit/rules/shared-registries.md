@@ -171,6 +171,10 @@ every session. The one-line form:
   number-keyed entry would let a third file join the pair unnoticed.
 - **A Makefile target is not a CI step.** A check CI never invokes does not
   run; have CI call the aggregate target.
+- **A CI step is not a CI run.** A workflow file that is right on disk says
+  nothing about whether a run ever got as far as its first step. Look at a
+  completed run before trusting a check as enforced, and make the lint check
+  a required status check on the default branch.
 - **Custom merge drivers do not travel with the repository.** Anything needing
   per-clone setup ships with a check that the setup took effect.
 - **Do not "simplify" the fragments back into one file.** It works until a

@@ -247,14 +247,28 @@ Appendix A.7 — the sequence:
    project never wrote — and every typed link (Appendix A.10): `make
    graph-links` where the kit is present, by hand otherwise.
 4. The umbrella lint target passes, and every check chained into it is reachable
-   from a CI workflow step.
+   from a CI workflow step. Reachable is not run: a workflow starts on the
+   events it names — the kit's on a pull request and on a push to the default
+   branch, not on the push of a feature branch. Once the pull request is
+   open, confirm that a run of that workflow completed with success
+   (`gh run list --workflow <file> --limit 5`, in this repository; none at
+   all, or one that ends within seconds before any step, checked nothing).
+   Where you were not asked to push and open it, or cannot see the runs, the
+   handoff says "CI not confirmed" and why — never "CI green" from a workflow
+   file. Separately, the handoff names the step that makes the check binding:
+   the lint check as a required status check on the default branch.
 5. Harmonize-track runs only: cross-check the ledger — every item is preserved
    in place, preserved elsewhere (relocated/merged), or its removal is
    justified in writing. Zero silent losses.
 6. Write the handoff summary: what was installed; what was deliberately
    deferred (specialist reviewer agents, hooks, external tool servers, the meta
    layer) and — from Appendix A.6 — the **signal** that should trigger each
-   deferred artifact later. On Claude Code a SessionStart hook is one of the
+   deferred artifact later. Test every signal you write down: *would it be
+   noticed while the deferred artifact does not exist?* "When the rule is
+   violated" is not a signal if the deferred thing is the check that would
+   notice the violation — nothing fails, so nothing fires. Name who or what
+   observes it (a line in a reviewer's checklist, the recurring audit, a
+   command that fails), or do not defer. On Claude Code a SessionStart hook is one of the
    deferred: the installer leaves a template in `docs/agent-templates/` and
    registers nothing, and the signal is sessions that keep fighting their
    environment. The installer does install the workspace-graph hook
@@ -275,7 +289,9 @@ Appendix A.7 — the sequence:
 - A fresh agent session in this repo starts from the contract and can state the
   project's non-negotiable rules without being told.
 - The umbrella lint target runs the first enforcement check locally and in CI,
-  and CI reaches it by invoking the aggregate target.
+  and CI reaches it by invoking the aggregate target — confirmed by a run that
+  completed with success, or recorded in the handoff as not confirmed, with
+  the reason.
 - Two branches can each add a registry entry and both merge with zero conflicts
   and zero duplicate identifiers. This is the acceptance test for the registry
   layer; run it rather than assuming it.
@@ -368,6 +384,12 @@ silent. Non-trivial scripts get their own tests.
 | Documented rule violated anyway | Enforcement script in the lint target |
 | Multiple specialist reviewers exist | Periodic meta-review of the reviewers (propose-only, human-approved) |
 | Workspace reaches real mass (~10+ files) | Workspace changelog + recurring audits |
+
+Each row works because someone is there to see the left-hand side happen. A
+deferred artifact's signal has to pass the same test: it must be noticeable
+while the artifact does not exist. "Documented rule violated anyway" is
+observed by a reviewer or an audit — so the handoff names that observer, or
+the check is not deferred.
 
 ### A.7 Harmonization protocol (existing workspaces)
 
@@ -508,9 +530,13 @@ never there.
   are outside the generator's grammar — declare them out of the layout rather
   than half-adopting them.
 
-**Two traps.** A check chained into the lint target but not into a CI workflow
+**Three traps.** A check chained into the lint target but not into a CI workflow
 step does not run, and nothing reports it — have CI invoke the aggregate target
-so coverage is total by construction. And a **custom** merge driver named in
+so coverage is total by construction. A workflow step is not a run either: a
+workflow that is right on disk and never completes a run (Actions disabled, a
+billing stop) leaves every pull request unchecked while every local gate is
+green — look at a completed run, and require the check on the default branch.
+And a **custom** merge driver named in
 `.gitattributes` needs `git config` in every clone; when that is missing git
 falls back silently. `union` is built in and needs nothing, which is why it is
 the only driver worth putting in a file you expect other people to clone.

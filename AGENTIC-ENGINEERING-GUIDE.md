@@ -641,7 +641,7 @@ fi
 **Design rules**
 
 1. One script per convention; exit non-zero with a **`file:line` trail and a pointer to the rule** it enforces ("see `.claude/rules/database.md § Baseline Cutover`"). Its header names the same rule as a typed link — `# Enforces: RULE:database § Baseline Cutover` — which the link gate resolves (§3.12), so a renamed rule cannot leave its script pointing at nothing.
-2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR.
+2. Wire every script into one umbrella lint target (`make lint` / `make ci-lint`) that CI runs on every PR. Then look at a run: a workflow file that never completed one enforces nothing, and no local gate can see that. Make the check required on the default branch.
 3. Design the escape hatch: a greppable commit-message marker (`[sanctioned-exception]`) for the rare legitimate violation — logged in history forever, never silent.
 4. Non-trivial check scripts get their own unit tests.
 
@@ -773,7 +773,7 @@ The third tier deserves its demotion for a specific reason. An agent resolving t
 | drift check | regenerate and compare what the artifact *says* to its fragments — same entries, same content, any order — so a union merge that only reorders is green, and one that mangles an entry is not |
 | identifier gate | exact-shape assertion, then uniqueness, with a pair-keyed allowlist |
 | `Makefile` + workflow | the aggregate lint target, invoked directly by CI |
-| coverage check | proves every check in that target actually runs in CI |
+| coverage check | proves every check in that target is invoked by a CI workflow step — not that a run completed, which only the hosting platform shows |
 | two skills | authoring the entry; triaging a conflict — deliberately separate |
 
 **Granularity is a separate decision from layout, and it is easy to get wrong.**
@@ -939,6 +939,8 @@ The single habit that separates a living setup from a decorative one — run the
 
 The "same PR" clause matters: the author of the fix is the only one who knows what to write, and the knowledge decays within days.
 
+Every row needs an observer: someone or something that sees the left-hand side happen. That is the test for anything you defer with a trigger — *would the trigger be noticed while the deferred artifact does not exist?* "Add the check when the rule is violated" fails it when the check is the only thing that would notice a violation: nothing turns red, so the trigger never fires. Name the observer (a reviewer's checklist line, the recurring audit, a command that fails) or do not defer.
+
 ### 5.2 Workspace audits
 
 The workspace itself accumulates drift: stale version numbers, rules referencing renamed files, commands duplicating skills, always-loaded bloat. Institutionalize two cadences (the reference project pioneered this as its `ai-engineering-workspace-audit` skill; a copy ships in the starter kit — `bootstrap.sh --with-meta`):
@@ -989,7 +991,7 @@ Run quarterly (or as the quick-audit report):
 - [ ] KB entry count growing (bugs are being converted, not just fixed)?
 - [ ] No rule file contradicts current code reality (spot-check the three oldest)?
 - [ ] No command duplicates a skill's body?
-- [ ] Every gate in the lint target actually runs in CI (not just present in the Makefile)?
+- [ ] Every gate in the lint target is invoked by CI (not just present in the Makefile), and a recent run of that workflow completed with success?
 - [ ] No shared file that many PRs append to has escaped the fragment layout?
 - [ ] Agents' violation lists match the current rule files they enforce? `make graph-impact NODE=RULE:<name>` names the agents holding each rule.
 - [ ] `.graph-link-allowlist` absent or empty — or every entry still an immutable decision record citing something retired?

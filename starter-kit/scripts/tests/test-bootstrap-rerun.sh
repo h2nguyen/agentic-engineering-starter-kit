@@ -96,6 +96,15 @@ grep -q 'Upgrading an existing install' "$WORK/run2.log" \
 ! grep -q "Fill in the constitution" "$WORK/run2.log" \
   && ok "and a re-run does not repeat the first-install steps" \
   || bad "a re-run tells a repository that has the kit to fill in the constitution again"
+# A workflow file is not a run. An install was "finished" with lint green and
+# every CI run aborted before its first step, on an unprotected default
+# branch. The installer cannot see a run; it can say that one has to be seen.
+grep -q 'gh run list --workflow lint.yml' "$WORK/run1.log" && grep -q 'required status check' "$WORK/run1.log" \
+  && grep -q 'pull request is open' "$WORK/run1.log" \
+  && ok "the next steps say to see a completed run of the lint workflow once the pull request is open, and to make lint a required status check" \
+  || bad "a first install does not name the workflow's run on the pull request, or the required status check"
+! grep -q 'gh run list' "$WORK/run2.log" \
+  && ok "and a re-run does not repeat it" || bad "a re-run repeats the first-install CI step"
 # An agent filling in the constitution keeps whatever the template shows. The
 # next steps have to say that an example with no counterpart is deleted.
 grep -qi 'delete' "$WORK/run1.log" \
