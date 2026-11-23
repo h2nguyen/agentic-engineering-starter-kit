@@ -104,6 +104,21 @@ class Measures(EvidenceTestCase):
         # AGENTS.md (3) + CLAUDE.md (1) + the one rule (3)
         self.assertEqual(data["always_loaded_lines"], 7)
 
+    def test_a_linked_rule_is_counted_from_gits_tree_not_from_the_file_system(self):
+        # A link is a link in git's tree on every platform and under every
+        # Python; what a checkout or an unpacked archive makes of it is not.
+        self.write("kit/rules/security.md", "# Security\n\none\ntwo\n")
+        os.makedirs(os.path.join(self.root, ".claude", "skills"), exist_ok=True)
+        self.write("kit/skills/semver/SKILL.md", "# Semver\n")
+        os.symlink("../../kit/rules/security.md", os.path.join(self.root, ".claude", "rules", "security.md"))
+        os.symlink("../../kit/skills/semver", os.path.join(self.root, ".claude", "skills", "semver"))
+        self.commit("feat: link a rule and a skill")
+        data = self.measure()
+        self.assertEqual(data["applied_by_reference"], 2)
+        self.assertEqual(data["always_loaded_lines"], 7 + 4)   # the linked rule is read through its link
+        links = et.links_at(self.root, self.git("rev-parse", "HEAD"))
+        self.assertEqual(links[".claude/rules/security.md"], "kit/rules/security.md")
+
     def test_a_merged_pull_request_is_judged_by_what_it_carried(self):
         self.merged_pr(1, "fix(tool): a defect", {"changelog.d/2026-01-02-a.md": "# a\n",
                                                   "scripts/tests/test_more.py": "def test_c():\n    pass\n"})
@@ -162,6 +177,9 @@ class GenerateAndCheck(EvidenceTestCase):
         code, out = self.run_tool("check")
         self.assertEqual(code, 1)
         self.assertIn("make evidence", out)
+        # The failure shows the lines that differ: which number, and what it should be.
+        self.assertIn("-| Decision records | 12 |", out)
+        self.assertIn("+| Decision records | 1 |", out)
 
     def test_later_commits_leave_it_stale_but_true(self):
         self.run_tool("generate")

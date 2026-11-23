@@ -15,8 +15,12 @@ a number cannot be edited by hand, and anyone with a clone can reproduce it.
 Commits made after the stamp leave the file older, never wrong: it says what
 was true at its commit, and the check reports how far behind it is.
 
-Everything is measured in an export of the stamped commit (`git archive`), so
-the working tree — and whatever is uncommitted in it — plays no part.
+Everything is measured in an export of the stamped commit, so the working
+tree — and whatever is uncommitted in it — plays no part. Git writes the
+export itself, and a symbolic link is read from git's tree, not from the file
+system: what a checkout or an unpacked archive makes of a link differs between
+platforms and between Python versions, and a number that depends on the
+machine it is computed on cannot be recomputed by anyone else.
 
 What it does not claim is in the file itself: one repository, no control
 group. The numbers show that the loop runs here, not that the kit causes them.
@@ -30,14 +34,13 @@ Stdlib only; the feedback and graph tools it reuses are the kit's own.
 from __future__ import annotations
 
 import argparse
-import io
+import difflib
 import json
 import os
 import re
 import statistics
 import subprocess
 import sys
-import tarfile
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -76,15 +79,31 @@ def git(root: str, *args: str, check: bool = True) -> str:
 
 
 def export(root: str, commit: str, into: str) -> None:
-    """The tree of `commit`, unpacked into `into`: what was committed, nothing else."""
-    done = subprocess.run(["git", "-C", root, "archive", "--format=tar", commit], capture_output=True)
-    if done.returncode != 0:
-        raise EvidenceError(f"git archive {commit} failed: {done.stderr.decode('utf-8', 'replace').strip()}")
-    with tarfile.open(fileobj=io.BytesIO(done.stdout)) as tar:
-        try:
-            tar.extractall(into, filter="tar")   # Python 3.12+: keep links, refuse paths that leave `into`
-        except TypeError:
-            tar.extractall(into)
+    """The tree of `commit`, written into `into` by git: what was committed, nothing else.
+
+    Through an index of its own, so neither the repository's index nor its
+    working tree is touched.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(scratch, "index"))
+        for args in (["read-tree", commit],
+                     ["checkout-index", "--all", "--force", f"--prefix={into.rstrip(os.sep)}{os.sep}"]):
+            done = subprocess.run(["git", "-C", root, *args], env=env, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace")
+            if done.returncode != 0:
+                raise EvidenceError(f"git {args[0]} {commit} failed: {done.stderr.strip()}")
+
+
+def links_at(root: str, commit: str) -> dict[str, str]:
+    """Every symbolic link in the tree of `commit`: its path → the path it points at."""
+    links = {}
+    for entry in git(root, "ls-tree", "-r", "-z", commit).split("\0"):
+        meta, _, path = entry.partition("\t")
+        fields = meta.split()
+        if len(fields) == 3 and fields[0] == "120000":
+            target = git(root, "cat-file", "-p", fields[2])
+            links[path] = os.path.normpath(os.path.join(os.path.dirname(path), target)).replace(os.sep, "/")
+    return links
 
 
 # --------------------------------------------------------------------------
@@ -109,7 +128,7 @@ def _files(directory: str, keep) -> list[str]:
     return sorted(name for name in os.listdir(directory) if keep(name))
 
 
-def measure_tree(tree: str) -> dict:
+def measure_tree(tree: str, links: dict[str, str]) -> dict:
     data: dict = {}
     lint = re.search(r"^lint:(.*)$", _read(os.path.join(tree, "Makefile")), re.MULTILINE)
     data["gates"] = [t for t in (lint.group(1).split() if lint else []) if t != "test"]
@@ -127,16 +146,15 @@ def measure_tree(tree: str) -> dict:
     data["unreleased_fragments"] = len(_files(os.path.join(tree, "changelog.d"),
                                               lambda n: n.endswith(".md") and n != "README.md"))
 
-    applied = 0
-    for kind in ("rules", "skills", "agents", "commands"):
-        directory = os.path.join(tree, ".claude", kind)
-        applied += sum(1 for name in _files(directory, lambda n: True) if os.path.islink(os.path.join(directory, name)))
-    data["applied_by_reference"] = applied
+    applied_under = tuple(f".claude/{kind}/" for kind in ("rules", "skills", "agents", "commands"))
+    data["applied_by_reference"] = sum(
+        1 for path in links if path.startswith(applied_under) and path.count("/") == 2)
 
     loaded = _lines(os.path.join(tree, "AGENTS.md")) + _lines(os.path.join(tree, "CLAUDE.md"))
     for directory in RULE_DIRS:
         for name in _files(os.path.join(tree, directory), lambda n: n.endswith(".md")):
-            loaded += _lines(os.path.join(tree, directory, name))   # a link is read through
+            path = f"{directory}/{name}"
+            loaded += _lines(os.path.join(tree, links.get(path, path)))   # a link is read through, by its target in git
     data["always_loaded_lines"] = loaded
 
     runs = _files(os.path.join(tree, WORKSPACE_LOG), lambda n: n.endswith(".md") and n != "README.md")
@@ -231,7 +249,7 @@ def measure_feedback(root: str, commit: str, tree: str) -> dict:
 def measure(root: str, commit: str) -> dict:
     with tempfile.TemporaryDirectory() as tree:
         export(root, commit, tree)
-        data = measure_tree(tree)
+        data = measure_tree(tree, links_at(root, commit))
         data.update(measure_feedback(root, commit, tree))
     data.update(measure_history(root, commit))
     data["commit"] = commit
@@ -369,10 +387,16 @@ def cmd_check(root: str) -> int:
               "      Evidence from a commit nobody can check is not evidence. Regenerate:  make evidence",
               file=sys.stderr)
         return 1
-    if render(measure(root, commit)) != text:
+    expected = render(measure(root, commit))
+    if expected != text:
         print(f"FAIL: {OUTPUT} does not say what the repository says at {commit[:7]}.\n"
               "      It is generated, never edited by hand — and a change to scripts/evidence_tool.py\n"
-              "      changes what it measures. Regenerate and commit:  make evidence", file=sys.stderr)
+              "      changes what it measures. Regenerate and commit:  make evidence\n"
+              "      The lines that differ (- the file, + the repository):", file=sys.stderr)
+        diff = difflib.unified_diff(text.splitlines(), expected.splitlines(), lineterm="", n=0)
+        for line in list(diff)[2:]:
+            if not line.startswith("@@"):
+                print("      " + line[:200], file=sys.stderr)
         return 1
     behind = git(root, "rev-list", "--count", f"{commit}..HEAD").strip()
     print(f"OK: {OUTPUT} reproduces at {commit[:7]}, {behind} commit(s) behind HEAD")
