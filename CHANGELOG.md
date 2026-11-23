@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [3.1.0] — 2026-11-23
+
+<!-- category: Added -->
 ### Added
 
 - `.starter-kit-declined`: a list you write at the root of your repository, one path per line with an optional `# reason`. The installer leaves a listed file out, and a listed directory with everything beneath it — on a first install and on every re-run — and reports each under "Skipped" as declined. Until now a file of the kit's that you had deleted came back with the next run, because the installer adds whatever is missing and cannot tell "deleted on purpose" from "new in this kit". Use it for a skill your organisation already ships as a plugin, a suite you do not run, a template you do not want. The installer never creates or edits the list. See "Declining what the kit installs" in the kit README, and ADR-0014.
@@ -106,8 +122,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - Asking `registry_tool.py` for a registry that is not declared says that `registries.json` declares no registry of that name, lists the ones it does, and points at the constitution. It used to say "unknown registry".
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [3.0.1] — 2026-11-20
 
