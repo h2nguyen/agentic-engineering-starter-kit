@@ -30,3 +30,4 @@ out of comments; the kit's own markers are in the rule already.
 | Kind | Shape, with an example | Read by |
 |---|---|---|
 | Template lead-in in the guide | A bold line that says "template" and names a kit file, before a fenced block: `**Template** (starter kit: \`rules/_rule-template.md\`)` | `scripts/check-guide-templates.sh` — the block must match the kit file byte for byte |
+| Evidence stamp | The first line of `docs/EVIDENCE.md`: `<!-- evidence: as of <40-digit commit> — … -->` | `scripts/evidence_tool.py check` (`make evidence-check`) — recomputes the file at that commit |

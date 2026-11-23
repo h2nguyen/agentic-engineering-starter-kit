@@ -143,6 +143,7 @@ make lint                                   # everything CI runs; must pass befo
 make kit-smoke                              # install into a throwaway repo and run its lint
 make registry-generate                      # rebuild CHANGELOG.md from changelog.d/
 make graph-impact NODE=RULE:documentation   # what cites an artifact — before renaming or deleting it
+make evidence                               # rewrite docs/EVIDENCE.md from the repository; never edit it by hand
 scripts/eval-run.sh --cwd /abs/dir --log /abs/log -- <command>   # run one command of an evaluation, recorded
 ```
 

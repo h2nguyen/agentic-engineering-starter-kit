@@ -78,7 +78,7 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 - The workspace-audit skill, its command and the agent-coach read the directory and write each run as a new file in it. The setup prompt's Harmonize track records its run the same way, whether or not the meta layer is installed.
 - A file is written once: a later pull request of the same run adds a file of its own, under a name no other branch would choose. Two edits of one entry conflict like two entries in one file.
 - **If you have a `WORKSPACE_CHANGELOG.md`, keep it.** Nothing migrates it and nothing fails: it is the archive, read for history and not written to. You get the directory at your next installer run with `--with-meta`, and the new wording when you copy the kit's skill, command and coach in upgrade step 2; until then they keep writing to the single file.
-- The kit's own repository now runs on its kit: its rules, skills, `agent-coach` and hook are applied there by links into `starter-kit/`, held by a gate (ADR-0022). Nothing changes in an installed project.
+- The kit's own repository now runs on its kit: its rules, skills, `agent-coach` and hook are applied there by links into `starter-kit/`, held by a gate (ADR-0022). What that shows is in `docs/EVIDENCE.md`: numbers computed from the repository at a stamped commit and recomputed by its `make lint` (ADR-0023). Nothing changes in an installed project.
 
 <!-- category: Deprecated -->
 

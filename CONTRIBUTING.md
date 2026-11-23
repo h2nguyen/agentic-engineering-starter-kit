@@ -50,6 +50,7 @@ name your machine gives it — the make targets find it through
    | `test-graph-hooks.sh` | The Claude Code hook: what it says after an edit and at the end of a turn, and that it is silent otherwise |
    | `test-brownfield-adoption.sh` | Installing into a repository that already has registries |
    | `scripts/tests/test-eval-run.sh` | `scripts/eval-run.sh`, this repository's evaluation recorder (below) |
+| `scripts/tests/test_evidence_tool.py` | `evidence_tool.py`: what it counts, that `check` recomputes it, and that a number edited by hand fails |
 | `scripts/tests/test-self-application.sh` | `check-self-application.sh`: a kit rule with no link here, a link that became a copy or points elsewhere, and a hook that cannot find the graph tool each fail |
 
 3. **Make the change.**
@@ -80,6 +81,7 @@ cause; none of these has a quiet override.
 | `documented-commands` | No command the kit or this repository writes down for someone to type starts Python as `python3 …`; each goes through `scripts/python.sh` or a make target (ADR-0013) |
 | `registry-drift`, `registry-ids` | `CHANGELOG.md` matches its fragments; identifiers are well-shaped and unique |
 | `ci-lint-coverage` | Every check in `make lint` is invoked by a CI workflow step. It reads the workflow files; that a run completed is seen on the pull request, not here (ADR-0019) |
+| `evidence-check` | `docs/EVIDENCE.md` reproduces at the commit it is stamped with. It is generated: `make evidence`, never an edit. Commits after the stamp leave it older, not wrong (ADR-0023) |
 | `self-application` | Every rule, skill, agent and command the kit ships is linked under `.claude/`, never copied, and the workspace-graph hook is registered there with `--tool` (ADR-0022). The failure prints the `ln -s` to run |
 | `constitution` | `AGENTS.md` and `CLAUDE.md` link only to files that exist. The kit ships this check unchained (ADR-0009); this repository chains it |
 
@@ -193,9 +195,12 @@ give the release commit a `BREAKING CHANGE:` footer.
 ```bash
 git checkout -b release/<X.Y.Z>
 starter-kit/scripts/python.sh starter-kit/scripts/registry_tool.py release --registry changelog --version <X.Y.Z>
+git commit -am "release: promote [Unreleased] to <X.Y.Z>"
+make evidence && git commit -am "docs: evidence as of the release"
 make lint
 ```
 
-Commit as `release: promote [Unreleased] to <X.Y.Z>`, open the pull request,
+The first commit is the release; the second records the evidence as of it,
+so the published numbers are the release's own. Open the pull request,
 and tag the merge commit `v<X.Y.Z>`. A released section is immutable: an error in it is
 corrected by a bullet under the next `[Unreleased]`, never by an edit.

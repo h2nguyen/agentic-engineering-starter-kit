@@ -6,4 +6,4 @@
 
 ## Changed
 
-- The kit's own repository now runs on its kit: its rules, skills, `agent-coach` and hook are applied there by links into `starter-kit/`, held by a gate (ADR-0022). Nothing changes in an installed project.
+- The kit's own repository now runs on its kit: its rules, skills, `agent-coach` and hook are applied there by links into `starter-kit/`, held by a gate (ADR-0022). What that shows is in `docs/EVIDENCE.md`: numbers computed from the repository at a stamped commit and recomputed by its `make lint` (ADR-0023). Nothing changes in an installed project.
