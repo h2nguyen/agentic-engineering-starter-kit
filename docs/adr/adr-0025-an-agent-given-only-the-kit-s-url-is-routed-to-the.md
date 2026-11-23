@@ -90,6 +90,20 @@ its own `CLAUDE.md` or `AGENTS.md` has to add `--alongside-existing`. That is
 the breaking change. An `agents`, `cursor` or `copilot` install beside a
 constitution of its own fails `make constitution` until the rules are linked.
 
+**Measured after the change**, with the same setup and the same two targets,
+plus one run with `SETUP-PROMPT.md` pasted. The agents cloned the branch
+through a redirected URL, so the README note was not part of the runs:
+GitHub shows the default branch.
+
+- With its own `CLAUDE.md`, the target was left untouched. The agent
+  rehearsed the install in a scratch copy and asked for approval of a plan
+  with `--alongside-existing`.
+- Without one, the agent read `AGENTS.md` in its clone. It asked its
+  questions only after installing, and assumed the tool it ran in, saying so.
+- With the prompt pasted, the agent cloned the kit outside the project, read
+  `AGENTS.md`, and asked for the tool and the feedback authors before writing
+  anything.
+
 **Not solved:** what an agent does with the steps it reads. The runs show it
 can skip the questions and edit a file without approval while every check
 passes. Asking and approval are between the agent and the user, and no gate
