@@ -149,22 +149,31 @@ esac
 # The globs go into a YAML header between double quotes. One that cannot be
 # written there is refused here, before anything is installed: a header Claude
 # Code cannot parse is ignored without a word, and the rule then loads into
-# every session as if it had none.
+# every session as if it had none. Only where the flag means something: on the
+# other tools it is reported as ignored, and must not stop the install.
 SOURCE_GLOBS=()
-if [ -n "$SOURCE_PATHS" ]; then
+if [ -n "$SOURCE_PATHS" ] && [ "$TOOL" = claude ]; then
+  refuse_glob() { # $1 = the glob, $2 = what is wrong with it
+    echo "ERROR: --source-paths: '$1' $2" >&2
+    echo "Give globs relative to the repository root, without quotes, backslashes or line" >&2
+    echo "breaks, one per comma — a brace alternative such as src/**/*.{ts,tsx} written out as" >&2
+    echo "two globs, a directory as src/**. Nothing was written." >&2
+    exit 1
+  }
   _rest="$SOURCE_PATHS,"
   while [ -n "$_rest" ]; do
     _glob="${_rest%%,*}"; _rest="${_rest#*,}"
-    _glob="$(printf '%s' "$_glob" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    case "$_glob" in *$'\n'*|*$'\r'*) refuse_glob "$(printf '%s' "$_glob" | tr '\n\r' '  ')" "has a line break in it." ;; esac
+    _glob="$(printf '%s' "$_glob" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s|^\./||')"
     [ -n "$_glob" ] || continue
     case "$_glob" in
-      *'"'*|*'\'*|*'{'*|*'}'*|/*)
-        echo "ERROR: --source-paths: '$_glob' cannot go into a paths: header as it is." >&2
-        echo "Give globs relative to the repository root, without quotes or backslashes, one per" >&2
-        echo "comma — a brace alternative such as src/**/*.{ts,tsx} written out as two globs." >&2
-        echo "Nothing was written." >&2
-        exit 1 ;;
+      *'"'*|*'\'*|*'{'*|*'}'*|/*) refuse_glob "$_glob" "cannot go into a paths: header as it is." ;;
     esac
+    # A bare directory name matches no file: the header would be valid and the
+    # rule would never arrive, which nothing reports.
+    if [ -d "$TARGET/$_glob" ]; then
+      refuse_glob "$_glob" "names a directory, which matches no file. Write '${_glob%/}/**'."
+    fi
     SOURCE_GLOBS+=("$_glob")
   done
 fi
@@ -471,22 +480,29 @@ try:
         cfg = json.load(fh)
 except (OSError, ValueError):
     sys.exit(0)
-for registry in cfg.get("registries", []):
+registries = cfg.get("registries") if isinstance(cfg, dict) else None
+for registry in registries if isinstance(registries, list) else []:
+    if not isinstance(registry, dict):
+        continue
     if sys.argv[2] == "changelog" and registry.get("kind") != "changelog":
         continue
     for key, suffix in (("fragments", "/**"), ("output", "")):
         value = str(registry.get(key) or "").strip("/")
-        if value and '"' not in value and "\\" not in value:
+        # The same refusals as for --source-paths, silently: a path that
+        # cannot be written into the header is left out of it.
+        if value and not any(c in value for c in '"\\{}\n\r'):
             print(value + suffix)
 PY
 }
 bind_rule() { # $1 = rule name, then its globs: write the header onto a rule this run installed
-  local rule="$1" f="$TARGET/$RULES_DIR/$1.md" seen=" " glob; shift
+  # Seen globs are kept one per line: a glob may contain a space, and joined
+  # by spaces "dir/**" would be found inside "src/my dir/**".
+  local rule="$1" f="$TARGET/$RULES_DIR/$1.md" seen=$'\n' glob; shift
   {
     echo "---"; echo "paths:"
     for glob in "$@"; do
-      case "$seen" in *" $glob "*) continue ;; esac
-      seen="$seen$glob "
+      case "$seen" in *$'\n'"$glob"$'\n'*) continue ;; esac
+      seen="$seen$glob"$'\n'
       printf '  - "%s"\n' "$glob"
     done
     echo "---"; echo ""; cat "$f"
@@ -494,6 +510,7 @@ bind_rule() { # $1 = rule name, then its globs: write the header onto a rule thi
   BOUND="$BOUND $rule"
 }
 BOUND=""
+UNBOUND=""
 if [ "$TOOL" = claude ]; then
   ALL_REGISTRY=(); CHANGELOG_REGISTRY=()
   while IFS= read -r _p; do [ -n "$_p" ] && ALL_REGISTRY+=("$_p"); done < <(registry_paths all)
@@ -506,9 +523,13 @@ if [ "$TOOL" = claude ]; then
   if [ ${#SOURCE_GLOBS[@]} -gt 0 ]; then
     if installed_now comments-and-annotations; then
       bind_rule comments-and-annotations "${SOURCE_GLOBS[@]}" '.github/**' '.claude/hooks/**' Makefile registry.mk
+    else
+      UNBOUND="$UNBOUND comments-and-annotations"
     fi
     if installed_now versioning-and-changelog; then
       bind_rule versioning-and-changelog "${SOURCE_GLOBS[@]}" ${CHANGELOG_REGISTRY[@]+"${CHANGELOG_REGISTRY[@]}"}
+    else
+      UNBOUND="$UNBOUND versioning-and-changelog"
     fi
   fi
 fi
@@ -689,7 +710,13 @@ if [ "$TOOL" = claude ] && [ -n "$BOUND" ]; then
   fi
   echo "  To see what really loads, start a NEW session and run the rule-load-check skill: a"
   echo "  header Claude Code cannot parse is ignored in silence, and a session that is already"
-  echo "  running keeps the rules it started with."
+  echo "  running has been seen to keep the rules it started with."
+fi
+if [ "$TOOL" = claude ] && [ -n "$UNBOUND" ]; then
+  echo "  --source-paths bound nothing for:$UNBOUND. A rule that was not installed by this"
+  echo "  run — it was already here, or it is declined — is yours, and the installer does not"
+  echo "  write into it. To bind one, add the 'paths:' header by hand ('Load classes' in"
+  echo "  $KIT_DIR/README.md shows it)."
 fi
 if [ "$TOOL" != claude ] && [ -n "$SOURCE_PATHS" ]; then
   echo "  Note ($TOOL): --source-paths was ignored. Only Claude Code loads a rule by path; here a"

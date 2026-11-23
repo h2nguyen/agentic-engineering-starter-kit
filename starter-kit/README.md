@@ -227,6 +227,8 @@ whichever version you started from. For why a file changed, search the kit's
    `paths:` header ([Load classes](#load-classes-of-the-rules-claude-code));
    the comparison is of the text under it, so a rule is not reported for a
    header you or the installer gave it, and taking the kit's text keeps it.
+   (In the commands below, `docs/agent-rules/` takes the place of
+   `.claude/rules/` on the other tools.)
    - **`comments-and-annotations.md`: move your rows out, once — or keep
      merging it by hand.** Kits up to 3.0.1 had you fill a table and four
      pointers inside this rule, so it could never be copied. Your half now
@@ -268,9 +270,13 @@ whichever version you started from. For why a file changed, search the kit's
      take the kit's text — naming them, because nothing is replaced that you
      did not name:
      ```bash
-     "$KIT"/starter-kit/upgrade-rules.sh --apply working-principles documentation versioning-and-changelog shared-registries
+     "$KIT"/starter-kit/upgrade-rules.sh --apply <rule> [<rule>…]
      ```
-     One you did change is merged by hand.
+     `<rule>` is a rule's name without `.md`, as the listing printed it. Leave
+     out every rule you edited — `documentation` and
+     `versioning-and-changelog` invite you to add your own locations — and
+     merge those by hand: `--apply` replaces the whole text of a rule you
+     name, and only git brings the old one back.
 4. **Leave what is yours.** The constitution (`CLAUDE.md`, `AGENTS.md` or
    `.github/copilot-instructions.md`), `Makefile`, `registries.json`, the CI
    workflow, the workspace changelog, and every changelog fragment,
@@ -324,7 +330,7 @@ it installs in that run, never onto a file that was already there:
 | Rule | Loads | Bound to |
 |---|---|---|
 | `working-principles`, `documentation`, `project-annotations` | every session | — |
-| `shared-registries` | on a registry file | every fragment directory and artifact `registries.json` declares, and `registries.json`, `registry.mk`, `.gitattributes`, `.registry-id-duplicate-allowlist` |
+| `shared-registries` | on a registry file | every fragment directory and artifact `registries.json` declared when the rule was installed, and `registries.json`, `registry.mk`, `.gitattributes`, `.registry-id-duplicate-allowlist`. Add a line when you declare a new registry |
 | `versioning-and-changelog` | with `--source-paths`: on source and changelog files. Without: every session | your source globs, and the changelog's fragment directory and artifact |
 | `comments-and-annotations` | with `--source-paths`: on source and build files. Without: every session | your source globs, and `.github/**`, `.claude/hooks/**`, `Makefile`, `registry.mk` |
 
@@ -334,7 +340,10 @@ it installs in that run, never onto a file that was already there:
 
 Where a project's source is, the installer does not guess: without
 `--source-paths` the last two load into every session. One glob per comma,
-relative to the repository root; write a brace alternative out as two globs.
+relative to the repository root; write a brace alternative out as two globs
+and a directory as `src/**`. The flag binds rules the run installs: on a
+re-run the rules are already yours, and the installer says which it left
+unbound.
 
 The header is yours once written. This is what one looks like — add it by
 hand to bind a rule later, or to bring an existing install to these classes:
@@ -361,8 +370,9 @@ Three things to know before relying on it:
   what the agent has; if your project's main work product is prose, bind the
   rule to those paths too, or leave it unbound.
 - **A header Claude Code cannot parse is ignored without a message**, and the
-  rule then loads into every session. A session that is already running
-  keeps the rules it started with. So check in a **new** session, with the
+  rule then loads into every session. A session that is already running has
+  been seen to keep the rules it started with — observed, not documented by
+  the tool. So check in a **new** session, with the
   `rule-load-check` skill: it lists what is in context before anything is
   read, reads one file per load class, and backs each claim with a quoted
   last line that is then compared with the file.

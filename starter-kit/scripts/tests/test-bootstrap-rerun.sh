@@ -521,10 +521,51 @@ R="$WORK/sourced-bad"; fresh_repo "$R"
 R="$WORK/sourced-brownfield"; fresh_repo "$R"; mkdir -p "$R/docs/decisions"
 printf '# Use Postgres\n\n## Status\n\nAccepted\n\n## Context\n\nc\n\n## Decision\n\nd\n\n## Consequences\n\ne\n' > "$R/docs/decisions/0001-use-postgres.md"
 "$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-brownfield.log" 2>&1
-adr_dir="$("$PY" -c 'import json,sys; print(next(r["fragments"] for r in json.load(open(sys.argv[1]))["registries"] if r["name"]=="adr"))' "$R/registries.json")"
-frontmatter "$R/.claude/rules/shared-registries.md" | grep -qxF "  - \"$adr_dir/**\"" \
-  && ok "the header names the registries where this repository keeps them ($adr_dir/), not where a fresh install would" \
-  || bad "the registries rule is not bound to $adr_dir/**"
+frontmatter "$R/.claude/rules/shared-registries.md" | grep -qxF '  - "docs/decisions/**"' \
+  && ! frontmatter "$R/.claude/rules/shared-registries.md" | grep -q 'docs/adr' \
+  && ok "the header names the registries where this repository keeps them (docs/decisions/), not where a fresh install would" \
+  || bad "the registries rule is not bound to docs/decisions/**: $(frontmatter "$R/.claude/rules/shared-registries.md" | grep -c . ) header lines"
+# What else must not reach the header, or must not stop a run it has no part in.
+for bad_glob in 'src\x/**' $'src/**\nlib/**'; do
+  R="$WORK/sourced-bad2"; rm -rf "$R"; fresh_repo "$R"
+  "$BOOTSTRAP" --tool claude --target "$R" --source-paths "$bad_glob" > "$WORK/sourced-bad2.log" 2>&1; rc=$?
+  [ "$rc" -ne 0 ] && [ -z "$(git -C "$R" status --porcelain)" ] \
+    && ok "a glob with a $(printf '%s' "$bad_glob" | tr -d 'a-z/*' | od -c | sed -n '1s/^[0-9]* *//p' | tr -s ' ') in it is refused, with nothing written" \
+    || bad "a glob that breaks the header was accepted (exit $rc): $(printf '%q' "$bad_glob")"
+done
+R="$WORK/sourced-dir"; fresh_repo "$R"; mkdir -p "$R/src"; : > "$R/src/keep"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src' > "$WORK/sourced-dir.log" 2>&1; rc=$?
+[ "$rc" -ne 0 ] && grep -q "src/\*\*" "$WORK/sourced-dir.log" \
+  && ok "a bare directory name, which matches no file, is refused and the glob that was meant is shown" \
+  || bad "--source-paths 'src' was accepted for a directory (exit $rc)"
+R="$WORK/sourced-space"; fresh_repo "$R"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'src/my dir/**,dir/**' > "$WORK/sourced-space.log" 2>&1
+frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "src/my dir/**"' \
+  && frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -qxF '  - "dir/**"' \
+  && ok "a glob with a space is written whole, and a later glob that is its tail is not taken for a duplicate" \
+  || bad "globs with a space: $(frontmatter "$R/.claude/rules/versioning-and-changelog.md" | tr '\n' ' ')"
+R="$WORK/sourced-copilot"; fresh_repo "$R"
+"$BOOTSTRAP" --tool copilot --target "$R" --source-paths 'src/**/*.{ts,tsx}' > "$WORK/sourced-copilot.log" 2>&1; rc=$?
+[ "$rc" -eq 0 ] && grep -q 'source-paths was ignored' "$WORK/sourced-copilot.log" \
+  && ok "where the flag does nothing, a glob it would refuse does not stop the install" \
+  || bad "copilot with a brace glob in --source-paths: exit $rc"
+R="$WORK/sourced-oddjson"; fresh_repo "$R"; printf '[]\n' > "$R/registries.json"
+"$BOOTSTRAP" --tool claude --target "$R" > "$WORK/sourced-oddjson.log" 2>&1
+! grep -q 'Traceback' "$WORK/sourced-oddjson.log" \
+  && ok "a registries.json that is not an object does not make the installer print a traceback" \
+  || bad "the installer prints a Python traceback for an odd registries.json"
+# A re-run cannot bind a rule that is already there — and used to take the
+# flag without a word, on the one tool where it means something.
+R="$WORK/sourced"
+"$BOOTSTRAP" --tool claude --target "$R" --source-paths 'app/**' > "$WORK/sourced-rerun.log" 2>&1
+! frontmatter "$R/.claude/rules/versioning-and-changelog.md" | grep -q 'app/' \
+  && grep -q 'source-paths.*comments-and-annotations.*versioning-and-changelog\|not bound.*comments-and-annotations' "$WORK/sourced-rerun.log" \
+  && ok "on a re-run --source-paths changes no existing rule, and the installer names the rules it did not bind and why" \
+  || bad "a re-run with --source-paths says nothing about the rules it left unbound"
+grep -q ':(glob)' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && grep -q 'exclude-standard' "$WORK/claude/.claude/skills/rule-load-check/SKILL.md" \
+  && ok "the load check finds its test file with the tool's glob meaning, among untracked files too" \
+  || bad "the skill lists candidate files with git's default pathspec, or only tracked ones"
 
 echo "=== the kit's own tools leave no bytecode behind in the repository ==="
 # The installer ships no .gitignore, so a __pycache__ the tools create shows

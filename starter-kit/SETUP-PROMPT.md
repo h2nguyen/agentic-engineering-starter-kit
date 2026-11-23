@@ -264,7 +264,7 @@ Appendix A.7 — the sequence:
 7. On Claude Code, the handoff says which rules are bound to which paths, and
    that what really loads must be checked **in a new session** — the
    `rule-load-check` skill where the kit is present. This session cannot do
-   it: it keeps the rules it started with, and a header the tool cannot parse
+   it: it has been seen to keep the rules it started with, and a header the tool cannot parse
    fails without a message.
 8. Commit on the feature branch with a clear message and propose the PR. Leave
    a `starter-kit/` directory out of the commit: it is the installer, nothing

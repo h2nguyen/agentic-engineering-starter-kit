@@ -184,7 +184,9 @@ every session. The one-line form:
 - [ ] `make lint` passes locally — drift check, identifier gate, shape check?
 - [ ] No identifier renamed that was already on the default branch?
 - [ ] If a new registry was added: declared in `registries.json`, its fragment
-      directory created, and its generated region marked in the artifact?
+      directory created, and its generated region marked in the artifact? And
+      where this rule file opens with a `paths:` header: the new paths added
+      to it?
 - [ ] Bringing an existing artifact under the layout: used
       `registry_tool.py adopt --registry <name>` rather than moving entries by
       hand, so nothing was dropped and no identifier changed?

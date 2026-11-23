@@ -7,8 +7,8 @@ description: >
   or its `paths:` header, after installing or upgrading the agent workspace,
   or when asked "which rules are loaded", "is this rule in context", "check
   the load classes". Run it in a NEW session — a session that was already
-  running keeps the rules it started with. Not for judging what a rule says;
-  that is a review.
+  running has been seen to keep the rules it started with. Not for judging
+  what a rule says; that is a review.
 ---
 
 # Rule Load Check
@@ -42,8 +42,9 @@ file:
 
 1. List every rule file whose **full text** is in your context now. A rule
    you know only from its one line in the constitution is not in full.
-2. For each, quote its last non-empty line, word for word. Do not open the
-   file to do this.
+2. For each, quote the last line of it that has at least four words, word
+   for word. Do not open the file to do this. (A last line that is only a
+   table rule or a heading could be guessed; a sentence cannot.)
 
 ## Phase 2 — What the headers say
 
@@ -66,10 +67,19 @@ the Phase 1 list. A rule with `paths:` is expected to be absent from it.
 For each distinct `paths:` list:
 
 1. Find one existing file that a pattern matches, by listing, not reading:
-   `git ls-files '<pattern>' | head -1`.
+
+   ```bash
+   git ls-files -co --exclude-standard ':(glob)<pattern>' | grep -v '^\.claude/rules/' | head -1
+   ```
+
+   `:(glob)` gives the pattern the meaning it has in the header — `*` stays
+   inside one directory, `**` crosses them — and `-co` includes files that
+   are not committed yet, which on the day of an install is all of them.
+   Never pick a file under `.claude/rules/`: reading a rule file puts that
+   rule in context and spoils its row.
 2. Read that one file with the Read tool.
 3. State which rules arrived with that access and were not in context before.
-   For each, quote its last non-empty line, word for word.
+   For each, quote its last line of at least four words, word for word.
 
 No file matches any pattern of a rule: record "no file to test with". That
 rule's load class is unverified, and the pattern may be wrong.
@@ -82,7 +92,7 @@ This check uses Read; say so in the report instead of claiming the others.
 1. Only now print the real last lines, and compare each with your quote:
 
    ```bash
-   for f in .claude/rules/*.md; do printf '%s: %s\n' "$f" "$(awk 'NF {l=$0} END {print l}' "$f")"; done
+   for f in .claude/rules/*.md; do printf '%s: %s\n' "$f" "$(awk 'NF >= 4 {l=$0} END {print l}' "$f")"; done
    ```
 
    A quote that does not match was reconstructed, not read from context.
@@ -97,7 +107,7 @@ This check uses Read; say so in the report instead of claiming the others.
 
    | Observed | It means |
    |---|---|
-   | Has `paths:`, and was in context at start | The header was not parsed. `claude --debug` prints the parse error |
+   | Has `paths:`, and was in context at start | The header was not parsed. Claude Code's documentation names `claude --debug` as the way to see the parse error |
    | Has no header, and was not in context at start | The file is not being loaded as a rule: check its location and extension |
    | Has `paths:`, and did not arrive on a matching file | No pattern matches that file. Patterns are relative to the repository root |
    | Arrived on a file its patterns do not match | Another pattern is wider than intended |

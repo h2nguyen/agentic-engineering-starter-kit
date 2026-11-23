@@ -13,7 +13,9 @@ audit skill budgets "rules without path scoping" as always-loaded — and
 shipped all five rules without a header. The guide's load-class table listed
 "rules files" as always loaded, without qualification.
 
-A fresh install therefore loaded 788 lines of rules at every session start.
+At kit 3.0.1 a fresh install therefore loaded 788 lines of rules at every
+session start (846 by the time of this record, with what the rules gained
+since).
 In the first project outside the kit's fixtures, whose work is mostly concept
 documents, about 540 of them — registries, versioning, annotations in source —
 were relevant to almost no session, while the project's own rules were bound
@@ -33,9 +35,10 @@ What decides where the header can come from:
   repository — `init` writes `registries.json` from what the repository
   already has — and the source paths are the project's.
 - **A header that cannot be parsed fails without a message**: the rule loads
-  as if it had none. And a session that is already running keeps the rules it
-  started with; the adopter saw a subagent of the session that changed a rule
-  still working from the old set.
+  as if it had none. And a session that is already running has been seen to
+  keep the rules it started with — the adopter saw a subagent of the session
+  that changed a rule still working from the old set. The tool's
+  documentation does not say either way.
 
 Options for the header:
 
@@ -72,8 +75,11 @@ in that run. It never touches a rule that was already there.
 - **`working-principles`, `documentation` and `project-annotations`** load
   into every session.
 
-A glob that cannot be written between double quotes is refused before
-anything is installed. The kit's rule files stay without a header, and the
+A glob that cannot be written between double quotes — a quote, a backslash,
+a brace, a line break — or that names a directory, which matches no file, is
+refused before anything is installed. On a re-run the flag binds nothing,
+because every rule is already the adopter's, and the installer names the
+rules it left unbound. The kit's rule files stay without a header, and the
 other three tools get none; `--source-paths` is reported as ignored there.
 
 The header is the adopter's from then on. So the upgrade compares and
@@ -98,8 +104,9 @@ a working install (ADR-0002's argument, and ADR-0004's).
 ## Consequences
 
 **Easier.** A fresh install with `--source-paths` loads the constitution and
-three rules into every session instead of five and a constitution; without
-the flag, four. An upgrade no longer special-cases a rule for its header.
+three rule files into every session; without the flag, five. Before, it was
+all six. Measured on a fresh install: 960 lines without the flag, 421 with
+it. An upgrade no longer special-cases a rule for its header.
 
 **Harder.** The installed rule differs from the kit's by its header, so
 "is this the kit's text" needs the helper and a checkout of the kit. One more
@@ -119,6 +126,11 @@ to run, and its evidence is the agent's own quotes.
 
 **Existing installs are not changed.** Their rules load as before. The README
 shows the header to add by hand.
+
+**The registries header is a snapshot.** It lists what `registries.json`
+declared on the day of the install. A registry declared later is not in it
+until someone adds the line; the rule's checklist asks for that, and nothing
+checks it.
 
 **Trigger to revisit.** If the tool gains a documented way to assign paths
 outside the file, the header leaves the rule and `upgrade-rules.sh` goes back
