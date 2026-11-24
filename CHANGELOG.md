@@ -21,6 +21,22 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- BEGIN GENERATED: changelog — do not edit inside this region. Add a file under changelog.d/ and run `make registry-generate`. -->
 
 <!-- category: Added -->
+
+<!-- category: Changed -->
+
+<!-- category: Deprecated -->
+
+<!-- category: Removed -->
+
+<!-- category: Fixed -->
+
+<!-- category: Security -->
+
+<!-- END GENERATED: changelog -->
+
+## [4.1.0] — 2026-11-23
+
+<!-- category: Added -->
 ### Added
 
 - The coach step of the weekly digest (`--with-coach-schedule`) runs on a `CLAUDE_CODE_OAUTH_TOKEN` repository secret when there is no `ANTHROPIC_API_KEY`. Make the token with `claude setup-token` on a Claude Pro, Max, Team or Enterprise plan and add it as a secret. The API key wins where both are set, and the log of the run says which credential the coach used. With neither secret, the coach is skipped and the log names both. Until now only an API key worked, so on a subscription the digest posted and the coach never ran. ADR-0026 records the decision.
@@ -39,8 +55,6 @@ Released sections are immutable — errata go under a new `[Unreleased]` bullet.
 <!-- category: Fixed -->
 
 <!-- category: Security -->
-
-<!-- END GENERATED: changelog -->
 
 ## [4.0.0] — 2026-11-23
 
